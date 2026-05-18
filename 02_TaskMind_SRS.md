@@ -1,25 +1,29 @@
 # Software Requirements Specification (SRS)
+
 ## TaskMind — Personal Task Automation App for Android
 
-| Field | Value |
-|---|---|
-| **Document Version** | 2.0 |
-| **Date** | May 18, 2026 |
-| **Author** | RJ |
-| **IEEE 830 Compliant** | Yes |
-| **Target Audience** | Kiro Agent (Development) |
-| **Stack** | React Native + Expo (Development Build) |
-| **Build Environment** | GitHub Actions only |
+| Field                  | Value                                   |
+| ---------------------- | --------------------------------------- |
+| **Document Version**   | 2.0                                     |
+| **Date**               | May 18, 2026                            |
+| **Author**             | RJ                                      |
+| **IEEE 830 Compliant** | Yes                                     |
+| **Target Audience**    | Kiro Agent (Development)                |
+| **Stack**              | React Native + Expo (Development Build) |
+| **Build Environment**  | GitHub Actions only                     |
 
 ---
 
 ## 1. Introduction
 
 ### 1.1 Purpose
+
 This document specifies the software requirements for TaskMind, a native Android task automation application built with React Native. It is intended to guide the Kiro development agent in implementing the system. It complements the PRD by providing technical depth: architecture, data models, interfaces, algorithms, native module design, and CI pipeline specifications.
 
 ### 1.2 Scope
+
 The system shall:
+
 - Capture and parse incoming notifications system-wide.
 - Convert detected actionable content into structured tasks.
 - Manage task lifecycle with no defer/snooze affordance.
@@ -28,20 +32,22 @@ The system shall:
 - Build entirely through GitHub Actions without requiring a local development environment.
 
 ### 1.3 Definitions, Acronyms, Abbreviations
-| Term | Meaning |
-|---|---|
-| RN | React Native |
-| JSI | JavaScript Interface (RN New Architecture core) |
-| TurboModule | Native module spec under the New Architecture |
-| Fabric | New Architecture renderer |
-| Headless JS | RN mechanism for running JS code without UI |
-| NLS | NotificationListenerService — Android API |
-| EAS | Expo Application Services |
-| MMKV | Mobile Key-Value storage (replaces AsyncStorage) |
-| ONNX | Open Neural Network Exchange format for ML models |
-| Hinglish | Hindi written in Latin script |
+
+| Term        | Meaning                                           |
+| ----------- | ------------------------------------------------- |
+| RN          | React Native                                      |
+| JSI         | JavaScript Interface (RN New Architecture core)   |
+| TurboModule | Native module spec under the New Architecture     |
+| Fabric      | New Architecture renderer                         |
+| Headless JS | RN mechanism for running JS code without UI       |
+| NLS         | NotificationListenerService — Android API         |
+| EAS         | Expo Application Services                         |
+| MMKV        | Mobile Key-Value storage (replaces AsyncStorage)  |
+| ONNX        | Open Neural Network Exchange format for ML models |
+| Hinglish    | Hindi written in Latin script                     |
 
 ### 1.4 References
+
 - PRD Document v2.0
 - UI/UX Design Specification v2.0
 - CI/CD Pipeline Specification v1.0
@@ -55,13 +61,16 @@ The system shall:
 ## 2. Overall Description
 
 ### 2.1 Product Perspective
+
 TaskMind is a standalone Android application built with React Native using the New Architecture (JSI + Fabric + TurboModules). It depends on no backend service. It interacts with:
+
 - The Android OS via a custom native module (notifications, foreground service).
 - The Android calendar provider via `expo-calendar`.
 - The user's configured SMTP server for outbound email only.
 - A model download endpoint for one-time setup only.
 
 ### 2.2 Product Functions Summary
+
 - F-NL-01: Notification capture (custom native module)
 - F-EX-01: Text-to-task extraction (TypeScript)
 - F-TM-01: Task management
@@ -76,7 +85,9 @@ TaskMind is a standalone Android application built with React Native using the N
 - F-CI-01: CI/CD pipeline (covered in dedicated CI document)
 
 ### 2.3 User Characteristics
+
 Single primary user with:
+
 - MERN stack development background.
 - Bilingual (English/Hindi) communication style.
 - No local Android development environment.
@@ -85,6 +96,7 @@ Single primary user with:
 - Tests builds by downloading APKs from GitHub Actions to phone.
 
 ### 2.4 General Constraints
+
 - **C-1:** All processing on-device after model download.
 - **C-2:** Min SDK = 28, Target SDK = 34+.
 - **C-3:** App must survive device reboot and OEM battery optimization.
@@ -94,6 +106,7 @@ Single primary user with:
 - **C-7:** No local development required — debugging via in-app diagnostics screen and CI logs only.
 
 ### 2.5 Assumptions and Dependencies
+
 - Android NLS API remains stable across target versions.
 - WhatsApp notification format includes sender in `title` field.
 - User has device storage ≥500 MB free.
@@ -104,6 +117,7 @@ Single primary user with:
 ## 3. System Architecture
 
 ### 3.1 Architectural Style
+
 **Layered Architecture** for a React Native app, with strict separation between native, JS service, and presentation layers:
 
 ```
@@ -226,50 +240,52 @@ taskmind/
 
 ### 3.3 Technology Stack
 
-| Layer | Technology | Version |
-|---|---|---|
-| Framework | React Native | 0.85+ |
-| Meta-framework | Expo with Development Build | SDK 55+ |
-| JS Engine | Hermes V1 | (RN default) |
-| Architecture | New Architecture (Fabric + JSI + TurboModules) | Required |
-| Language | TypeScript (strict mode) | 5.3+ |
-| Routing | Expo Router | 4+ |
-| State (UI) | Zustand | 4+ |
-| State (Server-state-like) | TanStack Query (for DB reactivity) | 5+ |
-| Database | expo-sqlite (or react-native-quick-sqlite) | latest |
-| ORM | Drizzle ORM | latest |
-| KV Storage | react-native-mmkv | latest |
-| Encryption | react-native-mmkv encryption + Android Keystore | latest |
-| Notifications (out) | @notifee/react-native | latest |
-| Notifications (in) | Custom Local Expo Module (TurboModule) | n/a |
-| Calendar | expo-calendar | latest |
-| File system | expo-file-system + expo-sharing | latest |
-| Background work | expo-background-fetch + Notifee triggers | latest |
-| Device info | react-native-device-info | latest |
-| Email | react-native-smtp-mailer (or @emailjs/native equivalent) | latest |
-| ML Inference | onnxruntime-react-native | latest |
-| Forms | react-hook-form | latest |
-| Animations | react-native-reanimated 3+ | latest |
-| Gestures | react-native-gesture-handler | latest |
-| Lists | @shopify/flash-list | latest |
-| Testing | Jest + React Native Testing Library | latest |
-| E2E Testing | Detox (post-MVP) | latest |
-| Linting | ESLint + @typescript-eslint + eslint-plugin-react-native | latest |
-| Formatting | Prettier | latest |
-| Build | Gradle 8+ via Expo prebuild | latest |
-| CI | GitHub Actions | n/a |
-| Build orchestration | EAS CLI (local mode in CI) | latest |
+| Layer                     | Technology                                               | Version      |
+| ------------------------- | -------------------------------------------------------- | ------------ |
+| Framework                 | React Native                                             | 0.85+        |
+| Meta-framework            | Expo with Development Build                              | SDK 55+      |
+| JS Engine                 | Hermes V1                                                | (RN default) |
+| Architecture              | New Architecture (Fabric + JSI + TurboModules)           | Required     |
+| Language                  | TypeScript (strict mode)                                 | 5.3+         |
+| Routing                   | Expo Router                                              | 4+           |
+| State (UI)                | Zustand                                                  | 4+           |
+| State (Server-state-like) | TanStack Query (for DB reactivity)                       | 5+           |
+| Database                  | expo-sqlite (or react-native-quick-sqlite)               | latest       |
+| ORM                       | Drizzle ORM                                              | latest       |
+| KV Storage                | react-native-mmkv                                        | latest       |
+| Encryption                | react-native-mmkv encryption + Android Keystore          | latest       |
+| Notifications (out)       | @notifee/react-native                                    | latest       |
+| Notifications (in)        | Custom Local Expo Module (TurboModule)                   | n/a          |
+| Calendar                  | expo-calendar                                            | latest       |
+| File system               | expo-file-system + expo-sharing                          | latest       |
+| Background work           | expo-background-fetch + Notifee triggers                 | latest       |
+| Device info               | react-native-device-info                                 | latest       |
+| Email                     | react-native-smtp-mailer (or @emailjs/native equivalent) | latest       |
+| ML Inference              | onnxruntime-react-native                                 | latest       |
+| Forms                     | react-hook-form                                          | latest       |
+| Animations                | react-native-reanimated 3+                               | latest       |
+| Gestures                  | react-native-gesture-handler                             | latest       |
+| Lists                     | @shopify/flash-list                                      | latest       |
+| Testing                   | Jest + React Native Testing Library                      | latest       |
+| E2E Testing               | Detox (post-MVP)                                         | latest       |
+| Linting                   | ESLint + @typescript-eslint + eslint-plugin-react-native | latest       |
+| Formatting                | Prettier                                                 | latest       |
+| Build                     | Gradle 8+ via Expo prebuild                              | latest       |
+| CI                        | GitHub Actions                                           | n/a          |
+| Build orchestration       | EAS CLI (local mode in CI)                               | latest       |
 
 ### 3.4 Custom Notification Listener Native Module
 
 This is the highest-risk component. No maintained React Native package supports the New Architecture for `NotificationListenerService` access.
 
 #### 3.4.1 Rationale
+
 - `react-native-android-notification-listener` last updated 2+ years ago, pre-New Architecture.
 - Existing alternatives are abandoned or incomplete.
 - The functionality is too central to risk a forked, unmaintained dependency.
 
 #### 3.4.2 Implementation Plan
+
 Build as a **local Expo Module** under `modules/notification-listener/` using the Expo Modules API, which generates a TurboModule-compatible interface.
 
 #### 3.4.3 Module Spec (TypeScript Interface)
@@ -307,7 +323,10 @@ export interface NotificationListenerModule {
   hidePersistentNotification(): Promise<void>;
 
   // Events
-  addListener(eventName: 'onNotification' | 'onQuickAction', listener: (data: any) => void): EventSubscription;
+  addListener(
+    eventName: 'onNotification' | 'onQuickAction',
+    listener: (data: any) => void
+  ): EventSubscription;
 }
 ```
 
@@ -326,6 +345,7 @@ export interface NotificationListenerModule {
 #### 3.4.5 Headless JS Bridge
 
 When a notification arrives:
+
 1. Native service captures notification.
 2. Filters against monitored apps in native code.
 3. If allowed, registers a Headless JS task with serialized notification data.
@@ -354,6 +374,7 @@ Headless JS alone is unreliable on aggressive OEMs. The foreground service we al
 **FR-NL-01:** The system shall implement a custom Expo Module wrapping Android's `NotificationListenerService` that intercepts every `StatusBarNotification`.
 
 **FR-NL-02:** The system shall extract these fields:
+
 - `packageName: string`
 - `appName: string` (resolved via PackageManager)
 - `title: string` (from `EXTRA_TITLE`)
@@ -396,6 +417,7 @@ Stage 7: ConfidenceAggregator → FinalDecision
 **FR-EX-05:** **Rule Engine** — match preprocessed text against seed + learned vocabularies. Case-insensitive, word-boundary aware for Latin, substring for Devanagari.
 
 **FR-EX-06:** **Rule Engine Confidence:**
+
 ```
 score = 0.0
 + 0.40 if IMPERATIVE matched
@@ -411,12 +433,15 @@ score = clamp(score, 0.0, 1.0)
 **FR-EX-07:** **Model Inference** — when ONNX model loaded, tokenize and run inference with 500ms timeout via `onnxruntime-react-native`. Fall back to rule-only if unavailable.
 
 **FR-EX-08:** **Combined Score:**
+
 ```
 final_confidence = (rule_score * w_rule) + (model_confidence * w_model)
 ```
+
 Weights default 0.5/0.5, configurable in advanced settings.
 
 **FR-EX-09:** **Decision Thresholds:**
+
 - `final ≥ 0.75` → auto-create (`needsConfirmation = false`)
 - `0.40 ≤ final < 0.75` → create with `needsConfirmation = true`
 - `final < 0.40` → discard, log to `discarded_log`
@@ -429,6 +454,7 @@ Weights default 0.5/0.5, configurable in advanced settings.
 **FR-TM-01:** Tasks persisted in Drizzle-managed SQLite with the entity defined in Section 5.1.
 
 **FR-TM-02:** TaskRepository shall expose:
+
 - `createTask(input: CreateTaskInput): Promise<Task>`
 - `updateTask(id: string, patch: Partial<Task>): Promise<Task>`
 - `completeTask(id: string): Promise<void>`
@@ -446,6 +472,7 @@ Weights default 0.5/0.5, configurable in advanced settings.
 **FR-PR-01:** Priority enum: `URGENT | HIGH | MEDIUM | LOW`.
 
 **FR-PR-02:** Priority assignment rules (first match wins):
+
 1. Sender in `vip_contacts` → `URGENT`
 2. URGENCY keyword with `critical` flag → `URGENT`
 3. URGENCY + DEADLINE → `HIGH`
@@ -460,6 +487,7 @@ Weights default 0.5/0.5, configurable in advanced settings.
 **FR-NT-01:** Exactly one persistent notification shall exist while ≥1 pending task exists. Implemented via the custom native module's foreground service, NOT via Notifee, because Notifee cannot create truly non-dismissible notifications.
 
 Notification properties:
+
 - Channel: `persistent_status`, importance LOW (silent)
 - Flags: `FLAG_ONGOING_EVENT | FLAG_NO_CLEAR`
 - Title: "TaskMind"
@@ -468,6 +496,7 @@ Notification properties:
 - Actions: "Open" and "Done Top"
 
 **FR-NT-02:** Nudge notifications scheduled via Notifee triggers:
+
 - Frequency from settings
 - Suppressed during quiet hours unless URGENT override active
 - Per-priority frequency override supported
@@ -484,6 +513,7 @@ Notification properties:
 ### 4.6 Confirmation Flow
 
 **FR-CF-01:** Tasks with `needsConfirmation=true` trigger a heads-up notification:
+
 - Title: "Possible task from {sender}"
 - Text: extracted task text
 - Actions: "Yes, Add" / "No, Discard" / "Open"
@@ -499,6 +529,7 @@ Notification properties:
 **FR-CL-01:** "Add to Calendar" action available on every task in detail view.
 
 **FR-CL-02:** Implementation via `expo-calendar`:
+
 - Request `WRITE_CALENDAR` permission at point of use
 - Use `Calendar.createEventAsync()` to insert
 - Pre-fill: title = task.text, notes = source context
@@ -512,6 +543,7 @@ Notification properties:
 **FR-TR-01:** Transcript screen accepts text input up to 50,000 characters.
 
 **FR-TR-02:** On submit:
+
 - Segment by sentence boundaries (`.`, `!`, `?`, `।`, `\n`)
 - Filter segments < 10 chars
 - Run extraction pipeline with threshold 0.55 (higher than notifications)
@@ -534,11 +566,13 @@ Notification properties:
 ### 4.10 Email Reporting
 
 **FR-EM-01:** SMTP credentials stored in encrypted MMKV instance (using Android Keystore):
+
 - `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `recipient_email`, `use_tls`
 
 **FR-EM-02:** Daily WorkManager-backed job at user-configured time sends report. Retries 3x with exponential backoff on failure.
 
 **FR-EM-03:** Email report (HTML + plain text fallback):
+
 - Subject: `TaskMind Daily Report — {yyyy-MM-dd}`
 - Summary: Created today, Completed today, Deleted today, Pending by priority
 - Completed today: list with priority, text, source, completion time
@@ -549,12 +583,14 @@ Notification properties:
 ### 4.11 Learning Subsystem
 
 **FR-LR-01:** Per-sender stats tracked in `sender_stats`:
+
 - Increment `tasks_created` on every task created
 - Increment `tasks_confirmed` on user confirm or completion
 - Increment `tasks_deleted` on delete within 5 min of creation
 - Increment `tasks_completed` on completion
 
 **FR-LR-02:** Sender reputation adjustment:
+
 ```
 confirm_rate = tasks_confirmed / max(tasks_created, 1)
 if tasks_created >= 5:
@@ -563,6 +599,7 @@ if tasks_created >= 5:
 ```
 
 **FR-LR-03:** N-gram extraction from confirmed tasks:
+
 - 1-grams, 2-grams, 3-grams from `rawSourceText`
 - Filter stopwords and seed keywords
 - Insert/increment in `learned_keywords` with status `PENDING`
@@ -580,13 +617,14 @@ if tasks_created >= 5:
 ### 5.1 Database Schema (Drizzle ORM + SQLite)
 
 #### Table: `tasks`
+
 ```typescript
 export const tasks = sqliteTable('tasks', {
-  id: text('id').primaryKey(),                    // UUID
+  id: text('id').primaryKey(), // UUID
   text: text('text').notNull(),
   rawSourceText: text('raw_source_text').notNull(),
-  priority: text('priority').notNull(),           // URGENT | HIGH | MEDIUM | LOW
-  status: text('status').notNull(),               // PENDING | COMPLETED | DELETED
+  priority: text('priority').notNull(), // URGENT | HIGH | MEDIUM | LOW
+  status: text('status').notNull(), // PENDING | COMPLETED | DELETED
   sourceApp: text('source_app').notNull(),
   sourceAppDisplay: text('source_app_display').notNull(),
   sender: text('sender'),
@@ -594,13 +632,13 @@ export const tasks = sqliteTable('tasks', {
   completedAt: integer('completed_at'),
   deletedAt: integer('deleted_at'),
   dueAt: integer('due_at'),
-  triggerKeywords: text('trigger_keywords').notNull(),  // JSON
+  triggerKeywords: text('trigger_keywords').notNull(), // JSON
   confidence: real('confidence').notNull(),
   ruleScore: real('rule_score').notNull(),
   modelScore: real('model_score'),
   needsConfirmation: integer('needs_confirmation', { mode: 'boolean' }).notNull(),
   calendarEventId: text('calendar_event_id'),
-  language: text('language').notNull()
+  language: text('language').notNull(),
 });
 
 // Indexes
@@ -610,82 +648,97 @@ export const tasksPriorityIdx = index('idx_tasks_priority').on(tasks.priority);
 ```
 
 #### Table: `vip_contacts`
+
 ```typescript
 export const vipContacts = sqliteTable('vip_contacts', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
-  createdAt: integer('created_at').notNull()
+  createdAt: integer('created_at').notNull(),
 });
 ```
 
 #### Table: `monitored_apps`
+
 ```typescript
 export const monitoredApps = sqliteTable('monitored_apps', {
   packageName: text('package_name').primaryKey(),
   displayName: text('display_name').notNull(),
   enabled: integer('enabled', { mode: 'boolean' }).notNull(),
-  addedAt: integer('added_at').notNull()
+  addedAt: integer('added_at').notNull(),
 });
 ```
 
 #### Table: `seed_keywords`
+
 ```typescript
 export const seedKeywords = sqliteTable('seed_keywords', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   phrase: text('phrase').notNull(),
-  category: text('category').notNull(),  // IMPERATIVE | URGENCY | DEADLINE | REQUEST | ANTI_PATTERN | DOMAIN
+  category: text('category').notNull(), // IMPERATIVE | URGENCY | DEADLINE | REQUEST | ANTI_PATTERN | DOMAIN
   language: text('language').notNull(),
-  weight: real('weight').notNull().default(1.0)
+  weight: real('weight').notNull().default(1.0),
 });
 ```
 
 #### Table: `learned_keywords`
+
 ```typescript
-export const learnedKeywords = sqliteTable('learned_keywords', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  phrase: text('phrase').notNull(),
-  category: text('category').notNull(),
-  language: text('language').notNull(),
-  frequency: integer('frequency').notNull().default(0),
-  weight: real('weight').notNull().default(0.5),
-  confirmCount: integer('confirm_count').notNull().default(0),
-  deleteCount: integer('delete_count').notNull().default(0),
-  status: text('status').notNull(),  // PENDING | ACTIVE | DEMOTED
-  firstSeen: integer('first_seen').notNull(),
-  lastUsed: integer('last_used').notNull()
-}, (table) => ({
-  uniqueIdx: uniqueIndex('idx_phrase_lang').on(table.phrase, table.language)
-}));
+export const learnedKeywords = sqliteTable(
+  'learned_keywords',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    phrase: text('phrase').notNull(),
+    category: text('category').notNull(),
+    language: text('language').notNull(),
+    frequency: integer('frequency').notNull().default(0),
+    weight: real('weight').notNull().default(0.5),
+    confirmCount: integer('confirm_count').notNull().default(0),
+    deleteCount: integer('delete_count').notNull().default(0),
+    status: text('status').notNull(), // PENDING | ACTIVE | DEMOTED
+    firstSeen: integer('first_seen').notNull(),
+    lastUsed: integer('last_used').notNull(),
+  },
+  (table) => ({
+    uniqueIdx: uniqueIndex('idx_phrase_lang').on(table.phrase, table.language),
+  })
+);
 ```
 
 #### Table: `sender_stats`
+
 ```typescript
-export const senderStats = sqliteTable('sender_stats', {
-  senderName: text('sender_name').notNull(),
-  sourceApp: text('source_app').notNull(),
-  tasksCreated: integer('tasks_created').notNull().default(0),
-  tasksConfirmed: integer('tasks_confirmed').notNull().default(0),
-  tasksDeleted: integer('tasks_deleted').notNull().default(0),
-  tasksCompleted: integer('tasks_completed').notNull().default(0),
-  firstSeen: integer('first_seen').notNull(),
-  lastSeen: integer('last_seen').notNull()
-}, (table) => ({
-  pk: primaryKey({ columns: [table.senderName, table.sourceApp] })
-}));
+export const senderStats = sqliteTable(
+  'sender_stats',
+  {
+    senderName: text('sender_name').notNull(),
+    sourceApp: text('source_app').notNull(),
+    tasksCreated: integer('tasks_created').notNull().default(0),
+    tasksConfirmed: integer('tasks_confirmed').notNull().default(0),
+    tasksDeleted: integer('tasks_deleted').notNull().default(0),
+    tasksCompleted: integer('tasks_completed').notNull().default(0),
+    firstSeen: integer('first_seen').notNull(),
+    lastSeen: integer('last_seen').notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.senderName, table.sourceApp] }),
+  })
+);
 ```
 
 #### Table: `training_log`
+
 ```typescript
 export const trainingLog = sqliteTable('training_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   text: text('text').notNull(),
-  label: text('label').notNull(),    // TASK | NOT_TASK
-  source: text('source').notNull(),  // user_confirm | user_delete | user_complete
-  timestamp: integer('timestamp').notNull()
+  label: text('label').notNull(), // TASK | NOT_TASK
+  source: text('source').notNull(), // user_confirm | user_delete | user_complete
+  timestamp: integer('timestamp').notNull(),
 });
 ```
 
 #### Table: `discarded_log`
+
 ```typescript
 export const discardedLog = sqliteTable('discarded_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -693,8 +746,8 @@ export const discardedLog = sqliteTable('discarded_log', {
   sourceApp: text('source_app').notNull(),
   sender: text('sender'),
   confidence: real('confidence').notNull(),
-  reason: text('reason').notNull(),  // LOW_CONFIDENCE | ANTI_PATTERN | TOO_SHORT
-  timestamp: integer('timestamp').notNull()
+  reason: text('reason').notNull(), // LOW_CONFIDENCE | ANTI_PATTERN | TOO_SHORT
+  timestamp: integer('timestamp').notNull(),
 });
 // Capped at 500 rows via scheduled cleanup
 ```
@@ -726,6 +779,7 @@ Two MMKV instances:
 | `language` | string | "en" |
 
 **`secrets` (encrypted via Android Keystore):**
+
 - `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_recipient`, `smtp_use_tls`
 
 ---
@@ -733,9 +787,11 @@ Two MMKV instances:
 ## 6. External Interface Requirements
 
 ### 6.1 User Interfaces
+
 Specified in separate UI/UX Design Specification document.
 
 ### 6.2 Hardware Interfaces
+
 - Microphone: NOT used.
 - Camera: NOT used.
 - Storage: read/write to Scoped Storage via expo-file-system.
@@ -743,6 +799,7 @@ Specified in separate UI/UX Design Specification document.
 ### 6.3 Software Interfaces
 
 #### 6.3.1 Android System APIs (via native module)
+
 - `NotificationListenerService`
 - `NotificationManager` + `NotificationChannel`
 - `Service` (foreground)
@@ -751,16 +808,19 @@ Specified in separate UI/UX Design Specification document.
 - `BroadcastReceiver` (BOOT_COMPLETED)
 
 #### 6.3.2 SMTP Server Interface
+
 - SMTP over TLS (port 587 or 465)
 - PLAIN/LOGIN authentication
 - Outbound only
 
 #### 6.3.3 Model Download Interface
+
 - HTTPS GET to user-configured URL OR hardcoded GitHub Releases asset
 - One-time during onboarding
 - SHA-256 verification
 
 ### 6.4 Communications Interfaces
+
 - HTTPS for model download and SMTP send only
 - No other outbound network calls
 - No inbound network listeners
@@ -771,80 +831,80 @@ Specified in separate UI/UX Design Specification document.
 
 ### 7.1 Performance Requirements
 
-| ID | Requirement | Target |
-|---|---|---|
-| NFR-PF-01 | End-to-end notification → task creation | <3000 ms (p95) |
-| NFR-PF-02 | ML inference latency | <500 ms (p95) |
-| NFR-PF-03 | App cold start (JS bundle) | <2500 ms |
-| NFR-PF-04 | Task list scroll (FlashList, 1000+ tasks) | 60 fps |
-| NFR-PF-05 | Battery drain | <4% per day with typical usage |
-| NFR-PF-06 | RAM footprint | <200 MB resident |
-| NFR-PF-07 | JS bundle size (Hermes bytecode) | <8 MB |
+| ID        | Requirement                               | Target                         |
+| --------- | ----------------------------------------- | ------------------------------ |
+| NFR-PF-01 | End-to-end notification → task creation   | <3000 ms (p95)                 |
+| NFR-PF-02 | ML inference latency                      | <500 ms (p95)                  |
+| NFR-PF-03 | App cold start (JS bundle)                | <2500 ms                       |
+| NFR-PF-04 | Task list scroll (FlashList, 1000+ tasks) | 60 fps                         |
+| NFR-PF-05 | Battery drain                             | <4% per day with typical usage |
+| NFR-PF-06 | RAM footprint                             | <200 MB resident               |
+| NFR-PF-07 | JS bundle size (Hermes bytecode)          | <8 MB                          |
 
 ### 7.2 Reliability Requirements
 
-| ID | Requirement |
-|---|---|
-| NFR-RL-01 | App crash rate <1 per 1000 sessions |
+| ID        | Requirement                                            |
+| --------- | ------------------------------------------------------ |
+| NFR-RL-01 | App crash rate <1 per 1000 sessions                    |
 | NFR-RL-02 | Foreground service auto-restart within 30s of OEM kill |
-| NFR-RL-03 | DB writes via transactions; no partial writes |
-| NFR-RL-04 | Failed email sends retry 3x with exponential backoff |
-| NFR-RL-05 | Notification dedup prevents ≥99% of duplicates |
-| NFR-RL-06 | CI build success rate ≥95% on main branch |
+| NFR-RL-03 | DB writes via transactions; no partial writes          |
+| NFR-RL-04 | Failed email sends retry 3x with exponential backoff   |
+| NFR-RL-05 | Notification dedup prevents ≥99% of duplicates         |
+| NFR-RL-06 | CI build success rate ≥95% on main branch              |
 
 ### 7.3 Security Requirements
 
-| ID | Requirement |
-|---|---|
-| NFR-SC-01 | SMTP credentials only in encrypted MMKV |
-| NFR-SC-02 | Database protected by Android app sandbox |
-| NFR-SC-03 | No third-party SDK with network I/O without user consent |
-| NFR-SC-04 | Exported files exclude SMTP credentials |
-| NFR-SC-05 | Permissions requested at point of use with rationale dialogs |
+| ID        | Requirement                                                     |
+| --------- | --------------------------------------------------------------- |
+| NFR-SC-01 | SMTP credentials only in encrypted MMKV                         |
+| NFR-SC-02 | Database protected by Android app sandbox                       |
+| NFR-SC-03 | No third-party SDK with network I/O without user consent        |
+| NFR-SC-04 | Exported files exclude SMTP credentials                         |
+| NFR-SC-05 | Permissions requested at point of use with rationale dialogs    |
 | NFR-SC-06 | Release keystore stored only in GitHub secrets, never committed |
-| NFR-SC-07 | Hermes bytecode + ProGuard for release builds |
+| NFR-SC-07 | Hermes bytecode + ProGuard for release builds                   |
 
 ### 7.4 Maintainability Requirements
 
-| ID | Requirement |
-|---|---|
+| ID        | Requirement                                                        |
+| --------- | ------------------------------------------------------------------ |
 | NFR-MN-01 | Code coverage ≥70% on `src/domain/` and `src/services/extraction/` |
-| NFR-MN-02 | All public APIs in domain layer have TSDoc |
-| NFR-MN-03 | Cyclomatic complexity per function ≤15 |
-| NFR-MN-04 | No function >60 lines (excluding tests) |
-| NFR-MN-05 | ESLint + Prettier + TypeScript strict mode enforced in CI |
-| NFR-MN-06 | TypeScript strict mode enabled (`strict: true` in tsconfig) |
+| NFR-MN-02 | All public APIs in domain layer have TSDoc                         |
+| NFR-MN-03 | Cyclomatic complexity per function ≤15                             |
+| NFR-MN-04 | No function >60 lines (excluding tests)                            |
+| NFR-MN-05 | ESLint + Prettier + TypeScript strict mode enforced in CI          |
+| NFR-MN-06 | TypeScript strict mode enabled (`strict: true` in tsconfig)        |
 
 ### 7.5 Portability Requirements
 
-| ID | Requirement |
-|---|---|
-| NFR-PT-01 | Support Android 9 (API 28) through latest stable |
+| ID        | Requirement                                                        |
+| --------- | ------------------------------------------------------------------ |
+| NFR-PT-01 | Support Android 9 (API 28) through latest stable                   |
 | NFR-PT-02 | Tested on at least one Xiaomi/Redmi, one Samsung, one Pixel device |
-| NFR-PT-03 | UI adapts to screen sizes 5"–7" without breakage |
-| NFR-PT-04 | Support light and dark theme |
+| NFR-PT-03 | UI adapts to screen sizes 5"–7" without breakage                   |
+| NFR-PT-04 | Support light and dark theme                                       |
 | NFR-PT-05 | Support portrait orientation; landscape acceptable on tablets only |
 
 ### 7.6 Usability Requirements
 
-| ID | Requirement |
-|---|---|
-| NFR-US-01 | Onboarding completable in <3 minutes |
+| ID        | Requirement                                                |
+| --------- | ---------------------------------------------------------- |
+| NFR-US-01 | Onboarding completable in <3 minutes                       |
 | NFR-US-02 | Common task actions reachable in ≤2 taps from notification |
-| NFR-US-03 | All interactive elements ≥48dp touch target |
-| NFR-US-04 | Color contrast ≥4.5:1 for body text (WCAG AA) |
-| NFR-US-05 | Support font scaling up to 200% |
+| NFR-US-03 | All interactive elements ≥48dp touch target                |
+| NFR-US-04 | Color contrast ≥4.5:1 for body text (WCAG AA)              |
+| NFR-US-05 | Support font scaling up to 200%                            |
 
 ### 7.7 Build Pipeline Requirements
 
-| ID | Requirement |
-|---|---|
-| NFR-CI-01 | Full CI run (lint + tests + APK build) completes in <25 min |
-| NFR-CI-02 | Debug APK available as artifact on every push to any branch |
+| ID        | Requirement                                                         |
+| --------- | ------------------------------------------------------------------- |
+| NFR-CI-01 | Full CI run (lint + tests + APK build) completes in <25 min         |
+| NFR-CI-02 | Debug APK available as artifact on every push to any branch         |
 | NFR-CI-03 | Release APK signed and attached to GitHub Release on every `v*` tag |
-| NFR-CI-04 | Cache hit rate for node_modules + Gradle ≥70% across runs |
+| NFR-CI-04 | Cache hit rate for node_modules + Gradle ≥70% across runs           |
 | NFR-CI-05 | Workflow logs include device-test instructions and APK download URL |
-| NFR-CI-06 | No CI step requires manual approval (except production releases) |
+| NFR-CI-06 | No CI step requires manual approval (except production releases)    |
 
 ---
 
@@ -852,54 +912,57 @@ Specified in separate UI/UX Design Specification document.
 
 ### 8.1 Testing Strategy
 
-| Test Type | Tool | Coverage |
-|---|---|---|
-| Unit Tests | Jest | Domain use cases, extraction pipeline stages, repositories with mocks |
-| Component Tests | React Native Testing Library | Critical screens |
-| Integration Tests | Jest + in-memory DB | Database operations, settings persistence |
-| E2E Tests | Detox (post-MVP) | Critical flows on emulator in CI |
-| Manual Tests | Real device | OEM-specific behavior, real WhatsApp, email delivery |
-| CI Smoke Test | curl + adb in workflow | APK installs without errors on emulator |
+| Test Type         | Tool                         | Coverage                                                              |
+| ----------------- | ---------------------------- | --------------------------------------------------------------------- |
+| Unit Tests        | Jest                         | Domain use cases, extraction pipeline stages, repositories with mocks |
+| Component Tests   | React Native Testing Library | Critical screens                                                      |
+| Integration Tests | Jest + in-memory DB          | Database operations, settings persistence                             |
+| E2E Tests         | Detox (post-MVP)             | Critical flows on emulator in CI                                      |
+| Manual Tests      | Real device                  | OEM-specific behavior, real WhatsApp, email delivery                  |
+| CI Smoke Test     | curl + adb in workflow       | APK installs without errors on emulator                               |
 
 ### 8.2 Test Data
+
 - 500+ labeled notification samples across English/Hindi/Hinglish (committed as JSON corpus).
 - Edge cases: emoji-only, all-caps, mixed scripts, very long, very short.
 - Negative samples: greetings, status confirmations, casual chat.
 
 ### 8.3 Acceptance Test Scenarios
 
-| TC ID | Scenario | Expected Result |
-|---|---|---|
-| AT-01 | Install APK from GitHub Actions, complete onboarding | Lands on empty home screen |
-| AT-02 | WhatsApp "kal tak report bhej dena" from VIP | URGENT task created, persistent notif updates |
-| AT-03 | Receive "lol thanks" | Discarded, logged |
-| AT-04 | Ambiguous "anyone has the file?" | Task with needsConfirmation, prompt shown |
-| AT-05 | Complete a task | Moves to history with timestamp |
-| AT-06 | Delete within 5 minutes | Sender stats deletion counter increments |
-| AT-07 | Paste 30-min transcript | Reviewable extracted list |
-| AT-08 | Export all as CSV | File created, sharable via system share sheet |
-| AT-09 | Import previously exported CSV | Tasks restored, duplicates skipped |
-| AT-10 | 9 PM with active config | Email report received with correct data |
-| AT-11 | Add task to calendar | Calendar event created |
-| AT-12 | Reboot device | Foreground service restarts, persistent notif reappears |
-| AT-13 | Toggle airplane mode | All core features work; email/model download disabled |
-| AT-14 | Confirm 50 tasks | Learned vocabulary screen shows ≥5 new phrases |
-| AT-15 | Set nudge 30 min, quiet 10 PM–7 AM | Nudges fire correctly outside quiet hours |
-| AT-CI-01 | Push to feature branch | CI runs lint, tests, builds debug APK as artifact |
-| AT-CI-02 | Tag `v1.0.0` | GitHub Release created with signed APK attached |
-| AT-CI-03 | Lint failure | CI fails, blocks merge |
-| AT-CI-04 | Unit test failure | CI fails, blocks merge |
+| TC ID    | Scenario                                             | Expected Result                                         |
+| -------- | ---------------------------------------------------- | ------------------------------------------------------- |
+| AT-01    | Install APK from GitHub Actions, complete onboarding | Lands on empty home screen                              |
+| AT-02    | WhatsApp "kal tak report bhej dena" from VIP         | URGENT task created, persistent notif updates           |
+| AT-03    | Receive "lol thanks"                                 | Discarded, logged                                       |
+| AT-04    | Ambiguous "anyone has the file?"                     | Task with needsConfirmation, prompt shown               |
+| AT-05    | Complete a task                                      | Moves to history with timestamp                         |
+| AT-06    | Delete within 5 minutes                              | Sender stats deletion counter increments                |
+| AT-07    | Paste 30-min transcript                              | Reviewable extracted list                               |
+| AT-08    | Export all as CSV                                    | File created, sharable via system share sheet           |
+| AT-09    | Import previously exported CSV                       | Tasks restored, duplicates skipped                      |
+| AT-10    | 9 PM with active config                              | Email report received with correct data                 |
+| AT-11    | Add task to calendar                                 | Calendar event created                                  |
+| AT-12    | Reboot device                                        | Foreground service restarts, persistent notif reappears |
+| AT-13    | Toggle airplane mode                                 | All core features work; email/model download disabled   |
+| AT-14    | Confirm 50 tasks                                     | Learned vocabulary screen shows ≥5 new phrases          |
+| AT-15    | Set nudge 30 min, quiet 10 PM–7 AM                   | Nudges fire correctly outside quiet hours               |
+| AT-CI-01 | Push to feature branch                               | CI runs lint, tests, builds debug APK as artifact       |
+| AT-CI-02 | Tag `v1.0.0`                                         | GitHub Release created with signed APK attached         |
+| AT-CI-03 | Lint failure                                         | CI fails, blocks merge                                  |
+| AT-CI-04 | Unit test failure                                    | CI fails, blocks merge                                  |
 
 ---
 
 ## 9. Appendices
 
 ### 9.1 Seed Keyword Reference
+
 See PRD Section 4.2 of v1.0 spec, also attached as `assets/seed-keywords.json`.
 
 ### 9.2 State Diagrams
 
 #### Task Lifecycle
+
 ```
 [CREATED] --(needsConfirmation)--> [AWAITING_CONFIRMATION]
 [CREATED] --(autoCreate)--> [PENDING]
@@ -911,6 +974,7 @@ See PRD Section 4.2 of v1.0 spec, also attached as `assets/seed-keywords.json`.
 ```
 
 #### Process Lifecycle
+
 ```
 [INSTALLED] --(first launch)--> [ONBOARDING]
 [ONBOARDING] --(permissions granted)--> [SERVICE_STARTING]
@@ -922,6 +986,7 @@ See PRD Section 4.2 of v1.0 spec, also attached as `assets/seed-keywords.json`.
 ```
 
 ### 9.3 Glossary
+
 - **Hard delete:** Permanent removal from DB.
 - **Soft delete:** Status set to DELETED, row retained.
 - **VIP:** Sender always producing URGENT tasks.
@@ -931,6 +996,7 @@ See PRD Section 4.2 of v1.0 spec, also attached as `assets/seed-keywords.json`.
 - **TurboModule:** New Architecture native module spec.
 
 ### 9.4 Document Conventions
+
 - Requirement IDs: `FR-{module}-{nn}` and `NFR-{category}-{nn}`.
 - "Shall" = mandatory.
 - "Should" = recommended.

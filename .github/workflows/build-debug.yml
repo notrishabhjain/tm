@@ -1,0 +1,121 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+concurrency:
+  group: build-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.tool-versions'
+          cache: 'npm'
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Download fonts
+        run: |
+          FONT_DIR=assets/fonts
+          BASE="https://github.com/rsms/inter/releases/download/v4.0"
+          curl -fsSL "$BASE/Inter-4.0.zip" -o /tmp/inter.zip
+          unzip -j /tmp/inter.zip "*/Inter-Regular.ttf" "*/Inter-Medium.ttf" "*/Inter-SemiBold.ttf" "*/Inter-Bold.ttf" -d "$FONT_DIR" || true
+          JB_BASE="https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304"
+          curl -fsSL "$JB_BASE/JetBrainsMono-2.304.zip" -o /tmp/jb.zip
+          unzip -j /tmp/jb.zip "*/JetBrainsMono-Regular.ttf" -d "$FONT_DIR" || true
+          NOTO_BASE="https://github.com/google/fonts/raw/main/ofl/notosansdevanagari"
+          curl -fsSL "$NOTO_BASE/NotoSansDevanagari%5Bwdth%2Cwght%5D.ttf" -o "$FONT_DIR/NotoSansDevanagari-Regular.ttf" || true
+          cp "$FONT_DIR/NotoSansDevanagari-Regular.ttf" "$FONT_DIR/NotoSansDevanagari-Medium.ttf" 2>/dev/null || true
+          ls -la "$FONT_DIR/"
+
+      - name: Generate version info
+        id: version
+        run: |
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "branch=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')" >> $GITHUB_OUTPUT
+          echo "build_time=$(date -u +%Y%m%d-%H%M)" >> $GITHUB_OUTPUT
+
+      - name: Build debug APK
+        env:
+          EXPO_PUBLIC_COMMIT_SHA: ${{ steps.version.outputs.short_sha }}
+        run: |
+          eas build \
+            --platform android \
+            --profile development \
+            --local \
+            --non-interactive \
+            --output ./taskmind-debug.apk
+
+      - name: Rename APK with metadata
+        run: |
+          mv ./taskmind-debug.apk \
+             "./taskmind-debug-${{ steps.version.outputs.branch }}-${{ steps.version.outputs.short_sha }}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'taskmind-debug-${{ steps.version.outputs.branch }}-${{ steps.version.outputs.short_sha }}'
+          path: ./taskmind-debug-*.apk
+          retention-days: 30
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs-${{ github.run_id }}
+          path: |
+            android/app/build/reports/
+            /tmp/eas-build-*.log
+          retention-days: 7
+
+      - name: Write step summary
+        run: |
+          echo "## Debug APK Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ steps.version.outputs.branch }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ steps.version.outputs.short_sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Built:** \`${{ steps.version.outputs.build_time }} UTC\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### How to install on your Android device:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Scroll down to the **Artifacts** section on this page" >> $GITHUB_STEP_SUMMARY
+          echo "2. Tap the artifact name to download the ZIP" >> $GITHUB_STEP_SUMMARY
+          echo "3. Extract the APK from the ZIP" >> $GITHUB_STEP_SUMMARY
+          echo "4. Open the APK to install (allow 'Install from Unknown Sources' if prompted)" >> $GITHUB_STEP_SUMMARY
+          echo "5. Open TaskMind and complete onboarding" >> $GITHUB_STEP_SUMMARY

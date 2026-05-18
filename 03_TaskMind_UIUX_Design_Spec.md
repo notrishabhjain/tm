@@ -1,13 +1,14 @@
 # UI/UX Design Specification
+
 ## TaskMind — Personal Task Automation App for Android
 
-| Field | Value |
-|---|---|
-| **Document Version** | 2.0 |
-| **Date** | May 18, 2026 |
-| **Author** | RJ |
-| **Target Tool** | Google Stitch |
-| **Implementation** | React Native + Expo (Native Android) |
+| Field                | Value                                |
+| -------------------- | ------------------------------------ |
+| **Document Version** | 2.0                                  |
+| **Date**             | May 18, 2026                         |
+| **Author**           | RJ                                   |
+| **Target Tool**      | Google Stitch                        |
+| **Implementation**   | React Native + Expo (Native Android) |
 
 ---
 
@@ -34,6 +35,7 @@ Nowhere in the interface shall there be a "Later", "Remind Me", "Snooze", or "Po
 Despite the cross-platform framework underneath, the app must feel native to Android. Use Material 3 patterns. Respect Android navigation conventions. No iOS-isms.
 
 ### 1.2 Design Tone Keywords
+
 Focused • Intentional • Crisp • Confident • Bilingual-Native • Slightly Industrial
 
 ---
@@ -43,67 +45,75 @@ Focused • Intentional • Crisp • Confident • Bilingual-Native • Slightl
 ### 2.1 Color Palette
 
 #### Primary (Brand)
-| Token | Hex | Usage |
-|---|---|---|
+
+| Token         | Hex     | Usage                              |
+| ------------- | ------- | ---------------------------------- |
 | `primary-900` | #0A2540 | Headers, top-bar background (dark) |
-| `primary-700` | #1E3A5F | Surface accent, active nav (dark) |
-| `primary-500` | #2E5B8E | Primary buttons, links |
-| `primary-300` | #6B8FBF | Disabled states, supporting |
-| `primary-100` | #D5E2F2 | Backgrounds, chip fills |
-| `primary-50` | #F2F6FB | Page background (light) |
+| `primary-700` | #1E3A5F | Surface accent, active nav (dark)  |
+| `primary-500` | #2E5B8E | Primary buttons, links             |
+| `primary-300` | #6B8FBF | Disabled states, supporting        |
+| `primary-100` | #D5E2F2 | Backgrounds, chip fills            |
+| `primary-50`  | #F2F6FB | Page background (light)            |
 
 #### Priority Semantic Colors
+
 These are non-negotiable. Each priority has a fixed color used consistently across all screens.
 
-| Priority | Color | Hex | Light BG | Dark BG |
-|---|---|---|---|---|
-| **URGENT** | Crimson Red | #D62828 | #FCE5E5 | #4A1010 |
-| **HIGH** | Amber Orange | #E76F00 | #FDEBD3 | #4A2810 |
-| **MEDIUM** | Steel Blue | #2E5B8E | #D5E2F2 | #1A2F4A |
-| **LOW** | Slate Gray | #6B7785 | #E8EBEE | #2A3138 |
+| Priority   | Color        | Hex     | Light BG | Dark BG |
+| ---------- | ------------ | ------- | -------- | ------- |
+| **URGENT** | Crimson Red  | #D62828 | #FCE5E5  | #4A1010 |
+| **HIGH**   | Amber Orange | #E76F00 | #FDEBD3  | #4A2810 |
+| **MEDIUM** | Steel Blue   | #2E5B8E | #D5E2F2  | #1A2F4A |
+| **LOW**    | Slate Gray   | #6B7785 | #E8EBEE  | #2A3138 |
 
 #### Neutral / Surface
-| Token | Hex (Light) | Hex (Dark) |
-|---|---|---|
-| `surface` | #FFFFFF | #121417 |
-| `surface-variant` | #F4F6F8 | #1A1D21 |
-| `outline` | #D6DAE0 | #2E3338 |
-| `on-surface` | #1A1D21 | #ECEEF1 |
-| `on-surface-variant` | #4A5159 | #A8B0B9 |
+
+| Token                | Hex (Light) | Hex (Dark) |
+| -------------------- | ----------- | ---------- |
+| `surface`            | #FFFFFF     | #121417    |
+| `surface-variant`    | #F4F6F8     | #1A1D21    |
+| `outline`            | #D6DAE0     | #2E3338    |
+| `on-surface`         | #1A1D21     | #ECEEF1    |
+| `on-surface-variant` | #4A5159     | #A8B0B9    |
 
 #### Status / Feedback
-| Token | Hex |
-|---|---|
+
+| Token     | Hex     |
+| --------- | ------- |
 | `success` | #2E8540 |
 | `warning` | #E76F00 |
-| `error` | #D62828 |
-| `info` | #2E5B8E |
+| `error`   | #D62828 |
+| `info`    | #2E5B8E |
 
 ### 2.2 Typography
 
 #### Font Family
+
 - **Primary:** Inter (English) — weights 400, 500, 600, 700. Load via `expo-font`.
 - **Devanagari:** Noto Sans Devanagari — must match Inter's optical weight.
 - **Monospace:** JetBrains Mono — for raw source text in detail view.
 
 #### Type Scale
-| Token | Size (px in RN) | Weight | Line Height | Usage |
-|---|---|---|---|---|
-| `display-lg` | 32 | 700 | 40 | Onboarding hero |
-| `display-md` | 24 | 700 | 32 | Screen titles |
-| `headline` | 20 | 600 | 28 | Section headers |
-| `title-lg` | 18 | 600 | 24 | Task text (list) |
-| `title-md` | 16 | 600 | 22 | Card titles |
-| `body-lg` | 16 | 400 | 24 | Primary body text |
-| `body-md` | 14 | 400 | 20 | Secondary text |
-| `label-lg` | 14 | 500 | 20 | Buttons, chips |
-| `label-md` | 12 | 500 | 16 | Metadata, timestamps |
-| `caption` | 11 | 400 | 14 | Captions, hints |
+
+| Token        | Size (px in RN) | Weight | Line Height | Usage                |
+| ------------ | --------------- | ------ | ----------- | -------------------- |
+| `display-lg` | 32              | 700    | 40          | Onboarding hero      |
+| `display-md` | 24              | 700    | 32          | Screen titles        |
+| `headline`   | 20              | 600    | 28          | Section headers      |
+| `title-lg`   | 18              | 600    | 24          | Task text (list)     |
+| `title-md`   | 16              | 600    | 22          | Card titles          |
+| `body-lg`    | 16              | 400    | 24          | Primary body text    |
+| `body-md`    | 14              | 400    | 20          | Secondary text       |
+| `label-lg`   | 14              | 500    | 20          | Buttons, chips       |
+| `label-md`   | 12              | 500    | 16          | Metadata, timestamps |
+| `caption`    | 11              | 400    | 14          | Captions, hints      |
 
 **RN Note:** Use `PixelRatio.getFontScale()` to respect user font scaling. Wrap text styles in a helper that applies font scaling automatically.
 
 ### 2.3 Spacing System
+
 4px base unit (RN convention, but scales appropriately).
+
 - `xs`: 4
 - `sm`: 8
 - `md`: 16
@@ -113,6 +123,7 @@ These are non-negotiable. Each priority has a fixed color used consistently acro
 - `3xl`: 64
 
 ### 2.4 Corner Radius
+
 - `none`: 0
 - `sm`: 4 (chips, small inputs)
 - `md`: 8 (buttons, cards in list)
@@ -121,13 +132,16 @@ These are non-negotiable. Each priority has a fixed color used consistently acro
 - `full`: 9999 (avatars, FAB)
 
 ### 2.5 Elevation (Shadows)
+
 RN handles shadows differently per platform. Use these for Android:
+
 - `level-0`: No shadow
 - `level-1`: `elevation: 2`
 - `level-2`: `elevation: 6`
 - `level-3`: `elevation: 12`
 
 ### 2.6 Iconography
+
 - **Library:** `lucide-react-native` (preferred) OR `@expo/vector-icons` with Material Icons
 - **Weight:** 1.5px stroke
 - **Size:** 20 (inline), 24 (standard), 32 (feature)
@@ -144,6 +158,7 @@ All components implemented as functional React components with TypeScript. Use t
 The most important component. Used on Home and Confirmation Inbox.
 
 **Layout (left to right):**
+
 - Priority Indicator Bar: 4px wide vertical bar in priority color, full height
 - Content area (padded 16):
   - Row 1: Task text (title-lg, on-surface, max 2 lines, ellipsis)
@@ -152,12 +167,14 @@ The most important component. Used on Home and Confirmation Inbox.
 - Right edge: Overflow menu (vertical 3-dot, 48 tap target)
 
 **RN Implementation Notes:**
+
 - Use `react-native-gesture-handler` for swipe gestures.
 - Use `react-native-reanimated` for swipe animations (off-JS-thread).
 - Use FlashList from `@shopify/flash-list` for the list, not FlatList.
 - Stable keys via task.id.
 
 **States:**
+
 - Default
 - Pressed (surface-variant background)
 - Swiped right (reveals green Complete action)
@@ -165,6 +182,7 @@ The most important component. Used on Home and Confirmation Inbox.
 - Long-pressed (multi-select mode)
 
 **Specs:**
+
 - Min height: 72
 - Background: surface
 - Border: 1 outline (bottom only)
@@ -173,22 +191,26 @@ The most important component. Used on Home and Confirmation Inbox.
 ### 3.2 Priority Chip
 
 **Variants:**
+
 - Filled (default): background = priority color, text = white, label-md
 - Outlined: 1.5 border in priority color, text in priority color
 
 **Specs:**
+
 - Height: 24
 - Padding: horizontal 10
 - Radius: `sm` (4)
 - Text: ALL CAPS
 
 ### 3.3 Source App Chip
+
 - Height: 28
 - Icon: 16 left, 6 gap, then text
 - Background: surface-variant
 - Radius: `full`
 
 ### 3.4 Primary Button
+
 - Height: 48
 - Padding: horizontal 24
 - Background: primary-500
@@ -199,15 +221,18 @@ The most important component. Used on Home and Confirmation Inbox.
 - Pressed state: primary-700
 
 ### 3.5 Secondary Button (Outlined)
+
 - Same dimensions
 - 1.5 border in primary-500
 - Transparent background
 - Text in primary-500
 
 ### 3.6 Destructive Button
+
 Same as Primary, background = error (#D62828).
 
 ### 3.7 Text Input Field
+
 - Height: 56 (single line), auto-grow (multiline up to 4 lines)
 - Background: surface-variant
 - Border: 1 outline (focused: 2 primary-500)
@@ -217,10 +242,13 @@ Same as Primary, background = error (#D62828).
 **RN Notes:** Use `react-hook-form` for form state. Use controlled inputs.
 
 ### 3.8 Toggle Switch
+
 Use `Switch` from `react-native`, themed with primary color.
 
 ### 3.9 Bottom Sheet
+
 Use `@gorhom/bottom-sheet` library.
+
 - Background: surface
 - Top corners: `lg` (12)
 - Drag handle: 32 wide × 4 tall, on-surface-variant @ 30%
@@ -228,6 +256,7 @@ Use `@gorhom/bottom-sheet` library.
 - Backdrop: rgba(0,0,0,0.4)
 
 ### 3.10 Top App Bar
+
 - Height: 64 (+ safe area inset top)
 - Background: surface
 - Title: title-lg, on-surface
@@ -236,6 +265,7 @@ Use `@gorhom/bottom-sheet` library.
 - No elevation default; 1 bottom border when scrolling
 
 ### 3.11 Bottom Navigation Bar
+
 - Height: 80 (with system gesture inset)
 - Items: 4 (Home, Confirmations, History, Settings)
 - Selected: filled icon + label + primary-500
@@ -246,6 +276,7 @@ Use `@gorhom/bottom-sheet` library.
 **RN Notes:** Use Expo Router's tab navigator OR React Navigation's bottom tabs.
 
 ### 3.12 Empty State
+
 - Centered vertically
 - Icon: 64, on-surface-variant @ 40%
 - Title: title-lg, on-surface
@@ -253,6 +284,7 @@ Use `@gorhom/bottom-sheet` library.
 - Optional action button
 
 ### 3.13 Filter Chip Row
+
 - Horizontally scrollable
 - Each chip: 32 height, `full` radius
 - Selected: primary-100 bg, primary-700 text
@@ -260,11 +292,13 @@ Use `@gorhom/bottom-sheet` library.
 - Active filter: leading checkmark icon (16)
 
 ### 3.14 Confirmation Action Pair
+
 - Two buttons side by side, equal width, 8 gap
 - Left: "Yes, Add" (Primary)
 - Right: "No, Discard" (Outlined with error color)
 
 ### 3.15 Stats Card
+
 - Background: surface
 - Padding: 16
 - Radius: `md`
@@ -280,6 +314,7 @@ Use `@gorhom/bottom-sheet` library.
 **Note for Kiro:** Use a stack navigator for onboarding. Each screen is a separate route. Pass progress via params.
 
 #### O-01: Welcome
+
 - Full-bleed primary-900 background
 - Centered: TaskMind logo (mark + wordmark, 80 tall)
 - "Your tasks. Captured. Confronted." (display-md, white)
@@ -287,6 +322,7 @@ Use `@gorhom/bottom-sheet` library.
 - Bottom: "Get Started" primary button (full width minus 24 margin), 48 from bottom inset
 
 #### O-02: Concept Explanation
+
 - White bg
 - Three icon + title + description blocks stacked, 32 spacing:
   1. ⚡ "Auto-Captures Tasks" — "From WhatsApp, SMS, email, and more"
@@ -295,6 +331,7 @@ Use `@gorhom/bottom-sheet` library.
 - Bottom: "Next" primary button
 
 #### O-03: Notification Access Permission
+
 - Hero illustration (256×256) of phone with notifications flowing
 - Title: "Grant Notification Access"
 - Description with privacy reassurance
@@ -302,6 +339,7 @@ Use `@gorhom/bottom-sheet` library.
 - Secondary: "Skip for Now"
 
 #### O-04: Select Apps to Monitor
+
 - List of installed messaging apps with checkboxes
 - Defaults pre-checked: WhatsApp, SMS, Gmail, Slack, Teams, Telegram
 - Search bar to filter
@@ -310,6 +348,7 @@ Use `@gorhom/bottom-sheet` library.
 **RN Notes:** Use `react-native-launch-arguments` or custom native module to enumerate installed apps. Cache the result.
 
 #### O-05: Add VIP Contacts
+
 - Title: "Who matters most?"
 - Subtitle: "Messages from these people always create URGENT tasks"
 - Input field with "+ Add Contact"
@@ -317,12 +356,14 @@ Use `@gorhom/bottom-sheet` library.
 - Skip option
 
 #### O-06: Configure Nudges
+
 - Title: "How should we nudge you?"
 - Frequency: radio group (15/30/60/120/240/off), default 60
 - Quiet hours: start/end time pickers, default 22:00–07:00
 - Toggle: "Urgent tasks override quiet hours" (default ON)
 
 #### O-07: Optional Features
+
 - Email Report toggle + configure button
 - Download Intelligence Model toggle + button (~50 MB ONNX, warning)
 - Both optional, can defer
@@ -333,11 +374,13 @@ Use `@gorhom/bottom-sheet` library.
 **Layout (top to bottom):**
 
 1. **Top App Bar (64)**
+
    - Left: TaskMind logo mark (24)
    - Center: "Tasks" title (title-lg)
    - Right: Sort icon, overflow menu
 
 2. **Stats Strip (~56)**
+
    - 4 mini-stats horizontally:
      - Pending: count + "PENDING"
      - Urgent: count in urgent color + "URGENT"
@@ -347,11 +390,13 @@ Use `@gorhom/bottom-sheet` library.
    - Separator below
 
 3. **Filter Chip Row (48)**
+
    - "All" / priorities / source apps
    - Horizontally scrollable
    - Persistent across sessions
 
 4. **Task List (fill remaining)**
+
    - FlashList of Task Cards
    - Sorted: priority DESC, then createdAt DESC
    - Sticky section headers for priority groups when "All" active
@@ -371,16 +416,20 @@ Use `@gorhom/bottom-sheet` library.
 **Layout:**
 
 1. **Top App Bar**
+
    - Back arrow, Title "Task", Edit/Calendar/overflow
 
 2. **Priority Banner (full-width, 64)**
+
    - Background: priority color @ 12% alpha
    - Priority Chip + "Created {relative time}" + status
 
 3. **Task Content (padded 24)**
+
    - Task text, title-lg, selectable, full text
 
 4. **Source Info Card (md radius, surface-variant)**
+
    - Padded 16, metadata rows:
      - Source: [app icon] WhatsApp
      - Sender: name
@@ -389,13 +438,16 @@ Use `@gorhom/bottom-sheet` library.
      - Confidence: 0.87 (progress bar)
 
 5. **Original Message (collapsible)**
+
    - Header with chevron
    - Body: rawSourceText in JetBrains Mono, surface-variant bg
 
 6. **Matched Keywords Chips**
+
    - Small chips, color-coded by category
 
 7. **Due Date (if set)**
+
    - Calendar icon + date + Edit link
 
 8. **Action Bar (sticky bottom)**
@@ -459,15 +511,18 @@ Use `@gorhom/bottom-sheet` library.
 Sections:
 
 **General**
+
 - Theme: System / Light / Dark
 - Language: System / English / हिन्दी
 
 **Detection**
+
 - Monitored Apps → sub-screen
 - VIP Contacts → sub-screen
 - Confidence Thresholds (advanced, collapsible)
 
 **Nudges**
+
 - Global frequency
 - Quiet hours
 - Per-priority overrides (collapsible)
@@ -475,6 +530,7 @@ Sections:
 - Sound / vibration
 
 **Intelligence**
+
 - Model status (downloaded / not)
 - Model version
 - Learned Vocabulary → screen
@@ -482,16 +538,19 @@ Sections:
 - Rule vs Model weight (advanced)
 
 **Email Report**
+
 - Enable toggle
 - SMTP config → form
 - Send time
 - Test email button
 
 **Calendar**
+
 - Default calendar
 - Default duration (15/30/60)
 
 **Data**
+
 - Export → options sheet
 - Import → file picker
 - Auto-backup → toggle + folder
@@ -499,12 +558,14 @@ Sections:
 - Reset all data
 
 **Diagnostics** (always visible since no debugger)
+
 - View recent notifications
 - View extraction decisions
 - View discarded log
 - Export all diagnostics as JSON
 
 **About**
+
 - Version + commit hash
 - Permissions status
 - OEM battery whitelist guide
@@ -566,15 +627,18 @@ Since the user has no local debugger, this screen is essential.
 **Implemented in custom native module, NOT via Notifee** (Notifee cannot create truly non-dismissible notifications).
 
 **Collapsed View:**
+
 - App icon
 - Title: "TaskMind"
 - Text: "{N} pending • {M} urgent"
 
 **Expanded View:**
+
 - BigTextStyle: top 2 task texts as bullet list
 - Actions: "Open" → launches app, "Done Top" → completes highest priority
 
 **Style:**
+
 - Small icon: app icon
 - Color accent: primary-500
 - No dismissal possible (FLAG_NO_CLEAR + FLAG_ONGOING_EVENT)
@@ -604,14 +668,14 @@ Since the user has no local debugger, this screen is essential.
 
 ### 6.1 Gestures
 
-| Gesture | Context | Action |
-|---|---|---|
-| Tap | Task card | Open detail |
-| Long press | Task card | Multi-select mode |
-| Swipe right | Task card | Reveal Complete (50% commit) |
-| Swipe left | Task card | Reveal Delete (with confirm) |
-| Pull to refresh | Task list | Re-query DB |
-| Swipe down | Bottom sheet | Dismiss |
+| Gesture         | Context      | Action                       |
+| --------------- | ------------ | ---------------------------- |
+| Tap             | Task card    | Open detail                  |
+| Long press      | Task card    | Multi-select mode            |
+| Swipe right     | Task card    | Reveal Complete (50% commit) |
+| Swipe left      | Task card    | Reveal Delete (with confirm) |
+| Pull to refresh | Task list    | Re-query DB                  |
+| Swipe down      | Bottom sheet | Dismiss                      |
 
 **RN Implementation:** Use `react-native-gesture-handler` + `react-native-reanimated` for all gestures. JS-thread animations are forbidden.
 
@@ -630,13 +694,13 @@ Since the user has no local debugger, this screen is essential.
 
 Use `expo-haptics` or `react-native-haptic-feedback`.
 
-| Event | Haptic |
-|---|---|
-| Task complete | Success (medium) |
-| Task delete | Warning (double tap) |
-| Swipe threshold crossed | Light selection |
-| URGENT nudge fires | Heavy impact |
-| Filter applied | Light selection |
+| Event                   | Haptic               |
+| ----------------------- | -------------------- |
+| Task complete           | Success (medium)     |
+| Task delete             | Warning (double tap) |
+| Swipe threshold crossed | Light selection      |
+| URGENT nudge fires      | Heavy impact         |
+| Filter applied          | Light selection      |
 
 ### 6.4 Loading States
 
@@ -656,16 +720,16 @@ Use `expo-haptics` or `react-native-haptic-feedback`.
 
 ## 7. Accessibility Requirements
 
-| ID | Requirement |
-|---|---|
-| A11Y-01 | All interactive elements ≥48 touch target |
-| A11Y-02 | Color contrast ≥4.5:1 body, ≥3:1 large (WCAG AA) |
-| A11Y-03 | All icons have `accessibilityLabel` |
-| A11Y-04 | Semantic order matches visual order |
-| A11Y-05 | TalkBack announces priority + source for every task card |
-| A11Y-06 | Font scaling 100%–200% without breakage |
-| A11Y-07 | No info via color alone (priority has icon + text too) |
-| A11Y-08 | Focus indicators for D-pad |
+| ID      | Requirement                                                            |
+| ------- | ---------------------------------------------------------------------- |
+| A11Y-01 | All interactive elements ≥48 touch target                              |
+| A11Y-02 | Color contrast ≥4.5:1 body, ≥3:1 large (WCAG AA)                       |
+| A11Y-03 | All icons have `accessibilityLabel`                                    |
+| A11Y-04 | Semantic order matches visual order                                    |
+| A11Y-05 | TalkBack announces priority + source for every task card               |
+| A11Y-06 | Font scaling 100%–200% without breakage                                |
+| A11Y-07 | No info via color alone (priority has icon + text too)                 |
+| A11Y-08 | Focus indicators for D-pad                                             |
 | A11Y-09 | Reduced motion respected (`AccessibilityInfo.isReduceMotionEnabled()`) |
 
 ---
@@ -674,13 +738,13 @@ Use `expo-haptics` or `react-native-haptic-feedback`.
 
 All screens support dark mode via theme tokens.
 
-| Surface | Light | Dark |
-|---|---|---|
-| Background | #F2F6FB | #0E1116 |
-| Card | #FFFFFF | #1A1D21 |
-| Top app bar | #FFFFFF | #1A1D21 |
+| Surface              | Light   | Dark    |
+| -------------------- | ------- | ------- |
+| Background           | #F2F6FB | #0E1116 |
+| Card                 | #FFFFFF | #1A1D21 |
+| Top app bar          | #FFFFFF | #1A1D21 |
 | Priority bg (urgent) | #FCE5E5 | #4A1010 |
-| Outline | #D6DAE0 | #2E3338 |
+| Outline              | #D6DAE0 | #2E3338 |
 
 **Priority colors stay vibrant in both modes** — never desaturate.
 
@@ -700,16 +764,19 @@ All screens support dark mode via theme tokens.
 ## 10. Asset Requirements
 
 ### 10.1 App Icon
+
 - Adaptive icon: foreground vector + primary-900 background
 - Concept: stylized checkmark with diagonal slash ("done, no snooze")
 - Format: PNG, 1024×1024 source. Expo auto-generates densities.
 
 ### 10.2 Onboarding Illustrations
+
 - 4 custom illustrations
 - Style: geometric, flat, 2-color (primary + accent)
 - Format: SVG via `react-native-svg`
 
 ### 10.3 Empty State Illustrations
+
 - "All Clear" — empty inbox
 - "Nothing to Review" — checkmark with pause
 - "No History" — empty calendar
@@ -728,33 +795,41 @@ When prompting Google Stitch:
 ### 11.1 Sample Task Texts
 
 **URGENT (English):**
+
 - "Submit GHCI UAT closure document by EOD"
 - "Call vendor about pricing — payment due tomorrow"
 - "Review and approve sprint backlog before standup"
 
 **URGENT (Hinglish):**
+
 - "Ravi sir ko abhi report bhej do"
 - "Client meeting ke liye agenda turant tayyar karo"
 
 **HIGH (English):**
+
 - "Reply to NeGD team about Phase 2 roadmap deck"
 - "Update certificate versioning specification document"
 
 **HIGH (Hindi):**
+
 - "कल तक UAT टेस्ट केस वर्कबुक भेजना है"
 
 **MEDIUM (Hinglish):**
+
 - "Sprint review ki slides finalize karna hai"
 - "Designer ko Figma file share kar do"
 
 **LOW (English):**
+
 - "Read the article Mira shared on AI governance"
 - "Check Slack thread on new design tokens"
 
 ### 11.2 Sample Senders
+
 Ravi Sharma · NeGD Team · Priya · Anand sir · Design Group · Client Lead · Mira · Sprint Channel
 
 ### 11.3 Sample Source Apps
+
 WhatsApp · Gmail · SMS · Slack · Microsoft Teams · Telegram · Meeting Transcript
 
 ---

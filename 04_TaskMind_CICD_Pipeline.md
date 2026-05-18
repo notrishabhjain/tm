@@ -1,25 +1,28 @@
 # CI/CD Pipeline Specification
+
 ## TaskMind — GitHub Actions Build Pipeline
 
-| Field | Value |
-|---|---|
-| **Document Version** | 1.0 |
-| **Date** | May 18, 2026 |
-| **Author** | RJ |
-| **Target Audience** | Kiro Agent |
-| **Constraint** | User has no local development machine. ALL builds happen in GitHub Actions. |
+| Field                | Value                                                                       |
+| -------------------- | --------------------------------------------------------------------------- |
+| **Document Version** | 1.0                                                                         |
+| **Date**             | May 18, 2026                                                                |
+| **Author**           | RJ                                                                          |
+| **Target Audience**  | Kiro Agent                                                                  |
+| **Constraint**       | User has no local development machine. ALL builds happen in GitHub Actions. |
 
 ---
 
 ## 1. Purpose & Scope
 
 This document specifies the complete CI/CD pipeline for TaskMind. Because the user has no local development environment, GitHub Actions is the **sole** environment that:
+
 - Installs dependencies
 - Runs linters and tests
 - Builds APKs
 - Signs and publishes releases
 
 The user's workflow is:
+
 1. Review and merge Kiro's PRs from a browser (phone or borrowed computer).
 2. CI builds an APK.
 3. User downloads APK from GitHub Actions artifacts or Releases.
@@ -34,18 +37,23 @@ Kiro must design the pipeline to make this loop fast, reliable, and self-diagnos
 ## 2. Core Principles
 
 ### 2.1 Use Local EAS Builds in CI
+
 Use `eas build --platform android --profile <name> --local` running on GitHub-hosted Linux runners. This bypasses the EAS Build cloud quotas (15 Android builds/month on free tier) entirely. You get effectively unlimited builds on GitHub Actions' free minutes (2000/month for private repos, unlimited for public).
 
 ### 2.2 Fast Feedback
+
 Every push to a branch must produce CI results within 25 minutes. Long iteration loops kill productivity. Optimize aggressively via caching.
 
 ### 2.3 Self-Service for the User
+
 The user cannot debug locally. The CI must produce APKs that are easy to find, easy to install, and clearly labeled. Workflow logs must be readable on a phone.
 
 ### 2.4 Reproducible Builds
+
 Same commit → same APK. Lock all dependency versions. Pin Node, JDK, and Gradle versions. Use a `.tool-versions` file for clarity.
 
 ### 2.5 Secrets Hygiene
+
 Release keystore, SMTP credentials for test reports, and any other secrets live ONLY in GitHub Secrets. Never in code, never in artifacts.
 
 ---
@@ -54,13 +62,13 @@ Release keystore, SMTP credentials for test reports, and any other secrets live 
 
 ### 3.1 Required GitHub Secrets
 
-| Secret Name | Purpose | Required For |
-|---|---|---|
-| `ANDROID_KEYSTORE_BASE64` | Release keystore, base64-encoded | Release builds |
-| `ANDROID_KEYSTORE_PASSWORD` | Keystore password | Release builds |
-| `ANDROID_KEY_ALIAS` | Key alias inside keystore | Release builds |
-| `ANDROID_KEY_PASSWORD` | Key password | Release builds |
-| `EXPO_TOKEN` | Expo access token (only if using EAS cloud features) | Optional |
+| Secret Name                 | Purpose                                              | Required For   |
+| --------------------------- | ---------------------------------------------------- | -------------- |
+| `ANDROID_KEYSTORE_BASE64`   | Release keystore, base64-encoded                     | Release builds |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password                                    | Release builds |
+| `ANDROID_KEY_ALIAS`         | Key alias inside keystore                            | Release builds |
+| `ANDROID_KEY_PASSWORD`      | Key password                                         | Release builds |
+| `EXPO_TOKEN`                | Expo access token (only if using EAS cloud features) | Optional       |
 
 Recommend generating the keystore once and storing it. Kiro should provide a script `scripts/generate-keystore.sh` for the user (or a paired developer) to run once via GitHub Codespaces (free tier) since the user has no local machine.
 
@@ -172,6 +180,7 @@ jobs:
 ```
 
 **Notes for Kiro:**
+
 - `npm ci` is preferred over `npm install` for reproducibility.
 - `--maxWorkers=2` keeps memory usage manageable on free runners.
 - Coverage thresholds are configured in `jest.config.js` and enforced via the `test:coverage-check` script.
@@ -188,7 +197,7 @@ name: Build Debug APK
 on:
   push:
     branches: ['**']
-  workflow_dispatch:  # Manual trigger from GitHub UI
+  workflow_dispatch: # Manual trigger from GitHub UI
 
 concurrency:
   group: build-debug-${{ github.ref }}
@@ -280,6 +289,7 @@ jobs:
 ```
 
 **Notes:**
+
 - `eas build --local` is the magic flag that runs the build entirely on the GitHub runner, bypassing EAS cloud quotas.
 - The `Summary` step writes user-friendly instructions to the workflow summary, which the user sees when checking the build on their phone.
 - APK retention is 30 days — long enough for testing iterations, short enough to not hit storage quotas.
@@ -303,7 +313,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
-      contents: write  # Required to create releases
+      contents: write # Required to create releases
 
     steps:
       - uses: actions/checkout@v4
@@ -395,6 +405,7 @@ jobs:
 ```
 
 **Notes:**
+
 - The keystore is decoded from base64 GitHub secret at build time and deleted after.
 - The signed APK is verified before release using `apksigner verify`.
 - Release notes are extracted from CHANGELOG.md automatically.
@@ -411,7 +422,7 @@ name: Nightly Build
 
 on:
   schedule:
-    - cron: '0 18 * * *'  # 23:30 IST daily
+    - cron: '0 18 * * *' # 23:30 IST daily
   workflow_dispatch:
 
 jobs:
@@ -466,6 +477,7 @@ jobs:
 ```
 
 **Notes:**
+
 - `"distribution": "internal"` because no Google Play Store distribution.
 - `buildType: "apk"` (not "aab") because user installs directly.
 - `appVersionSource: "local"` because version comes from `app.json`, not EAS managed.
@@ -565,15 +577,19 @@ Use `asdf` or `mise` semantics — these tools are auto-detected by GitHub Actio
 
 ```markdown
 ## Feature ID
+
 <!-- e.g., F-04 -->
 
 ## What's in this PR
+
 <!-- 2-3 sentence summary -->
 
 ## FR-IDs Implemented
+
 <!-- List FR-XX-NN IDs from SRS -->
 
 ## Definition of Done Checklist
+
 - [ ] All linked FR-IDs implemented
 - [ ] Tests added (unit + integration where applicable)
 - [ ] Lint, typecheck, format all clean
@@ -584,12 +600,15 @@ Use `asdf` or `mise` semantics — these tools are auto-detected by GitHub Actio
 - [ ] Self-tested with debug APK from CI
 
 ## Testing Notes
+
 <!-- How should RJ test this? Specific scenarios? -->
 
 ## Screenshots / Recordings
+
 <!-- For UI features. Attach screenshots or screen recording. -->
 
 ## Out of Scope
+
 <!-- Anything explicitly NOT in this PR that someone might expect -->
 ```
 
@@ -605,22 +624,28 @@ labels: bug
 ---
 
 ## APK Version
+
 <!-- From About screen, or filename: e.g., taskmind-debug-main-a1b2c3d.apk -->
 
 ## Device Info
+
 - **Device:** <!-- e.g., Redmi Note 12 -->
 - **Android version:** <!-- e.g., Android 13 -->
 
 ## What happened
+
 <!-- Steps to reproduce -->
 
 ## What I expected
+
 <!-- -->
 
 ## What actually happened
+
 <!-- -->
 
 ## Diagnostics Export
+
 <!-- If applicable: open Settings → Diagnostics → Export and attach JSON file -->
 ```
 
@@ -638,12 +663,14 @@ Personal Android task automation app.
 ## How to Install the Latest Build
 
 ### From a release (recommended)
+
 1. Go to **Releases** tab
 2. Tap the latest release
 3. Download the `.apk` file
 4. Open it to install
 
 ### From a development build
+
 1. Go to **Actions** tab
 2. Tap the latest successful "Build Debug APK" run
 3. Scroll to **Artifacts**
@@ -651,6 +678,7 @@ Personal Android task automation app.
 5. Extract the APK and tap to install
 
 ## First-Time Setup
+
 1. Install the APK
 2. Allow "Install from Unknown Sources" if prompted
 3. Open TaskMind
@@ -658,9 +686,11 @@ Personal Android task automation app.
 5. Complete the onboarding flow
 
 ## Reporting Issues
+
 Open an issue using the Bug Report template. Include the Diagnostics export from Settings → Diagnostics.
 
 ## Architecture
+
 See [SRS.md](./02_TaskMind_SRS.md) for the full technical specification.
 ```
 
@@ -670,12 +700,12 @@ See [SRS.md](./02_TaskMind_SRS.md) for the full technical specification.
 
 To hit the <25 minute build target consistently:
 
-| Cache | Path | Key |
-|---|---|---|
-| npm | `~/.npm` + `node_modules` | `package-lock.json` hash |
-| Gradle | `~/.gradle/caches`, `~/.gradle/wrapper` | `android/**/*.gradle*` hash |
-| EAS CLI | `~/.eas` | EAS version |
-| Android SDK | Provided by `android-actions/setup-android@v3` | n/a |
+| Cache       | Path                                           | Key                         |
+| ----------- | ---------------------------------------------- | --------------------------- |
+| npm         | `~/.npm` + `node_modules`                      | `package-lock.json` hash    |
+| Gradle      | `~/.gradle/caches`, `~/.gradle/wrapper`        | `android/**/*.gradle*` hash |
+| EAS CLI     | `~/.eas`                                       | EAS version                 |
+| Android SDK | Provided by `android-actions/setup-android@v3` | n/a                         |
 
 Cache hit rate should be ≥70% across CI runs. Monitor in early sprints; tune cache keys if needed.
 

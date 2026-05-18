@@ -1,15 +1,16 @@
 # Product Requirements Document (PRD)
+
 ## TaskMind — Personal Task Automation App for Android
 
-| Field | Value |
-|---|---|
-| **Document Version** | 2.0 |
-| **Date** | May 18, 2026 |
-| **Author** | RJ |
-| **Status** | Approved for Development |
-| **Target Platform** | Android (React Native, single-user, personal) |
-| **Development Tool** | Kiro Agent |
-| **Build Pipeline** | GitHub Actions only (no local IDE) |
+| Field                | Value                                         |
+| -------------------- | --------------------------------------------- |
+| **Document Version** | 2.0                                           |
+| **Date**             | May 18, 2026                                  |
+| **Author**           | RJ                                            |
+| **Status**           | Approved for Development                      |
+| **Target Platform**  | Android (React Native, single-user, personal) |
+| **Development Tool** | Kiro Agent                                    |
+| **Build Pipeline**   | GitHub Actions only (no local IDE)            |
 
 ---
 
@@ -26,9 +27,11 @@ This project is built using React Native (the primary user has prior MERN stack 
 ## 2. Problem Statement
 
 ### 2.1 The Problem
+
 Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work chat apps, and meetings — but they rarely make it into a structured task management system. Manual entry creates friction, leads to forgotten commitments, and enables procrastination through deferral mechanisms like snooze.
 
 ### 2.2 Personal Pain Points
+
 - Most actionable items arrive via WhatsApp in mixed Hindi/English language.
 - Existing task apps require manual entry, which is rarely done in real-time.
 - Snooze and reminder-deferral features enable procrastination.
@@ -36,6 +39,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 - Off-the-shelf solutions send data to the cloud, raising privacy concerns.
 
 ### 2.3 Why Existing Solutions Fail
+
 - **Todoist / TickTick / Microsoft To Do** — require manual input, no notification parsing, cloud-dependent.
 - **Google Tasks** — minimal automation, no language understanding.
 - **AI assistants (Bixby, Google Assistant)** — cloud-based, no persistent enforcement, weak Hindi support.
@@ -45,6 +49,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 ## 3. Goals & Objectives
 
 ### 3.1 Primary Goals
+
 1. **Eliminate manual task capture** for 80%+ of incoming actionable messages.
 2. **Force engagement with pending work** by removing snooze and using non-dismissible notifications.
 3. **Maintain absolute data privacy** through offline-only operation.
@@ -52,18 +57,20 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 5. **Build and ship entirely through CI** without requiring a local development environment.
 
 ### 3.2 Success Metrics
-| Metric | Target |
-|---|---|
-| Task detection accuracy | ≥85% after 2 weeks of use |
-| False positive rate | ≤10% on confirmed tasks |
-| Daily task completion rate | ≥60% of created tasks |
+
+| Metric                                  | Target                                     |
+| --------------------------------------- | ------------------------------------------ |
+| Task detection accuracy                 | ≥85% after 2 weeks of use                  |
+| False positive rate                     | ≤10% on confirmed tasks                    |
+| Daily task completion rate              | ≥60% of created tasks                      |
 | Time from notification to task creation | <3 seconds (RN bridge overhead acceptable) |
-| App crash-free sessions | ≥99% |
-| CI build success rate | ≥95% |
-| CI build duration | <25 minutes end-to-end |
-| Learned vocabulary growth | ≥5 new phrases per week of active use |
+| App crash-free sessions                 | ≥99%                                       |
+| CI build success rate                   | ≥95%                                       |
+| CI build duration                       | <25 minutes end-to-end                     |
+| Learned vocabulary growth               | ≥5 new phrases per week of active use      |
 
 ### 3.3 Non-Goals
+
 - Multi-user accounts or team collaboration.
 - Cloud sync across devices.
 - iOS support (Android only; iOS notification access is far more restrictive and would require a separate strategy).
@@ -77,6 +84,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 ## 4. Target User
 
 **Single Primary User:** RJ — a project manager who:
+
 - Has MERN stack background, comfortable with JavaScript/TypeScript.
 - Receives most actionable communications via WhatsApp in English/Hindi/Hinglish.
 - Manages multiple stakeholders and deadlines simultaneously.
@@ -91,34 +99,42 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 ### 5.1 Primary Use Cases
 
 **UC-01: WhatsApp Message from Manager**
-- *Trigger:* User receives WhatsApp message "kal tak report bhej dena please" from a VIP contact.
-- *Expected Behavior:* Task auto-created with URGENT priority, no confirmation prompt, persistent notification updates to reflect new urgent task.
+
+- _Trigger:_ User receives WhatsApp message "kal tak report bhej dena please" from a VIP contact.
+- _Expected Behavior:_ Task auto-created with URGENT priority, no confirmation prompt, persistent notification updates to reflect new urgent task.
 
 **UC-02: Vague Group Chat Message**
-- *Trigger:* User receives WhatsApp message "anyone has the file?" in a group chat from a non-VIP contact.
-- *Expected Behavior:* App detects low confidence (~0.45), creates task with `needsConfirmation=true`, shows confirmation prompt.
+
+- _Trigger:_ User receives WhatsApp message "anyone has the file?" in a group chat from a non-VIP contact.
+- _Expected Behavior:_ App detects low confidence (~0.45), creates task with `needsConfirmation=true`, shows confirmation prompt.
 
 **UC-03: Meeting Action Items**
-- *Trigger:* After a meeting, user pastes a 30-minute transcript into the Import Transcript screen.
-- *Expected Behavior:* App parses transcript, extracts 5–10 candidate tasks, shows reviewable list. User keeps 6, discards 4, adjusts priorities, saves.
+
+- _Trigger:_ After a meeting, user pastes a 30-minute transcript into the Import Transcript screen.
+- _Expected Behavior:_ App parses transcript, extracts 5–10 candidate tasks, shows reviewable list. User keeps 6, discards 4, adjusts priorities, saves.
 
 **UC-04: Anti-Procrastination Nudge**
-- *Trigger:* User has 3 pending tasks, 1 URGENT. 30 minutes pass with no action.
-- *Expected Behavior:* Nudge notification fires (URGENT override is 15 min). User has no snooze option — must complete, delete, or open the app.
+
+- _Trigger:_ User has 3 pending tasks, 1 URGENT. 30 minutes pass with no action.
+- _Expected Behavior:_ Nudge notification fires (URGENT override is 15 min). User has no snooze option — must complete, delete, or open the app.
 
 **UC-05: Daily Status Visibility**
-- *Trigger:* 9:00 PM daily.
-- *Expected Behavior:* Email report sent to user with today's completion stats, pending items grouped by priority, source breakdown.
+
+- _Trigger:_ 9:00 PM daily.
+- _Expected Behavior:_ Email report sent to user with today's completion stats, pending items grouped by priority, source breakdown.
 
 **UC-06: Calendar Commitment**
-- *Trigger:* User reviews a task "Call vendor about pricing" and decides it needs a scheduled slot.
-- *Expected Behavior:* User taps "Add to Calendar", picks tomorrow 11:00 AM, saves. Calendar event created with task details in description.
+
+- _Trigger:_ User reviews a task "Call vendor about pricing" and decides it needs a scheduled slot.
+- _Expected Behavior:_ User taps "Add to Calendar", picks tomorrow 11:00 AM, saves. Calendar event created with task details in description.
 
 **UC-07: CI Build and Install**
-- *Trigger:* Kiro pushes a new feature to the main branch.
-- *Expected Behavior:* GitHub Actions workflow runs lint, tests, builds an APK, attaches it as a workflow artifact. User downloads APK to phone, installs it, and tests on real device.
+
+- _Trigger:_ Kiro pushes a new feature to the main branch.
+- _Expected Behavior:_ GitHub Actions workflow runs lint, tests, builds an APK, attaches it as a workflow artifact. User downloads APK to phone, installs it, and tests on real device.
 
 ### 5.2 User Journey: First-Time Setup
+
 1. User downloads APK from GitHub Actions artifact via phone browser.
 2. Enables "Install from Unknown Sources" for browser.
 3. Installs APK.
@@ -138,35 +154,36 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 
 ### 6.1 Feature Priority Matrix
 
-| Feature ID | Feature Name | Priority | Phase |
-|---|---|---|---|
-| F-01 | Notification Listener Engine (native module) | P0 | 1 |
-| F-02 | Rule-Based Task Extraction | P0 | 1 |
-| F-03 | Task CRUD (Complete/Delete/Edit) | P0 | 1 |
-| F-04 | Persistent Non-Dismissible Notification | P0 | 1 |
-| F-05 | Priority System (4 levels) | P0 | 1 |
-| F-06 | VIP Contact Auto-Urgent | P0 | 2 |
-| F-07 | Confirmation Flow for Ambiguous Tasks | P0 | 2 |
-| F-08 | Periodic Nudges (Customizable) | P0 | 2 |
-| F-09 | History View with Filters | P0 | 2 |
-| F-10 | Calendar Integration | P1 | 3 |
-| F-11 | Meeting Transcript Import | P1 | 3 |
-| F-12 | CSV/JSON Export & Import | P1 | 3 |
-| F-13 | Daily Email Report | P1 | 3 |
-| F-14 | On-Device ML Model (ONNX Runtime) | P2 | 4 |
-| F-15 | Sender Reputation Tracking | P2 | 4 |
-| F-16 | Learned Vocabulary System | P2 | 4 |
-| F-17 | Learned Vocabulary Management UI | P2 | 4 |
-| F-18 | Discarded Log / Debug View | P3 | 5 |
-| F-19 | Automated Weekly Backup | P3 | 5 |
-| F-20 | OEM Battery Whitelist Guide | P3 | 5 |
-| F-CI-01 | GitHub Actions Build Pipeline | P0 | 0 |
-| F-CI-02 | Automated Testing in CI | P0 | 0 |
-| F-CI-03 | APK Artifact Publication & Signing | P0 | 0 |
+| Feature ID | Feature Name                                 | Priority | Phase |
+| ---------- | -------------------------------------------- | -------- | ----- |
+| F-01       | Notification Listener Engine (native module) | P0       | 1     |
+| F-02       | Rule-Based Task Extraction                   | P0       | 1     |
+| F-03       | Task CRUD (Complete/Delete/Edit)             | P0       | 1     |
+| F-04       | Persistent Non-Dismissible Notification      | P0       | 1     |
+| F-05       | Priority System (4 levels)                   | P0       | 1     |
+| F-06       | VIP Contact Auto-Urgent                      | P0       | 2     |
+| F-07       | Confirmation Flow for Ambiguous Tasks        | P0       | 2     |
+| F-08       | Periodic Nudges (Customizable)               | P0       | 2     |
+| F-09       | History View with Filters                    | P0       | 2     |
+| F-10       | Calendar Integration                         | P1       | 3     |
+| F-11       | Meeting Transcript Import                    | P1       | 3     |
+| F-12       | CSV/JSON Export & Import                     | P1       | 3     |
+| F-13       | Daily Email Report                           | P1       | 3     |
+| F-14       | On-Device ML Model (ONNX Runtime)            | P2       | 4     |
+| F-15       | Sender Reputation Tracking                   | P2       | 4     |
+| F-16       | Learned Vocabulary System                    | P2       | 4     |
+| F-17       | Learned Vocabulary Management UI             | P2       | 4     |
+| F-18       | Discarded Log / Debug View                   | P3       | 5     |
+| F-19       | Automated Weekly Backup                      | P3       | 5     |
+| F-20       | OEM Battery Whitelist Guide                  | P3       | 5     |
+| F-CI-01    | GitHub Actions Build Pipeline                | P0       | 0     |
+| F-CI-02    | Automated Testing in CI                      | P0       | 0     |
+| F-CI-03    | APK Artifact Publication & Signing           | P0       | 0     |
 
 ### 6.2 Detailed Feature Descriptions
 
 #### F-CI-01: GitHub Actions Build Pipeline
+
 - **Description:** Complete CI/CD pipeline that builds the Android APK on every push and on tagged releases. No local builds required.
 - **Acceptance Criteria:**
   - Workflow triggers on push to main, push to feature branches, and on tag creation matching `v*`.
@@ -177,6 +194,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Workflow logs are detailed enough to diagnose failures without local reproduction.
 
 #### F-CI-02: Automated Testing in CI
+
 - **Description:** Tests run automatically on every push and block merging on failure.
 - **Acceptance Criteria:**
   - Jest unit tests run with code coverage ≥70% on extraction and domain layers.
@@ -186,6 +204,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - PRs with failing tests cannot be merged.
 
 #### F-CI-03: APK Artifact Publication & Signing
+
 - **Description:** Every successful main-branch or tagged build produces a downloadable APK.
 - **Acceptance Criteria:**
   - APK uploaded as GitHub Actions artifact with 30-day retention for branch builds.
@@ -195,6 +214,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - APK filename includes version, commit hash, and build type.
 
 #### F-01: Notification Listener Engine
+
 - **Description:** Native Android module (Kotlin) bridged to JavaScript that captures all incoming notifications and forwards them to the JS layer via Headless JS.
 - **Acceptance Criteria:**
   - Captures package name, title, text, big text, timestamp, and group-chat indicator.
@@ -205,6 +225,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 - **Note:** This requires writing a custom native module because the existing `react-native-android-notification-listener` package has not been updated for the New Architecture in over 2 years. See SRS Section 3.4 for the rationale and implementation plan.
 
 #### F-02: Rule-Based Task Extraction
+
 - **Description:** Initial keyword + pattern matching system that converts notification text into structured task data. Implemented in TypeScript for testability.
 - **Acceptance Criteria:**
   - Ships with 200+ seed keywords across English/Hindi/Hinglish.
@@ -214,6 +235,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Pure functions, fully unit-testable with no native dependencies.
 
 #### F-03: Task CRUD
+
 - **Description:** Core lifecycle operations on tasks. Notably, no snooze.
 - **Acceptance Criteria:**
   - Mark Complete moves task to history with timestamp.
@@ -222,6 +244,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - All operations reflect instantly in UI via Zustand state and reactive subscriptions to the local DB.
 
 #### F-04: Persistent Non-Dismissible Notification
+
 - **Description:** Always-on status notification showing pending task summary, implemented via a foreground service started from the notification listener service.
 - **Acceptance Criteria:**
   - Cannot be swipe-dismissed when ≥1 pending task exists.
@@ -231,6 +254,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Updates within 1 second of any task state change.
 
 #### F-05: Priority System
+
 - **Description:** Four-tier priority with rule-based auto-assignment and manual override.
 - **Acceptance Criteria:**
   - URGENT / HIGH / MEDIUM / LOW levels supported.
@@ -239,6 +263,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - User can manually change priority of any task.
 
 #### F-06: VIP Contact Auto-Urgent
+
 - **Description:** Configurable list of senders whose messages always create URGENT tasks without confirmation.
 - **Acceptance Criteria:**
   - User can add/remove VIP contacts manually.
@@ -247,6 +272,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - VIP messages skip confirmation flow entirely.
 
 #### F-07: Confirmation Flow
+
 - **Description:** For low-confidence task detections, prompt user before committing.
 - **Acceptance Criteria:**
   - Tasks with confidence 0.40–0.75 enter confirmation queue.
@@ -255,6 +281,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - User decision is a learning signal.
 
 #### F-08: Periodic Nudges
+
 - **Description:** Configurable recurring reminders for pending tasks via Notifee scheduled triggers.
 - **Acceptance Criteria:**
   - Frequency options: 15min / 30min / 1hr / 2hr / 4hr / off.
@@ -263,6 +290,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Per-priority nudge frequency override available.
 
 #### F-09: History View
+
 - **Description:** Completed and deleted task archive with filtering.
 - **Acceptance Criteria:**
   - Filter by time range, status, source app, priority.
@@ -270,6 +298,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Search by text within history.
 
 #### F-10: Calendar Integration
+
 - **Description:** One-way push of tasks to Android Calendar using `expo-calendar`.
 - **Acceptance Criteria:**
   - "Add to Calendar" action on every task.
@@ -278,6 +307,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Requires READ/WRITE_CALENDAR permission.
 
 #### F-11: Meeting Transcript Import
+
 - **Description:** Paste meeting transcripts, get reviewable task list.
 - **Acceptance Criteria:**
   - Accepts text input up to 50,000 characters.
@@ -287,6 +317,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Source app set to "Meeting Transcript".
 
 #### F-12: Export & Import
+
 - **Description:** Data portability via CSV/JSON files using `expo-file-system` and `expo-sharing`.
 - **Acceptance Criteria:**
   - Export formats: CSV and JSON.
@@ -295,6 +326,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Merge by ID or replace-all options on import.
 
 #### F-13: Daily Email Report
+
 - **Description:** Automated daily summary email sent via a native module that wraps Android's `Intent.ACTION_SEND` with attachment support, OR a JS-side SMTP client.
 - **Acceptance Criteria:**
   - User-configurable SMTP server, credentials, recipient.
@@ -304,6 +336,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 - **Implementation Note:** JS-side SMTP is preferred for offline-first goal — uses `react-native-smtp-mailer` or equivalent.
 
 #### F-14: On-Device ML Model
+
 - **Description:** Quantized intent classifier for TASK vs NOT_TASK detection, run via `onnxruntime-react-native`.
 - **Acceptance Criteria:**
   - Model size ≤50 MB after quantization (INT8).
@@ -312,6 +345,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Combined with rule layer via weighted score (default 50/50).
 
 #### F-15: Sender Reputation
+
 - **Description:** Per-sender confidence adjustment based on historical user actions.
 - **Acceptance Criteria:**
   - Tracks per-sender: created, confirmed, deleted, completed counts.
@@ -320,6 +354,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Independent of VIP list (additive).
 
 #### F-16: Learned Vocabulary
+
 - **Description:** Adaptive expansion of trigger keyword set based on user behavior.
 - **Acceptance Criteria:**
   - Extracts n-grams from confirmed-task source text.
@@ -328,6 +363,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Logs to `learned_keywords` table with weights.
 
 #### F-17: Learned Vocabulary UI
+
 - **Description:** User-facing view of what the app has learned, with manual override.
 - **Acceptance Criteria:**
   - Lists all active learned phrases with frequency.
@@ -335,6 +371,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Shows demoted phrases in a separate section.
 
 #### F-18: Discarded Log
+
 - **Description:** Capped log of messages discarded by extractor for debugging. Critical given no local debugger.
 - **Acceptance Criteria:**
   - Rolling log capped at 500 entries.
@@ -343,6 +380,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Exportable as JSON for offline analysis.
 
 #### F-19: Automated Backup
+
 - **Description:** Weekly auto-export of full database.
 - **Acceptance Criteria:**
   - Runs weekly via `expo-background-fetch` or `react-native-background-fetch`.
@@ -351,6 +389,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
   - Keeps last 4 backups, rotates older ones.
 
 #### F-20: OEM Battery Guide
+
 - **Description:** In-app guide for Xiaomi/Samsung/OPPO/OnePlus battery whitelist setup.
 - **Acceptance Criteria:**
   - Detects device manufacturer via `react-native-device-info`.
@@ -362,6 +401,7 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 ## 7. Constraints
 
 ### 7.1 Technical Constraints
+
 - Must work fully offline except for email send and one-time model download.
 - Total install footprint ≤150 MB including model (smaller than Kotlin version due to JS bundle, but no native code generation overhead).
 - Min Android version: API 28 (Android 9).
@@ -369,17 +409,20 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 - No local development machine available — all builds run in GitHub Actions.
 
 ### 7.2 Build Pipeline Constraints
+
 - All builds must succeed in GitHub Actions Linux runners (ubuntu-latest).
 - Build artifacts must be downloadable from any device with a browser (including the user's phone).
 - The user cannot run `npm install`, `npx`, `eas`, `adb`, or any other CLI locally.
 - All debugging information must come from CI logs and the in-app Diagnostics screen.
 
 ### 7.3 Business Constraints
+
 - Personal project — no commercial considerations.
 - No app store distribution required (sideload via APK).
 - No external user support or update infrastructure.
 
 ### 7.4 Regulatory Constraints
+
 - Notification Listener access requires explicit user grant.
 - Calendar write requires runtime permission.
 - All data stays on device — no GDPR/data-residency concerns.
@@ -400,12 +443,14 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 ## 9. Dependencies
 
 ### 9.1 React Native Stack
+
 - React Native 0.85+ (New Architecture default)
 - Expo SDK 55+ with Development Build (bare-ish workflow for custom native modules)
 - Hermes V1 JavaScript engine
 - TypeScript 5+
 
 ### 9.2 Critical Libraries
+
 - `react-native` 0.85+
 - `expo` 55+
 - `expo-notifications` for outgoing notifications
@@ -423,9 +468,11 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 - React Navigation 7+ for routing
 
 ### 9.3 Custom Native Module
+
 - A custom Kotlin native module wrapping `NotificationListenerService`, since no maintained RN library supports the New Architecture for this use case. Details in SRS Section 3.4.
 
 ### 9.4 Build Tooling
+
 - GitHub Actions
 - EAS CLI (used in local mode within Actions runners)
 - Gradle 8+
@@ -435,20 +482,20 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 
 ## 10. Risks & Mitigations
 
-| Risk | Impact | Likelihood | Mitigation |
-|---|---|---|---|
+| Risk                                                    | Impact       | Likelihood  | Mitigation                                                                                                        |
+| ------------------------------------------------------- | ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------- |
 | **No maintained RN notification listener for New Arch** | **Critical** | **Certain** | Build a custom Kotlin native module with TurboModule spec. Allocate Phase 1 effort for this. See SRS Section 3.4. |
-| OEM kills foreground service aggressively | High | High | Provide F-20 setup guide; user manually whitelists |
-| Headless JS task gets killed in background | High | Medium | Use foreground service to keep process alive; combine with WorkManager for resilience |
-| Model size too large for download | Medium | Medium | Start with rule-only; make model optional |
-| WhatsApp notification format changes | High | Low | Defensive parsing; fall back to whole-text capture |
-| False positive rate too high initially | Medium | Medium | Confirmation flow + learning system reduces over time |
-| User loses device — data unrecoverable | High | Low | F-19 automated backup to chosen folder |
-| Hindi NLP accuracy lower than English | Medium | Medium | Extensive seed vocabulary in Hindi/Hinglish; learning system closes gap |
-| **CI build fails on user's phone install** | **High** | **Medium** | **Test on real device every release; include device-info debugging in onboarding** |
-| **JS bridge adds latency to notification processing** | Medium | Medium | Filter aggressively in native layer; only send useful notifications to JS |
-| GitHub Actions runner spec insufficient for builds | Low | Low | Use large runners ($) only if needed; build time budget is generous |
-| React Native version churn breaks dependencies | Medium | Medium | Pin all versions; quarterly upgrade window only |
+| OEM kills foreground service aggressively               | High         | High        | Provide F-20 setup guide; user manually whitelists                                                                |
+| Headless JS task gets killed in background              | High         | Medium      | Use foreground service to keep process alive; combine with WorkManager for resilience                             |
+| Model size too large for download                       | Medium       | Medium      | Start with rule-only; make model optional                                                                         |
+| WhatsApp notification format changes                    | High         | Low         | Defensive parsing; fall back to whole-text capture                                                                |
+| False positive rate too high initially                  | Medium       | Medium      | Confirmation flow + learning system reduces over time                                                             |
+| User loses device — data unrecoverable                  | High         | Low         | F-19 automated backup to chosen folder                                                                            |
+| Hindi NLP accuracy lower than English                   | Medium       | Medium      | Extensive seed vocabulary in Hindi/Hinglish; learning system closes gap                                           |
+| **CI build fails on user's phone install**              | **High**     | **Medium**  | **Test on real device every release; include device-info debugging in onboarding**                                |
+| **JS bridge adds latency to notification processing**   | Medium       | Medium      | Filter aggressively in native layer; only send useful notifications to JS                                         |
+| GitHub Actions runner spec insufficient for builds      | Low          | Low         | Use large runners ($) only if needed; build time budget is generous                                               |
+| React Native version churn breaks dependencies          | Medium       | Medium      | Pin all versions; quarterly upgrade window only                                                                   |
 
 ---
 
@@ -457,24 +504,29 @@ Tasks arrive through multiple digital channels — WhatsApp, email, SMS, work ch
 ### 11.1 Release Phases
 
 **Release 0.1 (Pipeline) — Phase 0 Complete**
+
 - Repo scaffolded, Expo project initialized.
 - GitHub Actions workflow producing debug APK on every push.
 - User can download and install APK; sees a "Hello TaskMind" screen.
 - Target: 1 week.
 
 **Release 1.0 (MVP) — Phases 1+2 Complete**
+
 - Notification capture (custom native module), rule-based extraction, task CRUD, persistent notification, priority system, VIP contacts, confirmation flow, nudges, history view.
 - Target: 5 weeks of development.
 
 **Release 1.1 — Phase 3 Complete**
+
 - Calendar push, transcript import, export/import, email reports.
 - Target: +2 weeks.
 
 **Release 1.2 — Phase 4 Complete**
+
 - On-device ML model, sender reputation, learned vocabulary.
 - Target: +3 weeks.
 
 **Release 1.3 — Phase 5 Complete**
+
 - Debug log, automated backup, OEM guide, polish.
 - Target: +1 week.
 
