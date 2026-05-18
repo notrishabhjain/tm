@@ -19,7 +19,7 @@ const NOISE_PATTERNS = [
 export function preprocessText(text: string): PreprocessedText {
   const original = text;
 
-  let normalized = text
+  const normalized = text
     .replace(EMOJI_REGEX, ' ')
     .replace(/[^\w\sऀ-ॿ.,!?:;'"()-]/g, ' ')
     .replace(/\s+/g, ' ')

@@ -160,7 +160,6 @@ function FilterChip({
   return (
     <View
       style={[styles.filterChip, active && styles.filterChipActive]}
-      // eslint-disable-next-line react-native/no-inline-styles
     >
       <Text
         style={[styles.filterChipText, active && styles.filterChipTextActive]}
