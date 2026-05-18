@@ -1,0 +1,24 @@
+# Normalize line endings to LF on all platforms
+* text=auto eol=lf
+
+# Binary files — never normalize
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.onnx binary
+*.ort binary
+*.apk binary
+*.keystore binary
+*.jks binary
+*.jar binary
+
+# Gradle wrapper
+android/gradlew text eol=lf
+android/gradlew.bat text eol=crlf

@@ -1,0 +1,86 @@
+{
+  "app": {
+    "name": "TaskMind"
+  },
+  "home": {
+    "title": "कार्य",
+    "emptyTitle": "सब ठीक है!",
+    "emptyBody": "कोई लंबित कार्य नहीं। इस पल का आनंद लें।",
+    "stats": {
+      "pending": "बाकी",
+      "urgent": "अर्जेंट",
+      "today": "आज",
+      "doneToday": "आज पूरा"
+    }
+  },
+  "priority": {
+    "URGENT": "अर्जेंट",
+    "HIGH": "उच्च",
+    "MEDIUM": "मध्यम",
+    "LOW": "कम"
+  },
+  "actions": {
+    "complete": "पूर्ण करें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "addToCalendar": "कैलेंडर में जोड़ें",
+    "confirm": "हाँ, जोड़ें",
+    "discard": "नहीं, हटाएं",
+    "open": "खोलें",
+    "doneTop": "शीर्ष पूर्ण",
+    "export": "निर्यात",
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "back": "वापस"
+  },
+  "confirmations": {
+    "title": "पुष्टि की प्रतीक्षा",
+    "emptyTitle": "समीक्षा के लिए कुछ नहीं",
+    "infoBanner": "ये संदेश कार्य हो सकते हैं। समीक्षा करें और निर्णय लें।"
+  },
+  "history": {
+    "title": "इतिहास",
+    "emptyTitle": "अभी कोई इतिहास नहीं",
+    "emptyBody": "पूर्ण और हटाए गए कार्य यहाँ दिखेंगे।"
+  },
+  "settings": {
+    "title": "सेटिंग्स",
+    "sections": {
+      "general": "सामान्य",
+      "detection": "पहचान",
+      "nudges": "रिमाइंडर",
+      "intelligence": "बुद्धिमत्ता",
+      "emailReport": "ईमेल रिपोर्ट",
+      "calendar": "कैलेंडर",
+      "data": "डेटा",
+      "diagnostics": "डायग्नोस्टिक्स",
+      "about": "के बारे में"
+    }
+  },
+  "diagnostics": {
+    "title": "डायग्नोस्टिक्स",
+    "tabs": {
+      "notifications": "नोटिफिकेशन",
+      "extraction": "निष्कर्षण",
+      "discarded": "अस्वीकृत",
+      "database": "DB आँकड़े",
+      "system": "सिस्टम"
+    },
+    "export": "डायग्नोस्टिक्स निर्यात"
+  },
+  "onboarding": {
+    "getStarted": "शुरू करें",
+    "next": "आगे",
+    "skip": "अभी छोड़ें",
+    "finish": "सेटअप पूर्ण",
+    "welcome": {
+      "headline": "आपके कार्य।\nकैप्चर। सामना।",
+      "tagline": "नोटिफिकेशन से कार्य स्वचालित रूप से पकड़ता है।\nकोई स्नूज़ नहीं। कोई बहाना नहीं।"
+    }
+  },
+  "errors": {
+    "generic": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।",
+    "permissionDenied": "अनुमति अस्वीकृत। कृपया सेटिंग्स में अनुमति दें।",
+    "exportFailed": "निर्यात विफल। कृपया पुनः प्रयास करें।"
+  }
+}

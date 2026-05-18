@@ -1,0 +1,113 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+concurrency:
+  group: build-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Generate version info
+        id: version
+        run: |
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "branch=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')" >> $GITHUB_OUTPUT
+          echo "build_time=$(date -u +%Y%m%d-%H%M)" >> $GITHUB_OUTPUT
+
+      - name: Build debug APK (local EAS — no cloud quota used)
+        env:
+          EXPO_PUBLIC_COMMIT_SHA: ${{ steps.version.outputs.short_sha }}
+          EXPO_PUBLIC_BUILD_TIME: ${{ steps.version.outputs.build_time }}
+        run: |
+          eas build \
+            --platform android \
+            --profile development \
+            --local \
+            --non-interactive \
+            --output ./taskmind-debug.apk
+
+      - name: Rename APK with metadata
+        run: |
+          mv ./taskmind-debug.apk \
+             ./taskmind-debug-${{ steps.version.outputs.branch }}-${{ steps.version.outputs.short_sha }}.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: taskmind-debug-${{ steps.version.outputs.branch }}-${{ steps.version.outputs.short_sha }}
+          path: ./taskmind-debug-*.apk
+          retention-days: 30
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs-${{ github.run_id }}
+          path: |
+            android/app/build/reports/
+            /tmp/eas-build-*.log
+          retention-days: 7
+
+      - name: Write install instructions to summary
+        run: |
+          echo "## 📱 Debug APK Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ steps.version.outputs.branch }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ steps.version.outputs.short_sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Built | \`${{ steps.version.outputs.build_time }} UTC\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📲 How to install on your Android device" >> $GITHUB_STEP_SUMMARY
+          echo "1. Tap the **Artifacts** section below (or scroll down on this page)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Tap the artifact named \`taskmind-debug-...\` to download the ZIP" >> $GITHUB_STEP_SUMMARY
+          echo "3. Extract the APK from the ZIP" >> $GITHUB_STEP_SUMMARY
+          echo "4. Tap the APK to install (allow 'Install from Unknown Sources' if prompted)" >> $GITHUB_STEP_SUMMARY
+          echo "5. Open TaskMind — you should see the Hello TaskMind screen" >> $GITHUB_STEP_SUMMARY

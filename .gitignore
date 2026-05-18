@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native builds — android/ IS committed (needed for custom native modules)
+# ios/ is excluded entirely (no iOS support)
+ios/
+
+# Gradle
+android/.gradle/
+android/app/build/
+android/build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Release keystore — NEVER commit
+android/app/release.keystore
+android/app/*.keystore
+
+# Metro
+.metro-health-check*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# Editor
+.DS_Store
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+
+# ML models — downloaded at runtime
+assets/models/*.onnx
+assets/models/*.ort
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temp
+/tmp/
+*.tmp
+
+# EAS
+.eas/

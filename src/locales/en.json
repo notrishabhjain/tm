@@ -1,0 +1,86 @@
+{
+  "app": {
+    "name": "TaskMind"
+  },
+  "home": {
+    "title": "Tasks",
+    "emptyTitle": "All clear!",
+    "emptyBody": "No pending tasks. Enjoy the moment — or start something new.",
+    "stats": {
+      "pending": "PENDING",
+      "urgent": "URGENT",
+      "today": "TODAY",
+      "doneToday": "DONE TODAY"
+    }
+  },
+  "priority": {
+    "URGENT": "URGENT",
+    "HIGH": "HIGH",
+    "MEDIUM": "MEDIUM",
+    "LOW": "LOW"
+  },
+  "actions": {
+    "complete": "Complete",
+    "delete": "Delete",
+    "edit": "Edit",
+    "addToCalendar": "Add to Calendar",
+    "confirm": "Yes, Add",
+    "discard": "No, Discard",
+    "open": "Open",
+    "doneTop": "Done Top",
+    "export": "Export",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back"
+  },
+  "confirmations": {
+    "title": "Pending Confirmations",
+    "emptyTitle": "Nothing to review",
+    "infoBanner": "These messages might be tasks. Review and decide."
+  },
+  "history": {
+    "title": "History",
+    "emptyTitle": "No history yet",
+    "emptyBody": "Completed and deleted tasks will appear here."
+  },
+  "settings": {
+    "title": "Settings",
+    "sections": {
+      "general": "General",
+      "detection": "Detection",
+      "nudges": "Nudges",
+      "intelligence": "Intelligence",
+      "emailReport": "Email Report",
+      "calendar": "Calendar",
+      "data": "Data",
+      "diagnostics": "Diagnostics",
+      "about": "About"
+    }
+  },
+  "diagnostics": {
+    "title": "Diagnostics",
+    "tabs": {
+      "notifications": "Notifications",
+      "extraction": "Extraction",
+      "discarded": "Discarded",
+      "database": "DB Stats",
+      "system": "System"
+    },
+    "export": "Export Diagnostics"
+  },
+  "onboarding": {
+    "getStarted": "Get Started",
+    "next": "Next",
+    "skip": "Skip for Now",
+    "finish": "Finish Setup",
+    "welcome": {
+      "headline": "Your tasks.\nCaptured. Confronted.",
+      "tagline": "Auto-captures tasks from your notifications.\nNo snooze. No excuses."
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "permissionDenied": "Permission denied. Please grant access in Settings.",
+    "exportFailed": "Export failed. Please try again."
+  }
+}

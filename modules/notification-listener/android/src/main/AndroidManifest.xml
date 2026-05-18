@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Permissions required by the notification listener + foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application>
+
+        <!-- NotificationListenerService: captures all status bar notifications -->
+        <service
+            android:name="com.taskmind.notificationlistener.TaskMindNotificationListenerService"
+            android:exported="true"
+            android:label="TaskMind Notification Listener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Foreground service: hosts persistent notification + process keep-alive -->
+        <service
+            android:name="com.taskmind.notificationlistener.TaskMindForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Headless JS bridge service for incoming notifications -->
+        <service
+            android:name="com.taskmind.notificationlistener.TaskMindHeadlessTaskService"
+            android:exported="false" />
+
+        <!-- Headless JS bridge service for notification quick actions -->
+        <service
+            android:name="com.taskmind.notificationlistener.QuickActionHeadlessService"
+            android:exported="false" />
+
+        <!-- Boot receiver: restarts foreground service after reboot -->
+        <receiver
+            android:name="com.taskmind.notificationlistener.BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Quick-action receiver: handles notification button taps -->
+        <receiver
+            android:name="com.taskmind.notificationlistener.QuickActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.taskmind.app.ACTION_DONE_TOP" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

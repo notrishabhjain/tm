@@ -1,0 +1,9 @@
+node_modules/
+android/
+ios/
+dist/
+web-build/
+.expo/
+coverage/
+*.snap
+package-lock.json
