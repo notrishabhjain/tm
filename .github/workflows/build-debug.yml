@@ -14,6 +14,8 @@ jobs:
     name: Build Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -160,6 +162,24 @@ jobs:
             android/app/build/reports/
             android/app/build/outputs/logs/
           retention-days: 7
+
+      - name: Post error summary to PR
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=$(gh pr list --head "$(git rev-parse --abbrev-ref HEAD)" --json number -q '.[0].number' 2>/dev/null || true)
+          if [ -z "$PR" ] || [ ! -f /tmp/gradle.log ]; then exit 0; fi
+          printf '## Build Failed (run %s)\n\n' "${{ github.run_id }}" > /tmp/comment.md
+          printf '### Error lines\n```\n' >> /tmp/comment.md
+          grep -E "(FAILURE|FAILED|BUILD FAILED|Exception|Could not|Caused by|Execution failed)" \
+            /tmp/gradle.log | head -40 >> /tmp/comment.md || true
+          printf '```\n\n### First 80 lines\n```\n' >> /tmp/comment.md
+          head -80 /tmp/gradle.log >> /tmp/comment.md
+          printf '```\n\n### Last 80 lines\n```\n' >> /tmp/comment.md
+          tail -80 /tmp/gradle.log >> /tmp/comment.md
+          printf '```\n' >> /tmp/comment.md
+          gh pr comment "$PR" --body-file /tmp/comment.md
 
       - name: Write step summary
         if: success()
