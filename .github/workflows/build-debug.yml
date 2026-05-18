@@ -82,8 +82,17 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Validate Gradle configuration
-        run: cd android && ./gradlew :app:dependencies --configuration releaseCompileClasspath --no-daemon -q 2>&1 | tail -20 || true
+      - name: Create local.properties
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+
+      - name: Generate debug keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/app/debug.keystore \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -noprompt
 
       - name: Build debug APK
         env:
@@ -93,13 +102,32 @@ jobs:
           cd android && ./gradlew :app:assembleDebug \
             --no-daemon \
             --stacktrace \
+            --info \
             -PreactNativeArchitectures=arm64-v8a \
             -Pandroid.injected.invoked.from.ide=false \
             2>&1 | tee /tmp/gradle.log
           BUILD_EXIT=${PIPESTATUS[0]}
-          echo "## Gradle Build Log (last 300 lines)" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Environment" >> $GITHUB_STEP_SUMMARY
+          echo "- JAVA_HOME: \`$JAVA_HOME\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ANDROID_SDK_ROOT: \`$ANDROID_SDK_ROOT\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ANDROID_NDK_HOME: \`$ANDROID_NDK_HOME\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Gradle Build Log" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### First 100 lines (config / startup errors)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -300 /tmp/gradle.log >> $GITHUB_STEP_SUMMARY
+          head -100 /tmp/gradle.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Key error lines (entire log)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E "(FAILURE|FAILED|error:|BUILD FAILED|Exception|Could not|Caused by|Execution failed)" \
+            /tmp/gradle.log | head -60 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Last 200 lines" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -200 /tmp/gradle.log >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           if [ $BUILD_EXIT -ne 0 ]; then
             grep -E "(FAILED|error:|> Task|BUILD FAILED|Exception|Could not|Caused by)" /tmp/gradle.log | tail -30 | while IFS= read -r line; do
