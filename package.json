@@ -78,6 +78,9 @@
     "@babel/core": "7.25.9",
     "babel-preset-expo": "12.0.9"
   },
+  "workspaces": [
+    "modules/*"
+  ],
   "overrides": {
     "ajv-keywords": {
       "ajv": "8.20.0"

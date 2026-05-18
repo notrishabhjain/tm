@@ -42,12 +42,6 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
 
-      - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          eas-version: latest
-
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
@@ -72,21 +66,24 @@ jobs:
           echo "branch=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-')" >> $GITHUB_OUTPUT
           echo "build_time=$(date -u +%Y%m%d-%H%M)" >> $GITHUB_OUTPUT
 
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
       - name: Build debug APK
         env:
           EXPO_PUBLIC_COMMIT_SHA: ${{ steps.version.outputs.short_sha }}
         run: |
-          eas build \
-            --platform android \
-            --profile development \
-            --local \
-            --non-interactive \
-            --output ./taskmind-debug.apk
+          cd android && ./gradlew :app:assembleDebug \
+            --no-daemon \
+            --stacktrace \
+            -Pandroid.injected.invoked.from.ide=false
 
-      - name: Rename APK with metadata
+      - name: Locate and rename APK
         run: |
-          mv ./taskmind-debug.apk \
-             "./taskmind-debug-${{ steps.version.outputs.branch }}-${{ steps.version.outputs.short_sha }}.apk"
+          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -1)
+          echo "Found APK at: $APK_PATH"
+          cp "$APK_PATH" \
+            "./taskmind-debug-${{ steps.version.outputs.branch }}-${{ steps.version.outputs.short_sha }}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -102,10 +99,11 @@ jobs:
           name: failure-logs-${{ github.run_id }}
           path: |
             android/app/build/reports/
-            /tmp/eas-build-*.log
+            android/app/build/outputs/logs/
           retention-days: 7
 
       - name: Write step summary
+        if: success()
         run: |
           echo "## Debug APK Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
