@@ -3,21 +3,20 @@ import type { Language } from '../types';
 // Devanagari Unicode range: U+0900–U+097F
 const DEVANAGARI_REGEX = /[ऀ-ॿ]/;
 
-// Common Hinglish/transliterated Hindi words (Latin script)
+// Common Hinglish/transliterated Hindi words (Latin script only, no English cognates)
 const HINGLISH_MARKERS = new Set([
   'kar', 'karo', 'karna', 'kiya', 'kiye', 'karein',
   'bhej', 'bhejo', 'bhejdo', 'bhejna',
   'dekh', 'dekho', 'dekhna', 'dekhe',
   'bata', 'batao', 'batana',
   'aaj', 'kal', 'parso', 'abhi', 'jaldi',
-  'zaroor', 'please', 'bhai', 'yaar',
-  'nahi', 'hai', 'hain', 'tha', 'the',
+  'zaroor', 'bhai', 'yaar',
+  'nahi', 'hai', 'hain',
   'mujhe', 'tujhe', 'humein', 'unhe',
   'kab', 'kyun', 'kaise', 'kahan',
-  'tak', 'se', 'ko', 'ke', 'ki', 'ka',
-  'mat', 'na', 'nahi', 'bilkul',
+  'tak', 'bilkul',
   'theek', 'accha', 'sahi', 'galat',
-  'batana', 'milna', 'aana', 'jana',
+  'milna', 'aana', 'jana',
 ]);
 
 export function detectLanguage(text: string): Language {

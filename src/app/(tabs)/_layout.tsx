@@ -59,7 +59,7 @@ export default function TabLayout(): React.JSX.Element {
   );
 }
 
-function TabIcon({ label, color }: { label: string; color: string }): React.JSX.Element {
+function TabIcon({ label: _label, color: _color }: { label: string; color: string }): React.JSX.Element {
   return (
     // eslint-disable-next-line react-native/no-inline-styles
     <React.Fragment>

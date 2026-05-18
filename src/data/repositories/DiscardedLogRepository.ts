@@ -1,4 +1,4 @@
-import { desc, asc } from 'drizzle-orm';
+import { desc, asc, eq } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { discardedLog } from '../db/schema';
 import type { DiscardedLogEntry, DiscardReason } from '@/domain/types';
@@ -41,10 +41,7 @@ export class DiscardedLogRepository {
         .orderBy(asc(discardedLog.createdAt))
         .limit(count - MAX_ENTRIES);
       for (const row of oldest) {
-        await this.db.delete(discardedLog).where(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (t: any) => t.id.eq(row.id)
-        );
+        await this.db.delete(discardedLog).where(eq(discardedLog.id, row.id));
       }
     }
   }
@@ -59,10 +56,7 @@ export class DiscardedLogRepository {
   }
 
   async deleteById(id: number): Promise<void> {
-    await this.db.delete(discardedLog).where(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (t: any) => t.id.eq(id)
-    );
+    await this.db.delete(discardedLog).where(eq(discardedLog.id, id));
   }
 
   async count(): Promise<number> {

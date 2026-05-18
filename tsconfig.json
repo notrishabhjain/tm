@@ -19,8 +19,9 @@
     },
     "jsx": "react-native",
     "moduleResolution": "bundler",
+    "module": "ESNext",
     "allowImportingTsExtensions": true
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.d.ts", "expo-env.d.ts"],
-  "exclude": ["node_modules", "android", "ios"]
+  "exclude": ["node_modules", "android", "ios", "__tests__"]
 }

@@ -1,17 +1,7 @@
-import type { Task, Priority, Language } from '../types';
-import type { TaskRepository } from '../../data/repositories/TaskRepository';
+import type { Task } from '../types';
+import type { TaskRepository, CreateTaskInput } from '../../data/repositories/TaskRepository';
 
-export interface CreateTaskInput {
-  title: string;
-  body: string | null;
-  sourceApp: string;
-  sender: string | null;
-  priority: Priority;
-  confidence: number;
-  needsConfirmation: boolean;
-  matchedKeywords: string[];
-  language: Language;
-}
+export type { CreateTaskInput };
 
 export async function createTask(
   repo: TaskRepository,

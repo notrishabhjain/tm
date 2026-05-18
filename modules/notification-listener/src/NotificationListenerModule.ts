@@ -7,7 +7,8 @@ import type {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const NativeModule = requireNativeModule<any>('NotificationListener');
-const emitter = new EventEmitter(NativeModule as Parameters<typeof EventEmitter>[0]);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+const emitter = new EventEmitter(NativeModule);
 
 const NotificationListenerModule = {
   getPermissionStatus(): Promise<PermissionStatus> {
@@ -47,15 +48,18 @@ const NotificationListenerModule = {
   },
 
   addNotificationListener(listener: (data: NotificationData) => void) {
-    return emitter.addListener('onNotification', listener);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (emitter as any).addListener('onNotification', listener) as { remove: () => void };
   },
 
   addQuickActionDoneTopListener(listener: () => void) {
-    return emitter.addListener('onQuickActionDoneTop', listener);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (emitter as any).addListener('onQuickActionDoneTop', listener) as { remove: () => void };
   },
 
   addQuickActionOpenListener(listener: () => void) {
-    return emitter.addListener('onQuickActionOpen', listener);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (emitter as any).addListener('onQuickActionOpen', listener) as { remove: () => void };
   },
 };
 

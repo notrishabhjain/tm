@@ -17,6 +17,7 @@ export interface Task {
   priority: Priority;
   status: TaskStatus;
   confidence: number;
+  needsConfirmation: boolean;
   createdAt: number;
   completedAt: number | null;
   deletedAt: number | null;

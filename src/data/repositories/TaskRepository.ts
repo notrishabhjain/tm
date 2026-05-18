@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, lt, ne } from 'drizzle-orm';
+import { eq, and, desc, isNull, not, lt } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { tasks } from '../db/schema';
 import type { Task, Priority, TaskStatus } from '@/domain/types';
@@ -14,7 +14,7 @@ export interface CreateTaskInput {
   sender?: string;
   priority: Priority;
   confidence: number;
-  ruleScore: number;
+  ruleScore?: number;
   modelScore?: number;
   language: string;
   matchedKeywords: string[];
@@ -31,6 +31,7 @@ function mapRow(row: typeof tasks.$inferSelect): Task {
     priority: row.priority as Priority,
     status: row.status as TaskStatus,
     confidence: row.confidence,
+    needsConfirmation: row.needsConfirmation ?? false,
     createdAt: row.createdAt,
     completedAt: row.completedAt ?? null,
     deletedAt: row.deletedAt ?? null,
@@ -151,7 +152,7 @@ export class TaskRepository {
       .delete(tasks)
       .where(
         and(
-          ne(tasks.deletedAt, null),
+          not(isNull(tasks.deletedAt)),
           lt(tasks.deletedAt, cutoff)
         )
       );

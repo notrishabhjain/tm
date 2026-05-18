@@ -1,4 +1,5 @@
 import type { NotificationData } from '../../modules/notification-listener/src/types';
+import NotificationListener from '../../modules/notification-listener/src';
 import { runExtractionPipeline } from '@/domain/extraction';
 import type { PipelineConfig } from '@/domain/extraction';
 import type { Keyword } from '@/domain/extraction/ruleEngine';
@@ -107,7 +108,6 @@ export async function handleNotification(taskData: { notification: NotificationD
   }
 
   try {
-    const { default: NotificationListener } = await import('../../modules/notification-listener/src');
     const taskRepo2 = new TaskRepository(db);
     const pending = await taskRepo2.getPendingTasks();
     const urgent = pending.filter((t) => t.priority === 'URGENT');
