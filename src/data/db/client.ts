@@ -3,16 +3,19 @@ import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 import * as schema from './schema';
 
 let _sqlite: SQLiteDatabase | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _db: any = null;
 let _openError: unknown = null;
 
 try {
   _sqlite = openDatabaseSync('taskmind.db', { enableChangeListener: true });
+  _db = drizzle(_sqlite, { schema });
 } catch (e) {
   _openError = e;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const db = (_sqlite ? drizzle(_sqlite, { schema }) : null) as any;
+export const db = _db as any;
 export type Database = ReturnType<typeof drizzle<typeof schema>>;
 
 export async function initializeDatabase(): Promise<void> {

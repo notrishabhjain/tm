@@ -96,6 +96,35 @@ jobs:
           print('Patched SQLiteModule.kt')
           "
 
+      - name: Patch renderRootComponent to show errors instead of blank screen
+        run: |
+          python3 -c "
+          import re
+          path = 'node_modules/expo-router/build/renderRootComponent.js'
+          with open(path, 'r') as f:
+              content = f.read()
+          old = '(0, expo_1.registerRootComponent)(() => <react_native_1.View />);'
+          new = (
+              '(0, expo_1.registerRootComponent)(() => {'
+              'const msg = String(error);'
+              'return React.createElement(react_native_1.View,'
+              '{style:{flex:1,backgroundColor:\"#0A2540\",justifyContent:\"center\",padding:24}},'
+              'React.createElement(react_native_1.Text,'
+              '{style:{color:\"#FF6B6B\",fontSize:14,fontWeight:\"700\",marginBottom:8}},'
+              '\"TaskMind startup error\"),'
+              'React.createElement(react_native_1.Text,'
+              '{style:{color:\"#FFFFFF\",fontSize:11,fontFamily:\"monospace\"}},'
+              'msg));});'
+          )
+          if old in content:
+              content = content.replace(old, new)
+              with open(path, 'w') as f:
+                  f.write(content)
+              print('Patched renderRootComponent.js')
+          else:
+              print('WARNING: renderRootComponent.js pattern not found — skipping patch')
+          "
+
       - name: Download fonts
         run: |
           FONT_DIR=assets/fonts
