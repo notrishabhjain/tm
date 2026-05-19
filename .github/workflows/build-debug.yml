@@ -74,6 +74,26 @@ jobs:
           print('Patched ExpoModulesCorePlugin.gradle')
           "
 
+      - name: Patch expo-dev-menu-interface for RN 0.76
+        run: |
+          python3 << 'PYEOF'
+          import re, os
+          path = 'node_modules/expo-dev-menu-interface/android/src/main/java/expo/interfaces/devmenu/ReactHostWrapper.kt'
+          with open(path, 'r') as f:
+              content = f.read()
+          # jsEngineResolutionAlgorithm was removed from ReactHost in RN 0.76; Hermes is always used
+          content = re.sub(
+              r'return if \(reactHost\.jsEngineResolutionAlgorithm == JSEngineResolutionAlgorithm\.JSC\) \{\s*"JSC"\s*\} else \{\s*"Hermes"\s*\}',
+              'return "Hermes"',
+              content
+          )
+          # Remove now-unused import
+          content = content.replace('import com.facebook.react.JSEngineResolutionAlgorithm\n', '')
+          with open(path, 'w') as f:
+              f.write(content)
+          print('Patched ReactHostWrapper.kt')
+          PYEOF
+
       - name: Download fonts
         run: |
           FONT_DIR=assets/fonts
@@ -137,8 +157,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Key error lines (entire log)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E "(FAILURE|FAILED|error:|BUILD FAILED|Exception|Could not|Caused by|Execution failed)" \
-            /tmp/gradle.log | head -60 >> $GITHUB_STEP_SUMMARY || true
+          grep -E "(FAILURE|FAILED|^e: |error: |BUILD FAILED|Execution failed for task|Could not resolve|Caused by: org\.gradle|Caused by: org\.jetbrains)" \
+            /tmp/gradle.log | grep -v "node_modules.*Exception\|\.kt:.*Exception\|\.java:.*Exception" | head -80 >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Last 200 lines" >> $GITHUB_STEP_SUMMARY
@@ -186,8 +206,8 @@ jobs:
           if [ -z "$PR" ] || [ ! -f /tmp/gradle.log ]; then exit 0; fi
           printf '## Build Failed (run %s)\n\n' "${{ github.run_id }}" > /tmp/comment.md
           printf '### Error lines\n```\n' >> /tmp/comment.md
-          grep -E "(FAILURE|FAILED|BUILD FAILED|Exception|Could not|Caused by|Execution failed)" \
-            /tmp/gradle.log | head -40 >> /tmp/comment.md || true
+          grep -E "(FAILED|^e: |error: |BUILD FAILED|Execution failed for task|Could not resolve|Caused by: org\.gradle|Caused by: org\.jetbrains)" \
+            /tmp/gradle.log | grep -v "node_modules.*Exception\|\.kt:.*Exception\|\.java:.*Exception" | head -60 >> /tmp/comment.md || true
           printf '```\n\n### First 80 lines\n```\n' >> /tmp/comment.md
           head -80 /tmp/gradle.log >> /tmp/comment.md
           printf '```\n\n### Last 80 lines\n```\n' >> /tmp/comment.md
