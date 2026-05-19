@@ -17,6 +17,16 @@ class NotificationListenerModule : Module() {
 
         Events("onNotification", "onQuickActionDoneTop", "onQuickActionOpen")
 
+        OnCreate {
+            instance = this@NotificationListenerModule
+        }
+
+        OnDestroy {
+            if (instance === this@NotificationListenerModule) {
+                instance = null
+            }
+        }
+
         AsyncFunction("getPermissionStatus") {
             val cn = ComponentName(context, TaskMindNotificationListenerService::class.java)
             val enabled = Settings.Secure.getString(

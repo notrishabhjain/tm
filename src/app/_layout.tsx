@@ -9,6 +9,8 @@ import { ThemeProvider } from '@/ui/theme';
 import { initializeDatabase } from '@/data/db/client';
 import { getSetting } from '@/data/storage/settings';
 import { seedDatabaseIfNeeded } from '@/services/db-seeder';
+import { handleNotification } from '@/services/notification-handler';
+import NotificationListener from '../../modules/notification-listener/src';
 import '@/i18n';
 
 void SplashScreen.preventAutoHideAsync();
@@ -58,6 +60,17 @@ export default function RootLayout(): React.JSX.Element | null {
     }
   }, [fontsLoaded, dbReady, router]);
 
+  // Subscribe to incoming notifications from the native listener service.
+  // This runs while the app is in the foreground; background processing is
+  // handled by the foreground service keeping the process alive.
+  useEffect(() => {
+    if (!dbReady) return;
+    const sub = NotificationListener.addNotificationListener((data) => {
+      void handleNotification({ notification: data });
+    });
+    return () => sub.remove();
+  }, [dbReady]);
+
   if (!fontsLoaded || !dbReady) {
     return <View style={{ flex: 1, backgroundColor: '#0A2540' }} />;
   }
@@ -74,6 +87,9 @@ export default function RootLayout(): React.JSX.Element | null {
             <Stack.Screen name="settings/vocabulary" options={{ presentation: 'card' }} />
             <Stack.Screen name="settings/email-report" options={{ presentation: 'card' }} />
             <Stack.Screen name="settings/battery-guide" options={{ presentation: 'card' }} />
+            <Stack.Screen name="settings/monitored-apps" options={{ presentation: 'card' }} />
+            <Stack.Screen name="settings/vip-contacts" options={{ presentation: 'card' }} />
+            <Stack.Screen name="settings/nudges" options={{ presentation: 'card' }} />
           </Stack>
         </GestureHandlerRootView>
       </ThemeProvider>
