@@ -20,23 +20,42 @@ const queryClient = new QueryClient({
 
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
-  { error: Error | null }
+  { error: Error | null; stack: string; componentStack: string }
 > {
-  state = { error: null };
+  state = { error: null as Error | null, stack: '', componentStack: '' };
   static getDerivedStateFromError(error: Error) {
-    return { error };
+    return { error, stack: error.stack ?? '' };
+  }
+  componentDidCatch(error: Error, info: { componentStack?: string | null }): void {
+    this.setState({
+      error,
+      stack: error.stack ?? String(error),
+      componentStack: info.componentStack ?? '',
+    });
+    // eslint-disable-next-line no-console
+    console.error('AppErrorBoundary:', error, info.componentStack);
   }
   render() {
     if (this.state.error) {
       return (
-        <View
-          style={{ flex: 1, backgroundColor: '#0A2540', justifyContent: 'center', padding: 24 }}
-        >
-          <Text style={{ color: '#FF6B6B', fontSize: 16, fontWeight: '700', marginBottom: 12 }}>
+        <View style={{ flex: 1, backgroundColor: '#0A2540', padding: 16, paddingTop: 56 }}>
+          <Text style={{ color: '#FF6B6B', fontSize: 16, fontWeight: '700', marginBottom: 10 }}>
             TaskMind crashed on startup
           </Text>
-          <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: 'monospace' }}>
+          <Text style={{ color: '#FFD27A', fontSize: 11, fontFamily: 'monospace', marginBottom: 8 }}>
             {String(this.state.error)}
+          </Text>
+          <Text style={{ color: '#A8C8FF', fontSize: 10, fontFamily: 'monospace', marginBottom: 8 }}>
+            STACK:
+          </Text>
+          <Text style={{ color: '#FFFFFF', fontSize: 9, fontFamily: 'monospace', marginBottom: 8 }}>
+            {this.state.stack.slice(0, 2000)}
+          </Text>
+          <Text style={{ color: '#A8C8FF', fontSize: 10, fontFamily: 'monospace', marginBottom: 8 }}>
+            COMPONENT STACK:
+          </Text>
+          <Text style={{ color: '#FFFFFF', fontSize: 9, fontFamily: 'monospace' }}>
+            {this.state.componentStack.slice(0, 1500)}
           </Text>
         </View>
       );
