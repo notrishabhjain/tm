@@ -106,6 +106,7 @@ function mockBuildDrizzle() {
 
 jest.mock('expo-sqlite', () => ({
   openDatabaseSync: jest.fn(() => ({
+    execSync: jest.fn(),
     execAsync: jest.fn().mockResolvedValue(undefined),
     runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 0, changes: 1 }),
     getFirstAsync: jest.fn().mockResolvedValue(null),

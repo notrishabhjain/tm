@@ -7,11 +7,11 @@
 // Mock functions must be created INSIDE the factory (jest.mock is hoisted before variable
 // declarations, so references to outer `const` variables would be undefined).
 jest.mock('expo-sqlite', () => {
-  const execAsync = jest.fn().mockResolvedValue(undefined);
+  const execSync = jest.fn();
   return {
     __esModule: true,
-    openDatabaseSync: jest.fn(() => ({ execAsync })),
-    _getExecAsync: () => execAsync,
+    openDatabaseSync: jest.fn(() => ({ execSync })),
+    _getExecSync: () => execSync,
   };
 });
 
@@ -21,35 +21,34 @@ jest.mock('drizzle-orm/expo-sqlite', () => ({
 
 import { initializeDatabase } from '@/data/db/client';
 
-function getExecAsyncMock(): jest.Mock {
+function getExecSyncMock(): jest.Mock {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (jest.requireMock('expo-sqlite') as any)._getExecAsync() as jest.Mock;
+  return (jest.requireMock('expo-sqlite') as any)._getExecSync() as jest.Mock;
 }
 
 describe('Database migrations', () => {
   beforeEach(() => {
-    getExecAsyncMock().mockClear();
-    getExecAsyncMock().mockResolvedValue(undefined);
+    getExecSyncMock().mockClear();
   });
 
-  it('initializes without throwing', async () => {
-    await expect(initializeDatabase()).resolves.not.toThrow();
+  it('initializes without throwing', () => {
+    expect(() => initializeDatabase()).not.toThrow();
   });
 
-  it('is idempotent — safe to call twice', async () => {
-    await initializeDatabase();
-    await expect(initializeDatabase()).resolves.not.toThrow();
+  it('is idempotent — safe to call twice', () => {
+    initializeDatabase();
+    expect(() => initializeDatabase()).not.toThrow();
   });
 
-  it('enables WAL journal mode', async () => {
-    await initializeDatabase();
-    const calls: string[] = getExecAsyncMock().mock.calls.map((c: unknown[]) => String(c[0]));
+  it('enables WAL journal mode', () => {
+    initializeDatabase();
+    const calls: string[] = getExecSyncMock().mock.calls.map((c: unknown[]) => String(c[0]));
     expect(calls.some((sql) => sql.includes('WAL'))).toBe(true);
   });
 
-  it('creates all 8 expected tables', async () => {
-    await initializeDatabase();
-    const allSql = getExecAsyncMock()
+  it('creates all 8 expected tables', () => {
+    initializeDatabase();
+    const allSql = getExecSyncMock()
       .mock.calls.map((c: unknown[]) => String(c[0]))
       .join('\n');
 
@@ -69,9 +68,9 @@ describe('Database migrations', () => {
     }
   });
 
-  it('uses IF NOT EXISTS for all CREATE TABLE statements', async () => {
-    await initializeDatabase();
-    const allSql = getExecAsyncMock()
+  it('uses IF NOT EXISTS for all CREATE TABLE statements', () => {
+    initializeDatabase();
+    const allSql = getExecSyncMock()
       .mock.calls.map((c: unknown[]) => String(c[0]))
       .join('\n');
     const allCreate = (allSql.match(/CREATE TABLE/gi) ?? []).length;
