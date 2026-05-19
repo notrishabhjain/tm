@@ -18,15 +18,17 @@ try {
 export const db = _db as any;
 export type Database = ReturnType<typeof drizzle<typeof schema>>;
 
-export async function initializeDatabase(): Promise<void> {
+export function initializeDatabase(): void {
   if (_openError !== null) {
     throw _openError instanceof Error ? _openError : new Error(String(_openError));
   }
   if (!_sqlite) {
     throw new Error('SQLite failed to open');
   }
-  await _sqlite.execAsync(`PRAGMA journal_mode=WAL;`);
-  await _sqlite.execAsync(`
+  // Use execSync to avoid the New Architecture async-queue issue where
+  // execAsync promises may never resolve when running on Queues.DEFAULT.
+  _sqlite.execSync(`PRAGMA journal_mode=WAL;`);
+  _sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY NOT NULL,
       title TEXT NOT NULL,

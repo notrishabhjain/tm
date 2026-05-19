@@ -85,17 +85,21 @@ export default function RootLayout(): React.JSX.Element | null {
   }, [fontsLoaded, fontsReady]);
 
   useEffect(() => {
+    // Safety timeout: if init hangs for any reason, proceed anyway after 3s.
+    const safetyTimer = setTimeout(() => setDbReady(true), 3000);
     async function init(): Promise<void> {
       try {
-        await initializeDatabase();
+        initializeDatabase(); // synchronous — no async queue dependency
         await seedDatabaseIfNeeded();
-        setDbReady(true);
       } catch (err) {
         console.error('DB init failed:', err);
+      } finally {
+        clearTimeout(safetyTimer);
         setDbReady(true);
       }
     }
     void init();
+    return () => clearTimeout(safetyTimer);
   }, []);
 
   useEffect(() => {

@@ -33,7 +33,7 @@ export async function handleNotification(taskData: {
 }): Promise<void> {
   const { notification } = taskData;
 
-  await initializeDatabase();
+  initializeDatabase();
 
   const monitoredRepo = new MonitoredAppRepository(db);
   const activePackages = await monitoredRepo.getActivePackageNames();
