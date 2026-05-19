@@ -99,30 +99,61 @@ jobs:
       - name: Patch renderRootComponent to show errors instead of blank screen
         run: |
           python3 -c "
-          import re
           path = 'node_modules/expo-router/build/renderRootComponent.js'
           with open(path, 'r') as f:
               content = f.read()
-          old = '(0, expo_1.registerRootComponent)(() => <react_native_1.View />);'
-          new = (
+
+          # 1. Wrap the normal production registration in a React error boundary
+          #    so any React rendering crash shows a visible error screen instead of blank.
+          old1 = '            else {\n                (0, expo_1.registerRootComponent)(Component);\n            }'
+          new1 = (
+              '            else {\n'
+              '                class _ErrBound extends React.Component {\n'
+              '                    constructor(p){super(p);this.state={err:null};}\n'
+              '                    static getDerivedStateFromError(e){return {err:e};}\n'
+              '                    render(){\n'
+              '                        if(this.state.err){\n'
+              '                            return React.createElement(react_native_1.View,\n'
+              '                                {style:{flex:1,backgroundColor:\"#0A2540\",justifyContent:\"center\",padding:24}},\n'
+              '                                React.createElement(react_native_1.Text,{style:{color:\"#FF6B6B\",fontSize:14,fontWeight:\"700\",marginBottom:8}},\"TaskMind render error:\"),\n'
+              '                                React.createElement(react_native_1.Text,{style:{color:\"#FFFFFF\",fontSize:11,fontFamily:\"monospace\"}},String(this.state.err)));\n'
+              '                        }\n'
+              '                        return this.props.children;\n'
+              '                    }\n'
+              '                }\n'
+              '                const _C=Component;\n'
+              '                const _W=(p)=>React.createElement(_ErrBound,null,React.createElement(_C,p));\n'
+              '                (0, expo_1.registerRootComponent)(_W);\n'
+              '            }'
+          )
+          if old1 in content:
+              content = content.replace(old1, new1)
+              print('Patched: wrapped component in error boundary')
+          else:
+              print('WARNING: error boundary patch target not found')
+
+          # 2. Show setup-phase errors (catch block) with visible text instead of blank View
+          old2 = '(0, expo_1.registerRootComponent)(() => <react_native_1.View />);'
+          new2 = (
               '(0, expo_1.registerRootComponent)(() => {'
               'const msg = String(error);'
               'return React.createElement(react_native_1.View,'
               '{style:{flex:1,backgroundColor:\"#0A2540\",justifyContent:\"center\",padding:24}},'
               'React.createElement(react_native_1.Text,'
               '{style:{color:\"#FF6B6B\",fontSize:14,fontWeight:\"700\",marginBottom:8}},'
-              '\"TaskMind startup error\"),'
+              '\"TaskMind setup error:\"),'
               'React.createElement(react_native_1.Text,'
               '{style:{color:\"#FFFFFF\",fontSize:11,fontFamily:\"monospace\"}},'
               'msg));});'
           )
-          if old in content:
-              content = content.replace(old, new)
-              with open(path, 'w') as f:
-                  f.write(content)
-              print('Patched renderRootComponent.js')
+          if old2 in content:
+              content = content.replace(old2, new2)
+              print('Patched: catch block shows error text')
           else:
-              print('WARNING: renderRootComponent.js pattern not found — skipping patch')
+              print('WARNING: catch block patch target not found')
+
+          with open(path, 'w') as f:
+              f.write(content)
           "
 
       - name: Download fonts
