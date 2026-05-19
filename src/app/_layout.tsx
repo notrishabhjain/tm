@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -16,16 +16,9 @@ import '@/i18n';
 void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 30,
-      retry: 1,
-    },
-  },
+  defaultOptions: { queries: { staleTime: 1000 * 30, retry: 1 } },
 });
 
-// Top-level error boundary — catches any React render crash and shows the
-// error message on screen instead of a blank white display.
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null }
@@ -53,13 +46,13 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
-export default function RootLayout(): React.JSX.Element | null {
+export default function RootLayout(): React.JSX.Element {
   const router = useRouter();
-  const [dbReady, setDbReady] = useState(false);
-  // Allow at most 4 seconds for fonts; proceed without them if they time out
-  // so the user never sees a permanent blank screen due to a font-load failure.
-  const [fontsReady, setFontsReady] = useState(false);
-  const fontTimerFired = useRef(false);
+
+  // Refs track readiness without causing re-renders that could race with navigation.
+  const dbReadyRef = useRef(false);
+  const fontsReadyRef = useRef(false);
+  const finalizedRef = useRef(false);
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': require('../../assets/fonts/Inter-Regular.ttf'),
@@ -69,75 +62,72 @@ export default function RootLayout(): React.JSX.Element | null {
     'JetBrainsMono-Regular': require('../../assets/fonts/JetBrainsMono-Regular.ttf'),
   });
 
-  // Resolve fontsReady either when fonts actually load or after a timeout.
-  useEffect(() => {
-    if (fontsLoaded && !fontsReady) {
-      setFontsReady(true);
-      return;
-    }
-    const timer = setTimeout(() => {
-      if (!fontTimerFired.current) {
-        fontTimerFired.current = true;
-        setFontsReady(true);
-      }
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, [fontsLoaded, fontsReady]);
-
-  useEffect(() => {
-    // Safety timeout: if init hangs for any reason, proceed anyway after 3s.
-    const safetyTimer = setTimeout(() => setDbReady(true), 3000);
-    async function init(): Promise<void> {
-      try {
-        initializeDatabase(); // synchronous — no async queue dependency
-        await seedDatabaseIfNeeded();
-      } catch (err) {
-        console.error('DB init failed:', err);
-      } finally {
-        clearTimeout(safetyTimer);
-        setDbReady(true);
-      }
-    }
-    void init();
-    return () => clearTimeout(safetyTimer);
-  }, []);
-
-  useEffect(() => {
-    if (fontsReady && dbReady) {
+  // Called when both DB and fonts are ready (or timed out).
+  function tryFinalize(): void {
+    if (!finalizedRef.current && dbReadyRef.current && fontsReadyRef.current) {
+      finalizedRef.current = true;
       void SplashScreen.hideAsync();
       const onboardingDone = getSetting('onboarding_complete');
       if (!onboardingDone) {
         router.replace('/onboarding');
       }
     }
-  }, [fontsReady, dbReady, router]);
+  }
 
+  // Hard fallback: reveal the app after 5 s no matter what.
   useEffect(() => {
-    if (!dbReady) return;
+    const t = setTimeout(() => {
+      dbReadyRef.current = true;
+      fontsReadyRef.current = true;
+      tryFinalize();
+    }, 5000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // DB init — synchronous schema setup, async seeding.
+  useEffect(() => {
+    async function boot(): Promise<void> {
+      try {
+        initializeDatabase();
+        await seedDatabaseIfNeeded();
+      } catch (err) {
+        console.error('DB init error (non-fatal):', err);
+      }
+      dbReadyRef.current = true;
+      tryFinalize();
+    }
+    void boot();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Font loading with 4 s timeout so a hung font load never blocks the app.
+  useEffect(() => {
+    if (fontsLoaded) {
+      fontsReadyRef.current = true;
+      tryFinalize();
+      return;
+    }
+    const t = setTimeout(() => {
+      fontsReadyRef.current = true;
+      tryFinalize();
+    }, 4000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontsLoaded]);
+
+  // Notification listener — attach once after mount.
+  useEffect(() => {
     const sub = NotificationListener.addNotificationListener((data) => {
       void handleNotification({ notification: data });
     });
     return () => sub.remove();
-  }, [dbReady]);
+  }, []);
 
-  if (!fontsReady || !dbReady) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: '#0A2540',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700', letterSpacing: 1 }}>
-          TaskMind
-        </Text>
-        <Text style={{ color: '#6B8FBF', fontSize: 12, marginTop: 8 }}>Loading…</Text>
-      </View>
-    );
-  }
-
+  // expo-router REQUIRES a navigator (Stack/Tabs/Slot) on every render,
+  // including the very first one. Never return a plain View here.
+  // The native splash screen (kept alive by preventAutoHideAsync above)
+  // provides the loading UI until tryFinalize() calls hideAsync().
   return (
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
