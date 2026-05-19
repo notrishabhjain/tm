@@ -125,6 +125,8 @@ jobs:
               f.write(content)
           print('Patched DevMenuReactHost.kt')
           PYEOF
+
+      - name: Download fonts
         run: |
           FONT_DIR=assets/fonts
           BASE="https://github.com/rsms/inter/releases/download/v4.0"
