@@ -126,6 +126,28 @@ jobs:
           print('Patched DevMenuReactHost.kt')
           PYEOF
 
+      - name: Patch expo-sqlite for expo-modules-core Queues API
+        run: |
+          python3 -c "
+          path = 'node_modules/expo-sqlite/android/src/main/java/expo/modules/sqlite/SQLiteModule.kt'
+          with open(path, 'r') as f:
+              content = f.read()
+          # expo-modules-core changed runOnQueue() to accept Queues enum, not CoroutineScope
+          content = content.replace('import kotlinx.coroutines.CoroutineScope\n', '')
+          content = content.replace('import kotlinx.coroutines.Dispatchers\n', '')
+          content = content.replace(
+              'private val moduleCoroutineScope = CoroutineScope(Dispatchers.IO)\n',
+              ''
+          )
+          content = content.replace(
+              '.runOnQueue(moduleCoroutineScope)',
+              '.runOnQueue(expo.modules.kotlin.functions.Queues.DEFAULT)'
+          )
+          with open(path, 'w') as f:
+              f.write(content)
+          print('Patched SQLiteModule.kt')
+          "
+
       - name: Download fonts
         run: |
           FONT_DIR=assets/fonts
