@@ -6,7 +6,12 @@ export type Language = 'EN' | 'HI' | 'HI-EN';
 
 export type ExtractionDecision = 'CREATE' | 'CONFIRM' | 'DISCARD';
 
-export type DiscardReason = 'LOW_CONFIDENCE' | 'ANTI_PATTERN' | 'TOO_SHORT' | 'FILTERED';
+export type DiscardReason =
+  | 'LOW_CONFIDENCE'
+  | 'ANTI_PATTERN'
+  | 'TOO_SHORT'
+  | 'FILTERED'
+  | 'USER_REJECTED';
 
 export interface Task {
   id: string;

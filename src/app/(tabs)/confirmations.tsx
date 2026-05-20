@@ -6,10 +6,14 @@ import { getPriorityColor } from '@/ui/theme/colors';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Button } from '@/ui/components/Button';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
+import { SenderStatsRepository } from '@/data/repositories/SenderStatsRepository';
+import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogRepository';
 import { db } from '@/data/db/client';
 import type { Task } from '@/domain/types';
 
 const taskRepo = new TaskRepository(db);
+const senderStatsRepo = new SenderStatsRepository(db);
+const discardedRepo = new DiscardedLogRepository(db);
 
 export default function ConfirmationsScreen(): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -21,17 +25,37 @@ export default function ConfirmationsScreen(): React.JSX.Element {
   });
 
   const confirmMutation = useMutation({
-    mutationFn: (id: string) => taskRepo.confirmTask(id),
+    mutationFn: async (task: Task) => {
+      await taskRepo.confirmTask(task.id);
+      const senderKey = task.sender ?? task.sourceApp;
+      await senderStatsRepo.incrementConfirm(senderKey);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (id: string) => taskRepo.deleteTask(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    mutationFn: async (task: Task) => {
+      await discardedRepo.insert({
+        notificationId: task.id,
+        sourceApp: task.sourceApp,
+        sender: task.sender ?? null,
+        bodyPreview: task.body ?? task.title,
+        reason: 'USER_REJECTED',
+        confidence: task.confidence,
+        createdAt: Date.now(),
+      });
+      const senderKey = task.sender ?? task.sourceApp;
+      await senderStatsRepo.incrementReject(senderKey);
+      await taskRepo.deleteTask(task.id);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['discarded-log'] });
+    },
   });
 
   const handleConfirm = (task: Task): void => {
-    confirmMutation.mutate(task.id);
+    confirmMutation.mutate(task);
   };
 
   const handleReject = (task: Task): void => {
@@ -40,7 +64,7 @@ export default function ConfirmationsScreen(): React.JSX.Element {
       {
         text: 'Skip',
         style: 'destructive',
-        onPress: () => rejectMutation.mutate(task.id),
+        onPress: () => rejectMutation.mutate(task),
       },
     ]);
   };
@@ -91,6 +115,11 @@ function ConfirmationCard({
       <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
       <View style={styles.cardContent}>
         <Text style={styles.taskText}>{task.title}</Text>
+        {task.body != null && task.body !== task.title && (
+          <Text style={styles.taskBody} numberOfLines={3}>
+            {task.body}
+          </Text>
+        )}
         <View style={styles.metaRow}>
           <Text style={styles.sourceMeta}>
             {task.sender ? `${task.sender} · ` : ''}
@@ -160,6 +189,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.onSurfaceLight,
     lineHeight: 21,
+    marginBottom: 4,
+  },
+  taskBody: {
+    fontSize: 13,
+    color: Colors.onSurfaceVariantLight,
+    lineHeight: 19,
     marginBottom: 8,
   },
   metaRow: {

@@ -14,10 +14,14 @@ import {
 import { db } from '@/data/db/client';
 import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogRepository';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
+import { VipContactRepository } from '@/data/repositories/VipContactRepository';
+import { MonitoredAppRepository } from '@/data/repositories/MonitoredAppRepository';
 import type { DiscardedLogEntry } from '@/domain/types';
 
 const discardedRepo = new DiscardedLogRepository(db);
 const taskRepo = new TaskRepository(db);
+const vipRepo = new VipContactRepository(db);
+const monitoredRepo = new MonitoredAppRepository(db);
 
 type DiagTab = 'Notifications' | 'Extraction' | 'Discarded' | 'DB' | 'System';
 
@@ -285,11 +289,75 @@ function DiscardedRow({
   );
 }
 
+interface DBStats {
+  taskCounts: Record<string, number>;
+  discardedCount: number;
+  vipCount: number;
+  monitoredAppsCount: number;
+  dbSizeKb: number | null;
+}
+
+async function fetchDBStats(): Promise<DBStats> {
+  const [taskCounts, discardedCount, vips, monitoredApps] = await Promise.all([
+    taskRepo.countByStatus(),
+    discardedRepo.count(),
+    vipRepo.getAll(),
+    monitoredRepo.getAll(),
+  ]);
+
+  let dbSizeKb: number | null = null;
+  try {
+    const dbPath = `${FileSystem.documentDirectory ?? ''}SQLite/taskmind.db`;
+    const info = await FileSystem.getInfoAsync(dbPath);
+    if (info.exists && 'size' in info) {
+      dbSizeKb = Math.round((info.size as number) / 1024);
+    }
+  } catch {
+    // File size optional
+  }
+
+  return {
+    taskCounts,
+    discardedCount,
+    vipCount: vips.length,
+    monitoredAppsCount: monitoredApps.length,
+    dbSizeKb,
+  };
+}
+
 function DBTab(): React.JSX.Element {
+  const { data: stats, isLoading, refetch } = useQuery({
+    queryKey: ['db-stats'],
+    queryFn: fetchDBStats,
+    refetchInterval: 15000,
+  });
+
+  if (isLoading || !stats) {
+    return (
+      <View style={styles.emptyTab}>
+        <Text style={styles.emptyText}>Loading stats…</Text>
+      </View>
+    );
+  }
+
+  const totalTasks = Object.values(stats.taskCounts).reduce((a, b) => a + b, 0);
+
   return (
     <View style={styles.dbTab}>
       <Text style={styles.dbTitle}>Database Stats</Text>
-      <Text style={styles.dbHint}>Live row counts and DB file size will appear here.</Text>
+      <SystemRow label="Total Tasks" value={String(totalTasks)} />
+      {Object.entries(stats.taskCounts).map(([status, count]) => (
+        <SystemRow key={status} label={`  ${status}`} value={String(count)} />
+      ))}
+      <SystemRow label="Discarded Log" value={String(stats.discardedCount)} />
+      <SystemRow label="VIP Contacts" value={String(stats.vipCount)} />
+      <SystemRow label="Monitored Apps" value={String(stats.monitoredAppsCount)} />
+      {stats.dbSizeKb !== null && (
+        <SystemRow label="DB File Size" value={`${stats.dbSizeKb} KB`} />
+      )}
+      <Pressable style={styles.refreshBtn} onPress={() => void refetch()}>
+        <Text style={styles.refreshBtnText}>Refresh</Text>
+      </Pressable>
     </View>
   );
 }
@@ -399,4 +467,13 @@ const styles = StyleSheet.create({
   },
   systemLabel: { fontSize: 14, color: Colors.onSurfaceVariantLight },
   systemValue: { fontSize: 14, color: Colors.onSurfaceLight, fontWeight: '500' },
+  refreshBtn: {
+    marginTop: 16,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: Colors.primary500,
+  },
+  refreshBtnText: { color: Colors.white, fontSize: 13, fontWeight: '600' },
 });
