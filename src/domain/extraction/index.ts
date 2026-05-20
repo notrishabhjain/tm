@@ -27,8 +27,9 @@ export async function runExtractionPipeline(
 ): Promise<ExtractionResult> {
   const combinedText = [input.title, input.text].filter(Boolean).join(' ');
 
-  // Early exit for noise
-  if (isNoise(combinedText)) {
+  // Early exit for noise — check combined text AND raw text separately
+  // (combined can fail ^ anchors if the app name is prepended)
+  if (isNoise(combinedText) || (input.text ? isNoise(input.text) : false)) {
     return {
       decision: 'DISCARD',
       priority: 'LOW',

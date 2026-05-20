@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AppState, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
@@ -180,9 +181,10 @@ export default function RootLayout(): React.JSX.Element {
   // provides the loading UI until tryFinalize() calls hideAsync().
   return (
     <AppErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <View style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <View style={{ flex: 1 }}>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="onboarding" options={{ headerShown: false }} />
@@ -196,9 +198,10 @@ export default function RootLayout(): React.JSX.Element {
               <Stack.Screen name="settings/nudges" options={{ presentation: 'card' }} />
               <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />
             </Stack>
-          </View>
-        </ThemeProvider>
-      </QueryClientProvider>
+            </View>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </SafeAreaProvider>
     </AppErrorBoundary>
   );
 }

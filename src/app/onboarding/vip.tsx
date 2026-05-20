@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
 import { ContactPickerModal } from '@/ui/components/ContactPickerModal';
+import { db, initializeDatabase } from '@/data/db/client';
+import { VipContactRepository } from '@/data/repositories/VipContactRepository';
 
 export default function OnboardingVipScreen(): React.JSX.Element {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [vips, setVips] = useState<string[]>([]);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -30,8 +34,8 @@ export default function OnboardingVipScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.stepLabel}>Step 3 of 4</Text>
         <Text style={styles.title}>VIP Contacts</Text>
         <Text style={styles.description}>
@@ -78,7 +82,20 @@ export default function OnboardingVipScreen(): React.JSX.Element {
       <View style={styles.footer}>
         <Button
           label="Continue →"
-          onPress={() => void router.push('/onboarding/priority')}
+          onPress={() =>
+            void (async () => {
+              if (vips.length > 0) {
+                try {
+                  initializeDatabase();
+                  const repo = new VipContactRepository(db);
+                  await Promise.all(vips.map((n) => repo.add(n, n, 'manual')));
+                } catch {
+                  // DB write failed — non-fatal, continue onboarding
+                }
+              }
+              router.push('/onboarding/priority');
+            })()
+          }
           fullWidth
         />
         <Button

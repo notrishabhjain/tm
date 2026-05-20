@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Contacts from 'expo-contacts';
 import { Colors } from '@/ui/theme/colors';
 
@@ -26,6 +27,7 @@ export function ContactPickerModal({
   onSelect,
   existingNames,
 }: Props): React.JSX.Element {
+  const insets = useSafeAreaInsets();
   const [allContacts, setAllContacts] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -82,7 +84,7 @@ export function ContactPickerModal({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
           <Text style={styles.title}>
             Pick a Contact{allContacts.length > 0 ? ` (${allContacts.length})` : ''}
           </Text>
@@ -153,7 +155,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 56,
     paddingBottom: 14,
     backgroundColor: Colors.surfaceLight,
     borderBottomWidth: 1,

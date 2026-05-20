@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
 import NotificationListener from '../../../modules/notification-listener/src';
 
 export default function OnboardingPermissionsScreen(): React.JSX.Element {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<'granted' | 'denied' | 'unknown'>('unknown');
 
   const checkStatus = async (): Promise<void> => {
@@ -33,7 +35,7 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
       <View style={styles.content}>
         <Text style={styles.stepLabel}>Step 1 of 4</Text>
         <Text style={styles.title}>Grant Notification Access</Text>
@@ -90,10 +92,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.backgroundLight,
-    padding: 24,
+    paddingHorizontal: 24,
     justifyContent: 'space-between',
   },
-  content: { flex: 1, paddingTop: 24 },
+  content: { flex: 1 },
   stepLabel: { fontSize: 12, color: Colors.onSurfaceVariantLight, marginBottom: 8 },
   title: { fontSize: 26, fontWeight: '700', color: Colors.primary900, marginBottom: 16 },
   description: {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
 import { setSetting } from '@/data/storage/settings';
@@ -8,15 +9,20 @@ import NotificationListener from '../../../modules/notification-listener/src';
 
 export default function OnboardingDoneScreen(): React.JSX.Element {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const handleFinish = async (): Promise<void> => {
     setSetting('onboarding_complete', true);
-    await NotificationListener.startService();
+    try {
+      await NotificationListener.startService();
+    } catch {
+      // Non-fatal: foreground service may not start until NLS permission is granted
+    }
     router.replace('/(tabs)');
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]}>
       <View style={styles.content}>
         <View style={styles.checkCircle}>
           <Text style={styles.checkIcon}>✓</Text>
@@ -50,7 +56,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.primary900,
-    padding: 32,
+    paddingHorizontal: 32,
     justifyContent: 'space-between',
   },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center' },

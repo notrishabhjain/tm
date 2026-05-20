@@ -11,10 +11,10 @@ const EMOJI_REGEX =
 const NOISE_PATTERNS = [
   // Media attachments (no actionable text)
   /^(photo|video|audio|document|sticker|gif|voice message|voice note|location|contact|reaction)$/i,
-  // Aggregate notification summaries
-  /^\d+\s+messages?\s+from\s+\d+\s+chats?$/i,
-  /^\d+\s+new\s+messages?$/i,
-  /^\d+\s+unread\s+messages?$/i,
+  // Aggregate notification summaries (may appear with or without app-name prefix)
+  /\b\d+\s+(new\s+)?messages?\s+from\s+\d+\s+chats?\b/i,
+  /^\d+\s+(new\s+)?messages?$/i,
+  /^\d+\s+unread\s+(messages?|notifications?)$/i,
   /^\d+\s+notifications?$/i,
   /^\d+\s+missed\s+(calls?|messages?)$/i,
   // Sync / status indicators

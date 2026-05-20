@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Link } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
 
 export default function OnboardingWelcomeScreen(): React.JSX.Element {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 32 }]}>
       <View style={styles.hero}>
         <Text style={styles.logo}>TaskMind</Text>
         <Text style={styles.tagline}>Turn every notification into action.</Text>
@@ -33,7 +36,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.primary900,
-    padding: 32,
+    paddingHorizontal: 32,
     justifyContent: 'space-between',
   },
   hero: {
