@@ -326,7 +326,11 @@ async function fetchDBStats(): Promise<DBStats> {
 }
 
 function DBTab(): React.JSX.Element {
-  const { data: stats, isLoading, refetch } = useQuery({
+  const {
+    data: stats,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['db-stats'],
     queryFn: fetchDBStats,
     refetchInterval: 15000,
@@ -352,9 +356,7 @@ function DBTab(): React.JSX.Element {
       <SystemRow label="Discarded Log" value={String(stats.discardedCount)} />
       <SystemRow label="VIP Contacts" value={String(stats.vipCount)} />
       <SystemRow label="Monitored Apps" value={String(stats.monitoredAppsCount)} />
-      {stats.dbSizeKb !== null && (
-        <SystemRow label="DB File Size" value={`${stats.dbSizeKb} KB`} />
-      )}
+      {stats.dbSizeKb !== null && <SystemRow label="DB File Size" value={`${stats.dbSizeKb} KB`} />}
       <Pressable style={styles.refreshBtn} onPress={() => void refetch()}>
         <Text style={styles.refreshBtnText}>Refresh</Text>
       </Pressable>
