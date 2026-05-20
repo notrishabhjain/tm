@@ -48,6 +48,41 @@ export async function handleNotification(taskData: {
   const vipRepo = new VipContactRepository(db);
   const allVipIds = await vipRepo.getAllIdentifiers();
 
+  // VIP contacts bypass the extraction pipeline entirely — always URGENT, no confirmation.
+  const senderText = `${notification.title ?? ''} ${notification.text ?? ''}`;
+  const isVip =
+    allVipIds.length > 0 &&
+    allVipIds.some((vip) => senderText.toLowerCase().includes(vip.toLowerCase()));
+
+  if (isVip) {
+    const vipTaskRepo = new TaskRepository(db);
+    const messageText = notification.bigText || notification.text || notification.title;
+    await vipTaskRepo.createTask({
+      title: notification.title
+        ? `${notification.title}: ${(notification.text || '').slice(0, 80)}`
+        : messageText.slice(0, 120),
+      body: notification.bigText || notification.text,
+      sourceApp: notification.packageName,
+      sender: notification.title,
+      priority: 'URGENT',
+      confidence: 1.0,
+      needsConfirmation: false,
+      matchedKeywords: ['vip_contact'],
+      language: 'EN',
+    });
+    logExtractionDecision({
+      input: messageText,
+      language: 'EN',
+      ruleScore: 1.0,
+      modelScore: 0,
+      finalScore: 1.0,
+      matchedKeywords: ['vip_contact'],
+      decision: 'CREATE',
+      timestamp: Date.now(),
+    });
+    return;
+  }
+
   const senderKey = `${notification.packageName}:${notification.title}`;
   const senderStatsRepo = new SenderStatsRepository(db);
   const confidenceAdjustment = await senderStatsRepo.getConfidenceAdjustment(senderKey);

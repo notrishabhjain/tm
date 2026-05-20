@@ -1,6 +1,7 @@
 package com.taskmind.app
 import expo.modules.splashscreen.SplashScreenManager
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 
@@ -13,14 +14,36 @@ import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
-    // Set the theme to AppTheme BEFORE onCreate to support
-    // coloring the background, status bar, and navigation bar.
-    // This is required for expo-splash-screen.
-    // setTheme(R.style.AppTheme);
-    // @generated begin expo-splashscreen - expo prebuild (DO NOT MODIFY) sync-f3ff59a738c56c9a6119210cb55f0b613eb8b6af
     SplashScreenManager.registerOnActivity(this)
-    // @generated end expo-splashscreen
     super.onCreate(null)
+    handleShareIntent(intent)
+  }
+
+  override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    intent?.let { handleShareIntent(it) }
+  }
+
+  private fun handleShareIntent(intent: Intent) {
+    if (intent.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {
+      val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
+      val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+      pendingShareText = text
+      pendingShareSubject = subject
+    }
+  }
+
+  companion object {
+    @Volatile var pendingShareText: String? = null
+    @Volatile var pendingShareSubject: String? = null
+
+    fun popShareIntent(): Map<String, String?>? {
+      val text = pendingShareText ?: return null
+      val subject = pendingShareSubject
+      pendingShareText = null
+      pendingShareSubject = null
+      return mapOf("text" to text, "subject" to subject)
+    }
   }
 
   /**

@@ -3,6 +3,7 @@ import { View, Text, Pressable, Switch, StyleSheet, ScrollView } from 'react-nat
 import { useRouter } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
 import { getSetting, setSetting } from '@/data/storage/settings';
+import { scheduleNudge, cancelNudge } from '@/services/nudge-scheduler';
 
 const FREQUENCY_OPTIONS = [
   { label: 'Off', value: 0 },
@@ -25,6 +26,11 @@ export default function NudgesScreen(): React.JSX.Element {
   const handleFrequency = (value: number): void => {
     setFrequencyMinutes(value);
     setSetting('nudge_freq_minutes', value);
+    if (value === 0) {
+      void cancelNudge();
+    } else {
+      void scheduleNudge(value);
+    }
   };
 
   const handleUrgentOverride = (value: boolean): void => {

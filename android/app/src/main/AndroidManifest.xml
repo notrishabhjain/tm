@@ -43,6 +43,11 @@
         <data android:scheme="com.taskmind.app"/>
         <data android:scheme="exp+taskmind"/>
       </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.SEND"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:mimeType="text/plain"/>
+      </intent-filter>
     </activity>
     <receiver android:name="expo.modules.notificationlistener.BootReceiver" android:exported="true">
       <intent-filter>

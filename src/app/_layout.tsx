@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Text, View } from 'react-native';
+import { AppState, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
@@ -9,6 +9,7 @@ import { initializeDatabase } from '@/data/db/client';
 import { getSetting } from '@/data/storage/settings';
 import { seedDatabaseIfNeeded } from '@/services/db-seeder';
 import { handleNotification } from '@/services/notification-handler';
+import { restoreNudgeFromSettings } from '@/services/nudge-scheduler';
 import NotificationListener from '../../modules/notification-listener/src';
 import '@/i18n';
 
@@ -109,12 +110,14 @@ export default function RootLayout(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // DB init — synchronous schema setup, async seeding.
+  // DB init — synchronous schema setup, async seeding, then restore nudge schedule.
   useEffect(() => {
     async function boot(): Promise<void> {
       try {
         initializeDatabase();
         await seedDatabaseIfNeeded();
+        const nudgeFreq = getSetting('nudge_freq_minutes');
+        void restoreNudgeFromSettings(nudgeFreq);
       } catch (err) {
         console.error('DB init error (non-fatal):', err);
       }
@@ -148,6 +151,29 @@ export default function RootLayout(): React.JSX.Element {
     return () => sub.remove();
   }, []);
 
+  // Share intent — check whenever app comes to foreground.
+  useEffect(() => {
+    const checkShare = (): void => {
+      void (async () => {
+        try {
+          const intent = await NotificationListener.getLastShareIntent();
+          if (intent?.text) {
+            router.push('/share');
+          }
+        } catch {
+          // Native module unavailable
+        }
+      })();
+    };
+
+    checkShare();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkShare();
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // expo-router REQUIRES a navigator (Stack/Tabs/Slot) on every render,
   // including the very first one. Never return a plain View here.
   // The native splash screen (kept alive by preventAutoHideAsync above)
@@ -168,6 +194,7 @@ export default function RootLayout(): React.JSX.Element {
               <Stack.Screen name="settings/monitored-apps" options={{ presentation: 'card' }} />
               <Stack.Screen name="settings/vip-contacts" options={{ presentation: 'card' }} />
               <Stack.Screen name="settings/nudges" options={{ presentation: 'card' }} />
+              <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />
             </Stack>
           </View>
         </ThemeProvider>

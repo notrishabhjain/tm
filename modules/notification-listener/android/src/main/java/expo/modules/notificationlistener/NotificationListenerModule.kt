@@ -85,6 +85,10 @@ class NotificationListenerModule : Module() {
             }
             context.startService(intent)
         }
+
+        AsyncFunction("getLastShareIntent") {
+            com.taskmind.app.MainActivity.popShareIntent()
+        }
     }
 
     companion object {

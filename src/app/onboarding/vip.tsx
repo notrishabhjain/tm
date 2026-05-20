@@ -1,23 +1,15 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  Alert,
-  Platform,
-} from 'react-native';
+import { View, Text, TextInput, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Contacts from 'expo-contacts';
 import { Colors } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
+import { ContactPickerModal } from '@/ui/components/ContactPickerModal';
 
 export default function OnboardingVipScreen(): React.JSX.Element {
   const router = useRouter();
   const [name, setName] = useState('');
   const [vips, setVips] = useState<string[]>([]);
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const addVip = (): void => {
     const trimmed = name.trim();
@@ -31,40 +23,10 @@ export default function OnboardingVipScreen(): React.JSX.Element {
     setVips((prev) => prev.filter((v) => v !== n));
   };
 
-  const pickContact = async (): Promise<void> => {
-    if (Platform.OS !== 'android') return;
-    const { status } = await Contacts.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission needed',
-        'Allow contacts access so TaskMind can pick a contact from your address book.',
-        [{ text: 'OK' }]
-      );
-      return;
+  const handleContactSelected = (contactName: string): void => {
+    if (!vips.includes(contactName)) {
+      setVips((prev) => [...prev, contactName]);
     }
-    const { data } = await Contacts.getContactsAsync({
-      fields: [Contacts.Fields.Name],
-      sort: Contacts.SortTypes.FirstName,
-    });
-    const names = data
-      .map((c) => c.name ?? '')
-      .filter((n) => n.length > 0)
-      .slice(0, 300);
-
-    if (names.length === 0) {
-      Alert.alert('No contacts', 'No contacts found in your address book.');
-      return;
-    }
-
-    Alert.alert('Pick a VIP contact', 'Choose from your recent contacts:', [
-      ...names.slice(0, 6).map((n) => ({
-        text: n,
-        onPress: () => {
-          if (!vips.includes(n)) setVips((prev) => [...prev, n]);
-        },
-      })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
   };
 
   return (
@@ -92,7 +54,7 @@ export default function OnboardingVipScreen(): React.JSX.Element {
           </Pressable>
         </View>
 
-        <Pressable style={styles.contactPickerBtn} onPress={() => void pickContact()}>
+        <Pressable style={styles.contactPickerBtn} onPress={() => setPickerVisible(true)}>
           <Text style={styles.contactPickerText}>📇 Pick from Contacts</Text>
         </Pressable>
 
@@ -126,6 +88,13 @@ export default function OnboardingVipScreen(): React.JSX.Element {
           fullWidth
         />
       </View>
+
+      <ContactPickerModal
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onSelect={handleContactSelected}
+        existingNames={vips}
+      />
     </View>
   );
 }

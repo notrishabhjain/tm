@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import * as Contacts from 'expo-contacts';
 import { Colors } from '@/ui/theme/colors';
 import { db } from '@/data/db/client';
 import { VipContactRepository } from '@/data/repositories/VipContactRepository';
+import { ContactPickerModal } from '@/ui/components/ContactPickerModal';
 
 const repo = new VipContactRepository(db);
 
@@ -13,6 +13,7 @@ export default function VipContactsScreen(): React.JSX.Element {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const { data: contacts = [] } = useQuery({
     queryKey: ['vip-contacts'],
@@ -42,38 +43,8 @@ export default function VipContactsScreen(): React.JSX.Element {
     addMutation.mutate(trimmed);
   };
 
-  const handlePickContact = async (): Promise<void> => {
-    const { status } = await Contacts.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission needed',
-        'Allow contacts access so TaskMind can pick a contact from your address book.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    const { data } = await Contacts.getContactsAsync({
-      fields: [Contacts.Fields.Name],
-      sort: Contacts.SortTypes.FirstName,
-    });
-    const names = data
-      .map((c) => c.name ?? '')
-      .filter((n) => n.length > 0)
-      .filter((n) => !contacts.some((c) => c.identifier.toLowerCase() === n.toLowerCase()))
-      .slice(0, 300);
-
-    if (names.length === 0) {
-      Alert.alert('No contacts', 'No new contacts available to add.');
-      return;
-    }
-
-    Alert.alert('Pick a VIP contact', 'Choose from your contacts:', [
-      ...names.slice(0, 6).map((n) => ({
-        text: n,
-        onPress: () => addMutation.mutate(n),
-      })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
+  const handleContactSelected = (contactName: string): void => {
+    addMutation.mutate(contactName);
   };
 
   const handleRemove = (id: string, displayName: string): void => {
@@ -117,7 +88,7 @@ export default function VipContactsScreen(): React.JSX.Element {
           </Pressable>
         </View>
 
-        <Pressable style={styles.contactPickerBtn} onPress={() => void handlePickContact()}>
+        <Pressable style={styles.contactPickerBtn} onPress={() => setPickerVisible(true)}>
           <Text style={styles.contactPickerText}>📇 Pick from Contacts</Text>
         </Pressable>
 
@@ -154,6 +125,13 @@ export default function VipContactsScreen(): React.JSX.Element {
           </Text>
         </View>
       </ScrollView>
+
+      <ContactPickerModal
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onSelect={handleContactSelected}
+        existingNames={contacts.map((c) => c.identifier)}
+      />
     </View>
   );
 }
