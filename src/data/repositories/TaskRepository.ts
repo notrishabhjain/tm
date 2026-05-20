@@ -76,7 +76,13 @@ export class TaskRepository {
     const rows = await this.db
       .select()
       .from(tasks)
-      .where(and(eq(tasks.status, 'PENDING'), isNull(tasks.deletedAt)))
+      .where(
+        and(
+          eq(tasks.status, 'PENDING'),
+          eq(tasks.needsConfirmation, false),
+          isNull(tasks.deletedAt)
+        )
+      )
       .orderBy(desc(tasks.createdAt));
     return rows.map(mapRow);
   }

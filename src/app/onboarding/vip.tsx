@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Pressable, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  Alert,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import * as Contacts from 'expo-contacts';
 import { Colors } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
 
@@ -19,6 +29,42 @@ export default function OnboardingVipScreen(): React.JSX.Element {
 
   const removeVip = (n: string): void => {
     setVips((prev) => prev.filter((v) => v !== n));
+  };
+
+  const pickContact = async (): Promise<void> => {
+    if (Platform.OS !== 'android') return;
+    const { status } = await Contacts.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission needed',
+        'Allow contacts access so TaskMind can pick a contact from your address book.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    const { data } = await Contacts.getContactsAsync({
+      fields: [Contacts.Fields.Name],
+      sort: Contacts.SortTypes.FirstName,
+    });
+    const names = data
+      .map((c) => c.name ?? '')
+      .filter((n) => n.length > 0)
+      .slice(0, 300);
+
+    if (names.length === 0) {
+      Alert.alert('No contacts', 'No contacts found in your address book.');
+      return;
+    }
+
+    Alert.alert('Pick a VIP contact', 'Choose from your recent contacts:', [
+      ...names.slice(0, 6).map((n) => ({
+        text: n,
+        onPress: () => {
+          if (!vips.includes(n)) setVips((prev) => [...prev, n]);
+        },
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
   };
 
   return (
@@ -45,6 +91,10 @@ export default function OnboardingVipScreen(): React.JSX.Element {
             <Text style={styles.addButtonText}>Add</Text>
           </Pressable>
         </View>
+
+        <Pressable style={styles.contactPickerBtn} onPress={() => void pickContact()}>
+          <Text style={styles.contactPickerText}>📇 Pick from Contacts</Text>
+        </Pressable>
 
         {vips.map((v) => (
           <View key={v} style={styles.vipRow}>
@@ -91,7 +141,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 24,
   },
-  inputRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  inputRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   input: {
     flex: 1,
     height: 48,
@@ -112,6 +162,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addButtonText: { color: Colors.white, fontWeight: '600', fontSize: 14 },
+  contactPickerBtn: {
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary500,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  contactPickerText: { fontSize: 14, color: Colors.primary500, fontWeight: '600' },
   vipRow: {
     flexDirection: 'row',
     alignItems: 'center',

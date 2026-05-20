@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Contacts from 'expo-contacts';
 import { Colors } from '@/ui/theme/colors';
 import { db } from '@/data/db/client';
 import { VipContactRepository } from '@/data/repositories/VipContactRepository';
@@ -39,6 +40,40 @@ export default function VipContactsScreen(): React.JSX.Element {
       return;
     }
     addMutation.mutate(trimmed);
+  };
+
+  const handlePickContact = async (): Promise<void> => {
+    const { status } = await Contacts.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission needed',
+        'Allow contacts access so TaskMind can pick a contact from your address book.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    const { data } = await Contacts.getContactsAsync({
+      fields: [Contacts.Fields.Name],
+      sort: Contacts.SortTypes.FirstName,
+    });
+    const names = data
+      .map((c) => c.name ?? '')
+      .filter((n) => n.length > 0)
+      .filter((n) => !contacts.some((c) => c.identifier.toLowerCase() === n.toLowerCase()))
+      .slice(0, 300);
+
+    if (names.length === 0) {
+      Alert.alert('No contacts', 'No new contacts available to add.');
+      return;
+    }
+
+    Alert.alert('Pick a VIP contact', 'Choose from your contacts:', [
+      ...names.slice(0, 6).map((n) => ({
+        text: n,
+        onPress: () => addMutation.mutate(n),
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
   };
 
   const handleRemove = (id: string, displayName: string): void => {
@@ -81,6 +116,10 @@ export default function VipContactsScreen(): React.JSX.Element {
             <Text style={styles.addButtonText}>Add</Text>
           </Pressable>
         </View>
+
+        <Pressable style={styles.contactPickerBtn} onPress={() => void handlePickContact()}>
+          <Text style={styles.contactPickerText}>📇 Pick from Contacts</Text>
+        </Pressable>
 
         {contacts.length === 0 ? (
           <Text style={styles.emptyHint}>
@@ -180,6 +219,16 @@ const styles = StyleSheet.create({
   urgentDot: { fontSize: 12 },
   contactName: { flex: 1, fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '500' },
   removeBtn: { fontSize: 16, color: Colors.error, fontWeight: '700' },
+  contactPickerBtn: {
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary500,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  contactPickerText: { fontSize: 14, color: Colors.primary500, fontWeight: '600' },
   emptyHint: {
     fontSize: 13,
     color: Colors.onSurfaceVariantLight,
