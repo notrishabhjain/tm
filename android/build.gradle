@@ -42,12 +42,19 @@ allprojects {
     // Pin onnxruntime-android to a fixed version so Gradle does not need to
     // fetch Maven metadata with a dynamic "latest.integration" selector (which
     // triggers an Ivy/Xerces XML-parsing bug on the CI runner).
+    // Also force androidx.core to 1.15.0: newer versions (1.17.0+) require
+    // compileSdk 36 and AGP 8.9.1, but RN 0.76 pins AGP to 8.6.0.
     configurations.all {
         resolutionStrategy.eachDependency { details ->
             if (details.requested.group == 'com.microsoft.onnxruntime' &&
                 details.requested.name == 'onnxruntime-android') {
                 details.useVersion '1.20.0'
                 details.because 'pin away from latest.integration to avoid Xerces SAX metadata-fetch failure'
+            }
+            if (details.requested.group == 'androidx.core' &&
+                (details.requested.name == 'core' || details.requested.name == 'core-ktx')) {
+                details.useVersion '1.15.0'
+                details.because 'core 1.17+ requires compileSdk 36 and AGP 8.9.1; RN 0.76 pins AGP to 8.6.0'
             }
         }
     }
