@@ -1,5 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/ui/theme/colors';
 
 export default function TabLayout(): React.JSX.Element {
@@ -20,7 +21,9 @@ export default function TabLayout(): React.JSX.Element {
         options={{
           title: 'Tasks',
           tabBarLabel: 'Home',
-          tabBarIcon: ({ color }) => <TabIcon label="⬜" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -28,7 +31,9 @@ export default function TabLayout(): React.JSX.Element {
         options={{
           title: 'Confirm',
           tabBarLabel: 'Confirm',
-          tabBarIcon: ({ color }) => <TabIcon label="?" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="checkmark-circle-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -36,7 +41,9 @@ export default function TabLayout(): React.JSX.Element {
         options={{
           title: 'History',
           tabBarLabel: 'History',
-          tabBarIcon: ({ color }) => <TabIcon label="◷" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="time-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -44,24 +51,11 @@ export default function TabLayout(): React.JSX.Element {
         options={{
           title: 'Settings',
           tabBarLabel: 'Settings',
-          tabBarIcon: ({ color }) => <TabIcon label="⚙" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>
-  );
-}
-
-function TabIcon({
-  label: _label,
-  color: _color,
-}: {
-  label: string;
-  color: string;
-}): React.JSX.Element {
-  return (
-    <React.Fragment>
-      {/* Placeholder icon — replace with lucide-react-native icons */}
-      <React.Fragment />
-    </React.Fragment>
   );
 }

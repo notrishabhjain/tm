@@ -1,0 +1,6 @@
+.github/
+node_modules/
+android/
+ios/
+coverage/
+*.md

@@ -60,6 +60,102 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Patch ExpoModulesCorePlugin for AGP 8.x
+        run: |
+          python3 -c "
+          with open('node_modules/expo-modules-core/android/ExpoModulesCorePlugin.gradle', 'r') as f:
+              content = f.read()
+          content = content.replace(
+              'from components.release',
+              'def _rc = project.components.findByName(\"release\"); if (_rc != null) { from _rc }'
+          )
+          with open('node_modules/expo-modules-core/android/ExpoModulesCorePlugin.gradle', 'w') as f:
+              f.write(content)
+          print('Patched ExpoModulesCorePlugin.gradle')
+          "
+
+      - name: Patch expo-sqlite for expo-modules-core Queues API
+        run: |
+          python3 -c "
+          path = 'node_modules/expo-sqlite/android/src/main/java/expo/modules/sqlite/SQLiteModule.kt'
+          with open(path, 'r') as f:
+              content = f.read()
+          # expo-modules-core changed runOnQueue() to accept Queues enum, not CoroutineScope
+          content = content.replace('import kotlinx.coroutines.CoroutineScope\n', '')
+          content = content.replace('import kotlinx.coroutines.Dispatchers\n', '')
+          content = content.replace(
+              'private val moduleCoroutineScope = CoroutineScope(Dispatchers.IO)\n',
+              ''
+          )
+          content = content.replace(
+              '.runOnQueue(moduleCoroutineScope)',
+              '.runOnQueue(expo.modules.kotlin.functions.Queues.DEFAULT)'
+          )
+          with open(path, 'w') as f:
+              f.write(content)
+          print('Patched SQLiteModule.kt')
+          "
+
+      - name: Patch renderRootComponent to show errors instead of blank screen
+        run: |
+          python3 -c "
+          path = 'node_modules/expo-router/build/renderRootComponent.js'
+          with open(path, 'r') as f:
+              content = f.read()
+
+          # 1. Wrap the normal production registration in a React error boundary
+          #    so any React rendering crash shows a visible error screen instead of blank.
+          old1 = '            else {\n                (0, expo_1.registerRootComponent)(Component);\n            }'
+          new1 = (
+              '            else {\n'
+              '                class _ErrBound extends React.Component {\n'
+              '                    constructor(p){super(p);this.state={err:null};}\n'
+              '                    static getDerivedStateFromError(e){return {err:e};}\n'
+              '                    render(){\n'
+              '                        if(this.state.err){\n'
+              '                            return React.createElement(react_native_1.View,\n'
+              '                                {style:{flex:1,backgroundColor:\"#0A2540\",justifyContent:\"center\",padding:24}},\n'
+              '                                React.createElement(react_native_1.Text,{style:{color:\"#FF6B6B\",fontSize:14,fontWeight:\"700\",marginBottom:8}},\"TaskMind render error:\"),\n'
+              '                                React.createElement(react_native_1.Text,{style:{color:\"#FFFFFF\",fontSize:11,fontFamily:\"monospace\"}},String(this.state.err)));\n'
+              '                        }\n'
+              '                        return this.props.children;\n'
+              '                    }\n'
+              '                }\n'
+              '                const _C=Component;\n'
+              '                const _W=(p)=>React.createElement(_ErrBound,null,React.createElement(_C,p));\n'
+              '                (0, expo_1.registerRootComponent)(_W);\n'
+              '            }'
+          )
+          if old1 in content:
+              content = content.replace(old1, new1)
+              print('Patched: wrapped component in error boundary')
+          else:
+              print('WARNING: error boundary patch target not found')
+
+          # 2. Show setup-phase errors (catch block) with visible text instead of blank View
+          old2 = '(0, expo_1.registerRootComponent)(() => <react_native_1.View />);'
+          new2 = (
+              '(0, expo_1.registerRootComponent)(() => {'
+              'const msg = String(error);'
+              'return React.createElement(react_native_1.View,'
+              '{style:{flex:1,backgroundColor:\"#0A2540\",justifyContent:\"center\",padding:24}},'
+              'React.createElement(react_native_1.Text,'
+              '{style:{color:\"#FF6B6B\",fontSize:14,fontWeight:\"700\",marginBottom:8}},'
+              '\"TaskMind setup error:\"),'
+              'React.createElement(react_native_1.Text,'
+              '{style:{color:\"#FFFFFF\",fontSize:11,fontFamily:\"monospace\"}},'
+              'msg));});'
+          )
+          if old2 in content:
+              content = content.replace(old2, new2)
+              print('Patched: catch block shows error text')
+          else:
+              print('WARNING: catch block patch target not found')
+
+          with open(path, 'w') as f:
+              f.write(content)
+          "
+
       - name: Download fonts
         run: |
           FONT_DIR=assets/fonts
@@ -96,12 +192,14 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US" \
             -noprompt
 
-      - name: Build debug APK
+      - name: Build APK
         env:
           EXPO_PUBLIC_COMMIT_SHA: ${{ steps.version.outputs.short_sha }}
         run: |
           set -o pipefail
-          cd android && ./gradlew :app:assembleDebug \
+          # Build release variant — this bundles JS and does not show Expo Dev Client launcher.
+          # The release signingConfig already points to the debug keystore (see android/app/build.gradle).
+          cd android && ./gradlew :app:assembleRelease \
             --no-daemon \
             --stacktrace \
             --info \
@@ -123,8 +221,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Key error lines (entire log)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E "(FAILURE|FAILED|error:|BUILD FAILED|Exception|Could not|Caused by|Execution failed)" \
-            /tmp/gradle.log | head -60 >> $GITHUB_STEP_SUMMARY || true
+          grep -E "(FAILURE|FAILED|^e: |error: |BUILD FAILED|Execution failed for task|Could not resolve|Caused by: org\.gradle|Caused by: org\.jetbrains)" \
+            /tmp/gradle.log | grep -v "node_modules.*Exception\|\.kt:.*Exception\|\.java:.*Exception" | head -80 >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Last 200 lines" >> $GITHUB_STEP_SUMMARY
@@ -140,7 +238,7 @@ jobs:
 
       - name: Locate and rename APK
         run: |
-          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -1)
+          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
           echo "Found APK at: $APK_PATH"
           cp "$APK_PATH" \
             "./taskmind-debug-${{ steps.version.outputs.branch }}-${{ steps.version.outputs.short_sha }}.apk"
@@ -172,8 +270,8 @@ jobs:
           if [ -z "$PR" ] || [ ! -f /tmp/gradle.log ]; then exit 0; fi
           printf '## Build Failed (run %s)\n\n' "${{ github.run_id }}" > /tmp/comment.md
           printf '### Error lines\n```\n' >> /tmp/comment.md
-          grep -E "(FAILURE|FAILED|BUILD FAILED|Exception|Could not|Caused by|Execution failed)" \
-            /tmp/gradle.log | head -40 >> /tmp/comment.md || true
+          grep -E "(FAILED|^e: |error: |BUILD FAILED|Execution failed for task|Could not resolve|Caused by: org\.gradle|Caused by: org\.jetbrains)" \
+            /tmp/gradle.log | grep -v "node_modules.*Exception\|\.kt:.*Exception\|\.java:.*Exception" | head -60 >> /tmp/comment.md || true
           printf '```\n\n### First 80 lines\n```\n' >> /tmp/comment.md
           head -80 /tmp/gradle.log >> /tmp/comment.md
           printf '```\n\n### Last 80 lines\n```\n' >> /tmp/comment.md

@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, not, lt } from 'drizzle-orm';
+import { eq, and, desc, isNull, not, lt, gte } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { tasks } from '../db/schema';
 import type { Task, Priority, TaskStatus } from '@/domain/types';
@@ -76,7 +76,13 @@ export class TaskRepository {
     const rows = await this.db
       .select()
       .from(tasks)
-      .where(and(eq(tasks.status, 'PENDING'), isNull(tasks.deletedAt)))
+      .where(
+        and(
+          eq(tasks.status, 'PENDING'),
+          eq(tasks.needsConfirmation, false),
+          isNull(tasks.deletedAt)
+        )
+      )
       .orderBy(desc(tasks.createdAt));
     return rows.map(mapRow);
   }
@@ -137,6 +143,22 @@ export class TaskRepository {
       .delete(tasks)
       .where(and(not(isNull(tasks.deletedAt)), lt(tasks.deletedAt, cutoff)));
     return result.changes ?? 0;
+  }
+
+  async getTodayCompletedCount(): Promise<number> {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const rows = await this.db
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.status, 'COMPLETE'),
+          isNull(tasks.deletedAt),
+          gte(tasks.completedAt, startOfDay.getTime())
+        )
+      );
+    return rows.length;
   }
 
   async countByStatus(): Promise<Record<string, number>> {

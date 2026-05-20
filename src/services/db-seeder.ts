@@ -17,7 +17,7 @@ const DEFAULT_MONITORED_APPS = [
 export async function seedDatabaseIfNeeded(): Promise<void> {
   if (getSetting('db_seeded')) return;
 
-  await initializeDatabase();
+  initializeDatabase();
   const now = Date.now();
   const keywords = seedKeywordsRaw as RawKeyword[];
 

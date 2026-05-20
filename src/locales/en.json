@@ -1,0 +1,215 @@
+{
+  "common": {
+    "continue": "Continue →",
+    "skip": "Skip for now",
+    "done": "Done",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "dismiss": "Dismiss",
+    "settings": "Settings",
+    "back": "Back"
+  },
+  "tabs": {
+    "home": "Home",
+    "confirmations": "Confirmations",
+    "history": "History",
+    "settings": "Settings"
+  },
+  "home": {
+    "title": "Tasks",
+    "stats": {
+      "pending": "Pending",
+      "urgent": "Urgent",
+      "doneToday": "Done today"
+    },
+    "filters": {
+      "all": "All",
+      "urgent": "Urgent",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "empty": {
+      "title": "All clear",
+      "subtitle": "No pending tasks. New tasks appear here when TaskMind captures an actionable notification."
+    },
+    "debugWatermark": "DEV"
+  },
+  "confirmations": {
+    "title": "Confirmations",
+    "subtitle": "Review notifications TaskMind isn't sure about",
+    "empty": {
+      "title": "Nothing to confirm",
+      "subtitle": "Low-confidence captures appear here for your review."
+    },
+    "confirm": "Yes, create task",
+    "dismiss": "Not a task"
+  },
+  "history": {
+    "title": "History",
+    "filters": {
+      "all": "All",
+      "completed": "Completed",
+      "deleted": "Deleted"
+    },
+    "empty": {
+      "title": "No history yet",
+      "subtitle": "Completed and dismissed tasks appear here."
+    },
+    "stats": {
+      "completedToday": "Today",
+      "completedWeek": "This week",
+      "total": "All time"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "sections": {
+      "monitoring": "Monitoring",
+      "intelligence": "Intelligence",
+      "nudges": "Nudges",
+      "reports": "Reports",
+      "data": "Data",
+      "device": "Device",
+      "debug": "Debug"
+    },
+    "rows": {
+      "monitoredApps": "Monitored Apps",
+      "vipContacts": "VIP Contacts",
+      "priorityRules": "Priority Rules",
+      "learnedVocabulary": "Learned Vocabulary",
+      "nudgeSchedule": "Nudge Schedule",
+      "quietHours": "Quiet Hours",
+      "urgentOverride": "Urgent overrides quiet hours",
+      "dailyEmailReport": "Daily Email Report",
+      "exportImport": "Export / Import",
+      "autoBackup": "Auto Backup",
+      "batteryGuide": "Battery Optimization Guide",
+      "appearance": "Appearance",
+      "diagnostics": "Diagnostics",
+      "ruleBasedMode": "Rule-based mode",
+      "noneSet": "None set",
+      "notConfigured": "Not configured",
+      "enabled": "Enabled",
+      "systemDefault": "System default"
+    },
+    "subtitles": {
+      "diagnostics": "Notification capture, extraction log"
+    }
+  },
+  "task": {
+    "complete": "Mark complete",
+    "delete": "Delete task",
+    "source": "Source",
+    "sender": "Sender",
+    "confidence": "Confidence",
+    "captured": "Captured",
+    "priority": {
+      "urgent": "URGENT",
+      "high": "HIGH",
+      "medium": "MEDIUM",
+      "low": "LOW"
+    }
+  },
+  "onboarding": {
+    "welcome": {
+      "logo": "TaskMind",
+      "tagline": "Turn every notification into action.",
+      "description": "TaskMind watches your WhatsApp, email, and other apps — and automatically creates actionable tasks from messages that need your attention.",
+      "note": "No snooze. No defer. Just do it.",
+      "cta": "Get Started",
+      "privacyNote": "All processing happens on your device. Nothing leaves your phone."
+    },
+    "permissions": {
+      "step": "Step 1 of 5",
+      "title": "Grant Notification Access",
+      "description": "TaskMind needs Notification Access to read your notifications and identify actionable tasks. This permission is required for the app to work.",
+      "statusGranted": "Notification Access: Granted ✓",
+      "statusDenied": "Notification Access: Not granted",
+      "howToTitle": "How to grant access:",
+      "step1": "1. Tap \"Open Settings\" below",
+      "step2": "2. Find TaskMind in the list",
+      "step3": "3. Toggle it ON",
+      "step4": "4. Come back here",
+      "openSettings": "Open Settings"
+    },
+    "apps": {
+      "step": "Step 2 of 5",
+      "title": "Choose Apps to Monitor",
+      "description": "TaskMind will only process notifications from these apps. You can change this anytime in Settings."
+    },
+    "vip": {
+      "step": "Step 3 of 5",
+      "title": "VIP Contacts",
+      "description": "Messages from VIP contacts are automatically flagged as HIGH priority. Add people whose messages always matter."
+    },
+    "priority": {
+      "step": "Step 4 of 5",
+      "title": "How Priorities Work",
+      "description": "TaskMind automatically assigns priorities based on keywords and urgency signals in your notifications.",
+      "levels": {
+        "urgent": {
+          "label": "URGENT",
+          "desc": "Deadlines today, critical issues, words like \"urgent\", \"ASAP\", \"deadline\""
+        },
+        "high": {
+          "label": "HIGH",
+          "desc": "Action needed soon, VIP senders, keywords like \"please review\", \"waiting for you\""
+        },
+        "medium": {
+          "label": "MEDIUM",
+          "desc": "Standard action items, replies needed, follow-ups"
+        },
+        "low": {
+          "label": "LOW",
+          "desc": "FYIs, soft requests, informational messages"
+        }
+      },
+      "learnNote": "TaskMind learns from your confirmations and dismissals over time."
+    },
+    "nudges": {
+      "step": "Step 5 of 5",
+      "title": "Configure Nudges",
+      "description": "TaskMind can send a persistent notification reminding you of pending tasks. Configure when and how often.",
+      "frequencyLabel": "Nudge frequency",
+      "quietHoursLabel": "Quiet hours",
+      "quietHoursFrom": "From",
+      "quietHoursTo": "To",
+      "urgentOverride": "Urgent tasks override quiet hours",
+      "options": {
+        "off": "Off",
+        "every30": "Every 30 min",
+        "every60": "Every hour",
+        "every120": "Every 2 hours",
+        "every240": "Every 4 hours"
+      }
+    },
+    "done": {
+      "title": "You're all set!",
+      "description": "TaskMind is now monitoring your selected apps. Actionable messages will automatically appear as tasks on your home screen.",
+      "reminderTitle": "Remember",
+      "reminder1": "• No snooze. No \"later\". Just act on tasks.",
+      "reminder2": "• Check Settings → Diagnostics if something isn't working.",
+      "reminder3": "• For battery optimization: Settings → Device → Battery Guide.",
+      "cta": "Start Using TaskMind"
+    }
+  },
+  "diagnostics": {
+    "title": "Diagnostics",
+    "tabs": {
+      "notifications": "Notifications",
+      "extraction": "Extraction",
+      "discarded": "Discarded",
+      "dbStats": "DB Stats",
+      "system": "System"
+    },
+    "empty": "No data yet",
+    "clearLog": "Clear log"
+  },
+  "errors": {
+    "dbInit": "Database initialization failed",
+    "generic": "Something went wrong"
+  }
+}

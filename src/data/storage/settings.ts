@@ -1,6 +1,13 @@
 import { MMKV } from 'react-native-mmkv';
 
-const storage = new MMKV({ id: 'taskmind_settings' });
+let _storage: MMKV | null = null;
+try {
+  _storage = new MMKV({ id: 'taskmind_settings' });
+} catch {
+  // MMKV unavailable — fall back to in-memory defaults below
+}
+
+const _mem = new Map<string, boolean | number | string>();
 
 export interface AppSettings {
   onboarding_complete: boolean;
@@ -44,20 +51,28 @@ const DEFAULTS: AppSettings = {
 
 export function getSetting<K extends keyof AppSettings>(key: K): AppSettings[K] {
   const defaultVal = DEFAULTS[key];
-  if (typeof defaultVal === 'boolean') {
-    return (storage.getBoolean(key) ?? defaultVal) as AppSettings[K];
-  } else if (typeof defaultVal === 'number') {
-    return (storage.getNumber(key) ?? defaultVal) as AppSettings[K];
+  if (_storage) {
+    if (typeof defaultVal === 'boolean') {
+      return (_storage.getBoolean(key) ?? defaultVal) as AppSettings[K];
+    } else if (typeof defaultVal === 'number') {
+      return (_storage.getNumber(key) ?? defaultVal) as AppSettings[K];
+    }
+    return (_storage.getString(key) ?? defaultVal) as AppSettings[K];
   }
-  return (storage.getString(key) ?? defaultVal) as AppSettings[K];
+  return (_mem.get(key) ?? defaultVal) as AppSettings[K];
 }
 
 export function setSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]): void {
-  if (typeof value === 'boolean') storage.set(key, value);
-  else if (typeof value === 'number') storage.set(key, value);
-  else storage.set(key, value as string);
+  if (_storage) {
+    if (typeof value === 'boolean') _storage.set(key, value);
+    else if (typeof value === 'number') _storage.set(key, value);
+    else _storage.set(key, value as string);
+  } else {
+    _mem.set(key, value as boolean | number | string);
+  }
 }
 
 export function clearAll(): void {
-  storage.clearAll();
+  if (_storage) _storage.clearAll();
+  else _mem.clear();
 }

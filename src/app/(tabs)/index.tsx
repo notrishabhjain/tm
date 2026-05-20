@@ -41,6 +41,12 @@ export default function HomeScreen(): React.JSX.Element {
     refetchInterval: 10000,
   });
 
+  const { data: todayCount = 0 } = useQuery({
+    queryKey: ['tasks', 'today-completed'],
+    queryFn: () => taskRepo.getTodayCompletedCount(),
+    refetchInterval: 10000,
+  });
+
   const completeMutation = useMutation({
     mutationFn: (id: string) => taskRepo.completeTask(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
@@ -73,7 +79,7 @@ export default function HomeScreen(): React.JSX.Element {
       <View style={styles.statsStrip}>
         <StatItem label="Pending" value={tasks.length} />
         <StatItem label="Urgent" value={urgentCount} valueColor={Colors.urgentFg} />
-        <StatItem label="Done today" value={0} valueColor={Colors.success} />
+        <StatItem label="Done today" value={todayCount} valueColor={Colors.success} />
       </View>
 
       {/* Filter chips */}
