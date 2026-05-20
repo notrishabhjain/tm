@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Colors } from '@/ui/theme/colors';
@@ -10,6 +11,13 @@ import {
   type CapturedNotification,
   type ExtractionDecisionLog,
 } from '@/services/diagnostics-logger';
+import { db } from '@/data/db/client';
+import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogRepository';
+import { TaskRepository } from '@/data/repositories/TaskRepository';
+import type { DiscardedLogEntry } from '@/domain/types';
+
+const discardedRepo = new DiscardedLogRepository(db);
+const taskRepo = new TaskRepository(db);
 
 type DiagTab = 'Notifications' | 'Extraction' | 'Discarded' | 'DB' | 'System';
 
@@ -176,13 +184,103 @@ function ExtractionRow({ item }: { item: ExtractionDecisionLog }): React.JSX.Ele
 }
 
 function DiscardedTab(): React.JSX.Element {
+  const queryClient = useQueryClient();
+
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ['discarded-log'],
+    queryFn: () => discardedRepo.getAll(100),
+    refetchInterval: 10000,
+  });
+
+  const promoteMutation = useMutation({
+    mutationFn: async (entry: DiscardedLogEntry) => {
+      await taskRepo.createTask({
+        title: entry.bodyPreview.slice(0, 120),
+        body: entry.bodyPreview,
+        sourceApp: entry.sourceApp,
+        sender: entry.sender ?? undefined,
+        priority: 'MEDIUM',
+        confidence: 0.5,
+        ruleScore: 0,
+        language: 'EN',
+        matchedKeywords: [],
+        needsConfirmation: true,
+      });
+      await discardedRepo.deleteById(Number(entry.id));
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['discarded-log'] });
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      Alert.alert('Added to Confirm', 'Notification promoted to confirmation queue.');
+    },
+    onError: (err) => Alert.alert('Error', String(err)),
+  });
+
+  if (isLoading) {
+    return (
+      <View style={styles.emptyTab}>
+        <Text style={styles.emptyText}>Loading…</Text>
+      </View>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <View style={styles.emptyTab}>
+        <Text style={styles.emptyText}>No discarded notifications yet.</Text>
+        <Text style={styles.emptyHint}>
+          Notifications that scored below the confidence threshold appear here. You can promote any
+          of them to the confirmation queue manually.
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.emptyTab}>
-      <Text style={styles.emptyText}>Discarded log shown here.</Text>
-      <Text style={styles.emptyHint}>
-        Tasks that were discarded due to low confidence appear here. You can promote them to tasks
-        manually.
-      </Text>
+    <View style={styles.logList}>
+      {entries.map((entry) => (
+        <DiscardedRow
+          key={entry.id}
+          entry={entry}
+          onPromote={() => promoteMutation.mutate(entry)}
+          promoting={promoteMutation.isPending}
+        />
+      ))}
+    </View>
+  );
+}
+
+function DiscardedRow({
+  entry,
+  onPromote,
+  promoting,
+}: {
+  entry: DiscardedLogEntry;
+  onPromote: () => void;
+  promoting: boolean;
+}): React.JSX.Element {
+  const appLabel = entry.sourceApp.split('.').pop() ?? entry.sourceApp;
+  return (
+    <View style={styles.discardedRow}>
+      <View style={styles.logContent}>
+        <Text style={styles.logTitle} numberOfLines={1}>
+          [{appLabel}]{entry.sender ? ` ${entry.sender}` : ''}
+        </Text>
+        <Text style={styles.logBody} numberOfLines={2}>
+          {entry.bodyPreview}
+        </Text>
+        <Text style={styles.logMeta}>
+          {entry.reason} · score: {entry.confidence.toFixed(2)} ·{' '}
+          {new Date(entry.createdAt).toLocaleTimeString()}
+        </Text>
+      </View>
+      <Pressable
+        style={[styles.promoteBtn, promoting && styles.promoteBtnDisabled]}
+        onPress={onPromote}
+        disabled={promoting}
+      >
+        <Text style={styles.promoteBtnText}>+ Task</Text>
+      </Pressable>
     </View>
   );
 }
@@ -271,6 +369,24 @@ const styles = StyleSheet.create({
   logBody: { fontSize: 12, color: Colors.onSurfaceVariantLight, marginBottom: 2 },
   logMeta: { fontSize: 11, color: Colors.onSurfaceVariantLight, fontStyle: 'italic' },
   logKeywords: { fontSize: 11, color: Colors.primary500, marginTop: 2 },
+  discardedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.surfaceLight,
+    padding: 12,
+    borderRadius: 8,
+    elevation: 1,
+    marginBottom: 8,
+  },
+  promoteBtn: {
+    backgroundColor: Colors.primary500,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  promoteBtnDisabled: { opacity: 0.5 },
+  promoteBtnText: { color: Colors.white, fontSize: 12, fontWeight: '700' },
   dbTab: { padding: 16 },
   dbTitle: { fontSize: 15, fontWeight: '600', color: Colors.onSurfaceLight, marginBottom: 8 },
   dbHint: { fontSize: 13, color: Colors.onSurfaceVariantLight },
