@@ -1,12 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Link } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
 
 export default function OnboardingWelcomeScreen(): React.JSX.Element {
-  const router = useRouter();
-
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
@@ -20,11 +18,9 @@ export default function OnboardingWelcomeScreen(): React.JSX.Element {
       </View>
 
       <View style={styles.footer}>
-        <Button
-          label="Get Started"
-          onPress={() => void router.push('/onboarding/permissions')}
-          fullWidth
-        />
+        <Link href="/onboarding/permissions" asChild>
+          <Button label="Get Started" fullWidth />
+        </Link>
         <Text style={styles.privacyNote}>
           All processing happens on your device. Nothing leaves your phone.
         </Text>

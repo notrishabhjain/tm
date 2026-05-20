@@ -33,6 +33,7 @@ describe('runRuleEngine', () => {
 
   it('penalizes anti-pattern without imperative', () => {
     const result = runRuleEngine('lol', 1, VOCAB);
+    // anti-pattern(-0.25) + short(<3 words, -0.1) = -0.35 → clamped to 0
     expect(result.score).toBe(0);
   });
 

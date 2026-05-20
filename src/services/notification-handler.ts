@@ -16,7 +16,7 @@ type RawKeyword = { keyword: string; language: string; priority_hint: string };
 
 function priorityHintToCategory(hint: string): Keyword['category'] {
   if (hint === 'URGENT') return 'URGENCY';
-  if (hint === 'HIGH') return 'DEADLINE';
+  if (hint === 'HIGH') return 'IMPERATIVE';
   if (hint === 'MEDIUM') return 'IMPERATIVE';
   return 'ANTI_PATTERN';
 }

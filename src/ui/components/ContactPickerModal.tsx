@@ -53,9 +53,11 @@ export function ContactPickerModal({
       }
       const { data } = await Contacts.getContactsAsync({
         fields: [Contacts.Fields.Name],
-        sort: Contacts.SortTypes.FirstName,
       });
-      const names = data.map((c) => c.name ?? '').filter((n) => n.length > 0);
+      const names = data
+        .map((c) => c.name ?? '')
+        .filter((n) => n.length > 0)
+        .sort((a, b) => a.localeCompare(b));
       setAllContacts(names);
     } catch {
       Alert.alert('Error', 'Could not load contacts. Please try again.');
@@ -81,7 +83,9 @@ export function ContactPickerModal({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Pick a VIP Contact</Text>
+          <Text style={styles.title}>
+            Pick a Contact{allContacts.length > 0 ? ` (${allContacts.length})` : ''}
+          </Text>
           <Pressable onPress={onClose} hitSlop={12} style={styles.closeHit}>
             <Text style={styles.closeBtn}>✕</Text>
           </Pressable>
@@ -109,6 +113,13 @@ export function ContactPickerModal({
             <Text style={styles.hintText}>
               {search ? 'No contacts match your search.' : 'No new contacts available to add.'}
             </Text>
+            {!search && allContacts.length < 10 && allContacts.length > 0 && (
+              <Text style={styles.hintText}>
+                Only {allContacts.length} contact{allContacts.length !== 1 ? 's' : ''} found. If you
+                have more, go to Settings → Apps → TaskMind → Permissions → Contacts → Allow all
+                contacts.
+              </Text>
+            )}
           </View>
         ) : (
           <FlatList
