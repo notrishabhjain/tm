@@ -96,6 +96,36 @@ jobs:
           print('Patched SQLiteModule.kt')
           "
 
+      - name: Patch expo-sqlite build.gradle to avoid expo-module-gradle-plugin lookup
+        run: |
+          python3 -c "
+          import re
+          path = 'node_modules/expo-sqlite/android/build.gradle'
+          with open(path, 'r') as f:
+              content = f.read()
+          # expo-sqlite 15.x uses the 'plugins {}' block with 'expo-module-gradle-plugin'.
+          # That plugin is provided by android/expo-module-gradle-plugin via pluginManagement
+          # includeBuild, which can be fragile on CI. Replace with the equivalent traditional
+          # apply-from-ExpoModulesCorePlugin approach that all other expo modules use.
+          old = '''plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}'''
+          new = '''apply plugin: 'com.android.library'
+def expoModulesCorePlugin = new File(project(':expo-modules-core').projectDir.absolutePath, 'ExpoModulesCorePlugin.gradle')
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useDefaultAndroidSdkVersions()'''
+          if old in content:
+              content = content.replace(old, new)
+              print('Patched expo-sqlite build.gradle plugin block')
+          else:
+              print('WARNING: expo-sqlite plugin block not found, skipping patch')
+          with open(path, 'w') as f:
+              f.write(content)
+          "
+
       - name: Patch renderRootComponent to show errors instead of blank screen
         run: |
           python3 -c "
