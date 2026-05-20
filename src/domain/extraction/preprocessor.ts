@@ -9,11 +9,29 @@ const EMOJI_REGEX =
 
 // Common noise patterns in messaging app notifications
 const NOISE_PATTERNS = [
-  /^(photo|video|audio|document|sticker|gif|voice message|location)$/i,
-  /^\d+ messages? from \d+ chats?$/i,
-  /^typing\.{3}$/i,
-  /^online$/i,
-  /^(delivered|read|sent)$/i,
+  // Media attachments (no actionable text)
+  /^(photo|video|audio|document|sticker|gif|voice message|voice note|location|contact|reaction)$/i,
+  // Aggregate notification summaries
+  /^\d+\s+messages?\s+from\s+\d+\s+chats?$/i,
+  /^\d+\s+new\s+messages?$/i,
+  /^\d+\s+unread\s+messages?$/i,
+  /^\d+\s+notifications?$/i,
+  /^\d+\s+missed\s+(calls?|messages?)$/i,
+  // Sync / status indicators
+  /^sync(ing)?(\s+for\s+new\s+messages?)?\.{0,3}$/i,
+  /^(downloading|uploading|backup|restoring|connecting|reconnecting)(\s+.*)?$/i,
+  /^end.to.end\s+encrypted$/i,
+  // Delivery / read receipts
+  /^(delivered|read|sent|seen|pending)$/i,
+  // Presence / status
+  /^(online|offline|away|busy|last seen .+)$/i,
+  /^typing\.{0,3}$/i,
+  // Call noise (missed call is actionable, but raw status lines are not)
+  /^(incoming|outgoing|ongoing)\s+(voice|video)?\s*call$/i,
+  // App-level status lines
+  /^(tap to|swipe to)\s+(view|open|reply|dismiss).*$/i,
+  /^(pull down to refresh|no new notifications?|all caught up)$/i,
+  /^(\d+\s+)?new\s+(email|message|notification)s?$/i,
 ];
 
 export function preprocessText(text: string): PreprocessedText {

@@ -2798,5 +2798,545 @@
     "keyword": "पहले करें",
     "language": "HI",
     "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "buy",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "meet",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "appointment",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "pick up",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "drop off",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "clarify",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "discuss",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "acknowledge",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "reply by",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "get back to me",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "ping me",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "connect",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "loop in",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "brief me",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "organize",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "reserve",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "audit",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "countersign",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "witness",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "notarize",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "payment",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "wire",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "deposit",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "withdraw",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "refund",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "bill",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "subscribe",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "unsubscribe",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "renew",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "cancel",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "terminate",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "install",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "upgrade",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "configure",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "reset",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "restore",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "print",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "scan",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "copy",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "fax",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "courier",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "ship",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "deliver",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "flag",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "mark",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "tag",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "label",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "categorize",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "file",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "hire",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "onboard",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "train",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "evaluate",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "assess",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "post",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "announce",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "broadcast",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "investigate",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "analyse",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "analyze",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "study",
+    "language": "EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "remind me",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "check if",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "take note",
+    "language": "EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "expiring",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "expires",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "due soon",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "past due",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "time sensitive",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "act now",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "do it now",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "right away",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "cannot wait",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "cant wait",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "expiry",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "expired",
+    "language": "EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "bol",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "sun",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "aa ja",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "milna",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "karna hai",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "invoice bhej",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "bill bhej",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "paisa",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "meeting hai",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "call pe aao",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "kab",
+    "language": "HI-EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "kyun",
+    "language": "HI-EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "ho gaya",
+    "language": "HI-EN",
+    "priority_hint": "MEDIUM"
+  },
+  {
+    "keyword": "abhi bhej",
+    "language": "HI-EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "abhi karo",
+    "language": "HI-EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "jaldi karo",
+    "language": "HI-EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "abhi call karo",
+    "language": "HI-EN",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "bata do",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "dekh lo",
+    "language": "HI-EN",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "खरीद",
+    "language": "HI",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "बिल",
+    "language": "HI",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "मिलना",
+    "language": "HI",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "मुलाकात",
+    "language": "HI",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "याद दिलाना",
+    "language": "HI",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "जरूरी",
+    "language": "HI",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "अभी करो",
+    "language": "HI",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "जल्दी करो",
+    "language": "HI",
+    "priority_hint": "URGENT"
+  },
+  {
+    "keyword": "भुगतान",
+    "language": "HI",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "हस्ताक्षर",
+    "language": "HI",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "सत्यापित",
+    "language": "HI",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "अनुमोदन",
+    "language": "HI",
+    "priority_hint": "HIGH"
+  },
+  {
+    "keyword": "नियुक्ति",
+    "language": "HI",
+    "priority_hint": "HIGH"
   }
 ]
