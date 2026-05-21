@@ -35,9 +35,27 @@ function tryLoadOrt(): boolean {
 }
 
 let session: InferenceSession | null = null;
-let taskPrototypeEmb: Float32Array | null = null;
-let nonTaskPrototypeEmb: Float32Array | null = null;
+let taskPrototypes: Float32Array[] = [];
+let nonTaskPrototypes: Float32Array[] = [];
 let sessionLoadFailed = false;
+
+const TASK_SENTENCES = [
+  'please send the document and confirm by tomorrow',
+  'call me back urgently as soon as possible',
+  'review and approve the report before the deadline',
+  'pay the invoice before it is due this week',
+  'let me know your feedback on this proposal',
+  'submit the form to the manager by end of day',
+  'need your response and approval on this matter',
+  'follow up on the pending request immediately',
+];
+
+const NON_TASK_SENTENCES = [
+  'good morning just letting you know about this update',
+  'thanks for everything have a great day',
+  'your package has been shipped tracking number included',
+  'happy birthday wishing you all the best',
+];
 
 // ── Tokenizer (simplified BERT WordPiece) ────────────────────────────────────
 
@@ -246,7 +264,7 @@ function cosine(a: Float32Array, b: Float32Array): number {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export function isModelLoaded(): boolean {
-  return session !== null && !sessionLoadFailed;
+  return session !== null && !sessionLoadFailed && taskPrototypes.length > 0;
 }
 
 export async function loadModel(): Promise<boolean> {
@@ -261,16 +279,19 @@ export async function loadModel(): Promise<boolean> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     session = await InferenceSessionClass!.create(getModelLocalPath());
 
-    // Warm up with prototype phrases to compute reference embeddings
-    const [taskEmb, nonTaskEmb] = await Promise.all([
-      embed('please send the document and confirm by tomorrow'),
-      embed('good morning just letting you know about this update'),
+    // Embed all prototype sentences in parallel for multi-prototype classification
+    const [taskEmbs, nonTaskEmbs] = await Promise.all([
+      Promise.all(TASK_SENTENCES.map((s) => embed(s))),
+      Promise.all(NON_TASK_SENTENCES.map((s) => embed(s))),
     ]);
-    taskPrototypeEmb = taskEmb;
-    nonTaskPrototypeEmb = nonTaskEmb;
+    taskPrototypes = taskEmbs.filter((e): e is Float32Array => e !== null);
+    nonTaskPrototypes = nonTaskEmbs.filter((e): e is Float32Array => e !== null);
+    if (taskPrototypes.length === 0) throw new Error('Failed to embed task prototypes');
     return true;
   } catch {
     session = null;
+    taskPrototypes = [];
+    nonTaskPrototypes = [];
     sessionLoadFailed = true;
     return false;
   }
@@ -281,14 +302,17 @@ export async function loadModel(): Promise<boolean> {
  * Higher = more likely a real actionable task.
  */
 export async function classifyTaskProbability(text: string): Promise<number> {
-  if (!session || !taskPrototypeEmb || !nonTaskPrototypeEmb) return 0.5;
+  if (!session || taskPrototypes.length === 0 || nonTaskPrototypes.length === 0) return 0.5;
   const emb = await embed(text);
   if (!emb) return 0.5;
 
-  const simTask = cosine(emb, taskPrototypeEmb);
-  const simNonTask = cosine(emb, nonTaskPrototypeEmb);
+  // Mean cosine similarity to each prototype class
+  const avgTask =
+    taskPrototypes.reduce((sum, p) => sum + cosine(emb, p), 0) / taskPrototypes.length;
+  const avgNonTask =
+    nonTaskPrototypes.reduce((sum, p) => sum + cosine(emb, p), 0) / nonTaskPrototypes.length;
 
-  // Softmax-like normalization: how much closer to task vs non-task
-  const score = (simTask - simNonTask + 1) / 2;
+  // Normalize: how much closer to task vs non-task prototypes
+  const score = (avgTask - avgNonTask + 1) / 2;
   return Math.max(0, Math.min(1, score));
 }

@@ -10,6 +10,7 @@ export function createTaskEntity(params: {
   status: TaskStatus;
   confidence: number;
   needsConfirmation: boolean;
+  dueDate: number | null;
   createdAt: number;
   completedAt: number | null;
   deletedAt: number | null;

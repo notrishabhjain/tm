@@ -155,6 +155,7 @@ export async function handleNotification(taskData: {
     needsConfirmation: result.decision === 'CONFIRM',
     matchedKeywords: result.matchedKeywords,
     language: result.language,
+    dueDate: result.dueDate ?? null,
   });
 
   if (result.decision === 'CREATE') {

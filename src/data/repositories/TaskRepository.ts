@@ -19,6 +19,7 @@ export interface CreateTaskInput {
   language: string;
   matchedKeywords: string[];
   needsConfirmation: boolean;
+  dueDate?: number | null;
 }
 
 function mapRow(row: typeof tasks.$inferSelect): Task {
@@ -32,6 +33,7 @@ function mapRow(row: typeof tasks.$inferSelect): Task {
     status: row.status as TaskStatus,
     confidence: row.confidence,
     needsConfirmation: row.needsConfirmation ?? false,
+    dueDate: row.dueDate ?? null,
     createdAt: row.createdAt,
     completedAt: row.completedAt ?? null,
     deletedAt: row.deletedAt ?? null,
@@ -58,6 +60,7 @@ export class TaskRepository {
       language: input.language,
       matchedKeywords: JSON.stringify(input.matchedKeywords),
       needsConfirmation: input.needsConfirmation,
+      dueDate: input.dueDate ?? null,
       createdAt: now,
     });
 

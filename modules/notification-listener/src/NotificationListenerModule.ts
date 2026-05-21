@@ -69,6 +69,29 @@ const NotificationListenerModule = {
     } | null>;
   },
 
+  peekShareIntent(): Promise<{ text: string; subject: string | null } | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.peekShareIntent() as Promise<{
+      text: string;
+      subject: string | null;
+    } | null>;
+  },
+
+  clearShareIntent(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.clearShareIntent() as Promise<void>;
+  },
+
+  getLatestScreenshot(): Promise<string | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.getLatestScreenshot() as Promise<string | null>;
+  },
+
+  clearLatestScreenshot(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.clearLatestScreenshot() as Promise<void>;
+  },
+
   addNotificationListener(listener: (data: NotificationData) => void) {
     if (!emitter) return { remove: () => undefined };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

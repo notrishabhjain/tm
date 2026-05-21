@@ -6,6 +6,7 @@ import { runRuleEngine } from './ruleEngine';
 import { assignPriority } from './priorityAssigner';
 import { extractTaskText } from './actionExtractor';
 import { aggregateConfidence } from './confidenceAggregator';
+import { extractDeadline } from './deadlineExtractor';
 
 export interface PipelineInput {
   text: string;
@@ -86,6 +87,7 @@ export async function runExtractionPipeline(
   );
 
   const extractedTitle = extractTaskText(combinedText);
+  const dueDate = extractDeadline(combinedText);
 
   const discardReason =
     decision === 'DISCARD'
@@ -105,6 +107,7 @@ export async function runExtractionPipeline(
     modelScore,
     matchedKeywords: ruleResult.matches.map((m) => m.phrase),
     extractedTitle,
+    dueDate,
     discardReason,
   };
 }

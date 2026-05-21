@@ -32,9 +32,9 @@ export function aggregateConfidence(input: AggregatorInput): AggregatorResult {
   }
 
   let decision: ExtractionDecision;
-  if (finalConfidence >= 0.75) {
+  if (finalConfidence >= 0.6) {
     decision = 'CREATE';
-  } else if (finalConfidence >= 0.4) {
+  } else if (finalConfidence >= 0.35) {
     decision = 'CONFIRM';
   } else {
     decision = 'DISCARD';

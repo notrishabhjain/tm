@@ -17,6 +17,7 @@ export const tasks = sqliteTable(
     matchedKeywords: text('matched_keywords').notNull().default('[]'),
     needsConfirmation: integer('needs_confirmation', { mode: 'boolean' }).notNull().default(false),
     calendarEventId: text('calendar_event_id'),
+    dueDate: integer('due_date'),
     createdAt: integer('created_at').notNull(),
     completedAt: integer('completed_at'),
     deletedAt: integer('deleted_at'),

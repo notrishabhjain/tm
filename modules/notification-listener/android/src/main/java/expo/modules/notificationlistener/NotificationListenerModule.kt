@@ -89,6 +89,23 @@ class NotificationListenerModule : Module() {
         AsyncFunction("getLastShareIntent") {
             popShareIntent()
         }
+
+        AsyncFunction("peekShareIntent") {
+            peekShareIntentData()
+        }
+
+        AsyncFunction("clearShareIntent") {
+            clearShareIntentData()
+        }
+
+        AsyncFunction("getLatestScreenshot") {
+            val file = java.io.File(context.filesDir, "taskmind_share_screenshot.jpg")
+            if (file.exists()) file.absolutePath else null
+        }
+
+        AsyncFunction("clearLatestScreenshot") {
+            java.io.File(context.filesDir, "taskmind_share_screenshot.jpg").delete()
+        }
     }
 
     companion object {
@@ -109,6 +126,16 @@ class NotificationListenerModule : Module() {
             pendingShareText = null
             pendingShareSubject = null
             return mapOf("text" to text, "subject" to subject)
+        }
+
+        fun peekShareIntentData(): Map<String, String?>? {
+            val text = pendingShareText ?: return null
+            return mapOf("text" to text, "subject" to pendingShareSubject)
+        }
+
+        fun clearShareIntentData() {
+            pendingShareText = null
+            pendingShareSubject = null
         }
 
         fun sendNotificationEvent(data: Map<String, Any>) {

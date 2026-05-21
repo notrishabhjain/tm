@@ -23,6 +23,7 @@ export interface Task {
   status: TaskStatus;
   confidence: number;
   needsConfirmation: boolean;
+  dueDate: number | null;
   createdAt: number;
   completedAt: number | null;
   deletedAt: number | null;
@@ -48,6 +49,7 @@ export interface ExtractionResult {
   modelScore: number | null;
   matchedKeywords: string[];
   extractedTitle: string;
+  dueDate?: number | null;
   discardReason?: DiscardReason;
 }
 

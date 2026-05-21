@@ -36,6 +36,38 @@ function getSourceLabel(sourceApp: string): string {
   return labels[sourceApp] ?? sourceApp.split('.').pop() ?? sourceApp;
 }
 
+function DueDateBadge({ dueDate }: { dueDate: number }): React.JSX.Element {
+  const now = Date.now();
+  const diffMs = dueDate - now;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  let label: string;
+  let bgColor: string;
+  let textColor: string;
+  if (diffMs < 0) {
+    label = 'OVERDUE';
+    bgColor = Colors.urgentBgLight;
+    textColor = Colors.urgentFg;
+  } else if (diffDays === 0) {
+    label = 'TODAY';
+    bgColor = '#FFF3CD';
+    textColor = '#856404';
+  } else if (diffDays === 1) {
+    label = 'TOMORROW';
+    bgColor = Colors.mediumBgLight;
+    textColor = Colors.mediumFg;
+  } else {
+    const d = new Date(dueDate);
+    label = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+    bgColor = Colors.surfaceVariantLight;
+    textColor = Colors.onSurfaceVariantLight;
+  }
+  return (
+    <View style={[styles.dueBadge, { backgroundColor: bgColor }]}>
+      <Text style={[styles.dueBadgeText, { color: textColor }]}>{label}</Text>
+    </View>
+  );
+}
+
 export function TaskCard({
   task,
   onPress,
@@ -81,6 +113,7 @@ export function TaskCard({
               <Text style={styles.confirmChipText}>CONFIRM</Text>
             </View>
           )}
+          {task.dueDate && <DueDateBadge dueDate={task.dueDate} />}
         </View>
       </View>
 
@@ -168,6 +201,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.primary500,
     letterSpacing: 0.5,
+  },
+  dueBadge: {
+    height: 24,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dueBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   actions: {
     justifyContent: 'center',

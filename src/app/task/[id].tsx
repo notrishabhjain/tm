@@ -11,11 +11,15 @@ import { db } from '@/data/db/client';
 
 const taskRepo = new TaskRepository(db);
 
-async function addToCalendar(title: string, notes: string | null): Promise<void> {
+async function addToCalendar(
+  title: string,
+  notes: string | null,
+  dueDate: number | null
+): Promise<string | null> {
   const { status } = await Calendar.requestCalendarPermissionsAsync();
   if (status !== 'granted') {
     Alert.alert('Permission Required', 'Calendar access is needed to add this task as an event.');
-    return;
+    return null;
   }
 
   const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
@@ -24,12 +28,20 @@ async function addToCalendar(title: string, notes: string | null): Promise<void>
   );
   if (!writable) {
     Alert.alert('No Calendar', 'No writable calendar found on this device.');
-    return;
+    return null;
   }
 
-  const start = new Date();
-  start.setMinutes(0, 0, 0);
-  start.setHours(start.getHours() + 1);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  let start: Date;
+  if (dueDate) {
+    start = new Date(dueDate);
+    start.setHours(9, 0, 0, 0);
+  } else {
+    start = new Date();
+    start.setMinutes(0, 0, 0);
+    start.setHours(start.getHours() + 1);
+  }
   const end = new Date(start.getTime() + 60 * 60 * 1000);
 
   const eventId = await Calendar.createEventAsync(writable.id, {
@@ -37,10 +49,11 @@ async function addToCalendar(title: string, notes: string | null): Promise<void>
     notes: notes ?? undefined,
     startDate: start,
     endDate: end,
+    timeZone,
     alarms: [{ relativeOffset: -30 }],
   });
 
-  return void eventId;
+  return eventId ?? null;
 }
 
 export default function TaskDetailScreen(): React.JSX.Element {
@@ -75,9 +88,12 @@ export default function TaskDetailScreen(): React.JSX.Element {
     if (!task) return;
     void (async () => {
       try {
-        await addToCalendar(task.title, task.body);
-        setCalendarAdded(true);
-        Alert.alert('Added to Calendar', 'Task has been added as a calendar event.');
+        const eventId = await addToCalendar(task.title, task.body, task.dueDate ?? null);
+        if (eventId) {
+          await taskRepo.setCalendarEvent(task.id, eventId);
+          setCalendarAdded(true);
+          Alert.alert('Added to Calendar', 'Task has been added as a calendar event.');
+        }
       } catch (err) {
         Alert.alert('Calendar Error', String(err));
       }
@@ -130,6 +146,16 @@ export default function TaskDetailScreen(): React.JSX.Element {
           <InfoRow label="Source" value={task.sourceApp.split('.').pop() ?? task.sourceApp} />
           {task.sender && <InfoRow label="From" value={task.sender} />}
           <InfoRow label="Captured" value={new Date(task.createdAt).toLocaleString('en-IN')} />
+          {task.dueDate && (
+            <InfoRow
+              label="Due"
+              value={new Date(task.dueDate).toLocaleDateString('en-IN', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              })}
+            />
+          )}
           <InfoRow label="Confidence" value={`${Math.round(task.confidence * 100)}%`} />
         </View>
 

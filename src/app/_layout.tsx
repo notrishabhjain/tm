@@ -157,7 +157,7 @@ export default function RootLayout(): React.JSX.Element {
     const checkShare = (): void => {
       void (async () => {
         try {
-          const intent = await NotificationListener.getLastShareIntent();
+          const intent = await NotificationListener.peekShareIntent();
           if (intent?.text) {
             router.push('/share');
           }

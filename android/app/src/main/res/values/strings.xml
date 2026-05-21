@@ -2,4 +2,5 @@
   <string name="app_name">TaskMind</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
+  <string name="accessibility_service_description">TaskMind captures a screenshot when you share content to preserve task context. No data leaves your device.</string>
 </resources>
