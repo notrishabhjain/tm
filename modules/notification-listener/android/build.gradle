@@ -19,7 +19,4 @@ dependencies {
   implementation 'com.google.mlkit:text-recognition:16.0.1'
   implementation 'com.google.mlkit:text-recognition-devanagari:16.0.1'
 
-  // ONNX Runtime GenAI — generative LLM inference (Qwen3-1.7B INT4).
-  // Downloaded as a user-initiated ~1 GB model file; bundled runtime is ~40 MB in APK.
-  implementation 'com.microsoft.onnxruntime:onnxruntime-genai-android:0.6.0'
 }

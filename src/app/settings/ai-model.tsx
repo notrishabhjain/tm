@@ -199,11 +199,12 @@ function Qwen3Card(): React.JSX.Element {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            unloadLlm();
-            void deleteLlm().then(() => {
-              setSizeMb(null);
-              setStatus('not-downloaded');
-            });
+            void unloadLlm()
+              .then(() => deleteLlm())
+              .then(() => {
+                setSizeMb(null);
+                setStatus('not-downloaded');
+              });
           },
         },
       ]
@@ -212,16 +213,16 @@ function Qwen3Card(): React.JSX.Element {
 
   return (
     <ModelCard
-      name="Qwen3-1.7B INT4 (offline LLM)"
-      badge="LLM · ~1 GB download"
-      description="Full language model for rich task extraction from screenshots and meeting transcripts. Runs entirely on-device — no data ever leaves your phone. Requires ~1.5 GB free RAM."
+      name="Qwen3-1.7B Q4_K_M (offline LLM)"
+      badge="LLM · ~1.1 GB download"
+      description="Full language model (llama.cpp, GGUF) for rich task extraction from screenshots and meeting transcripts. Runs entirely on-device — no data ever leaves your phone. Requires ~1.5 GB free RAM."
       status={status}
       progress={progress}
       errorMsg={errorMsg}
       sizeLabel={sizeMb !== null && status === 'ready' ? `${sizeMb} MB on device` : undefined}
       onDownload={() => void handleDownload()}
       onDelete={handleDelete}
-      downloadLabel="Download (~1 GB)"
+      downloadLabel="Download (~1.1 GB)"
     />
   );
 }

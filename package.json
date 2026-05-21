@@ -47,6 +47,7 @@
     "expo-status-bar": "2.0.1",
     "expo-task-manager": "12.0.5",
     "i18next": "23.16.8",
+    "llama.rn": "0.12.3",
     "lucide-react-native": "0.468.0",
     "onnxruntime-react-native": "^1.24.3",
     "react": "18.3.1",
