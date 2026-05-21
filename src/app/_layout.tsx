@@ -184,8 +184,16 @@ export default function RootLayout(): React.JSX.Element {
           DEFAULT_PIPELINE_CONFIG
         );
 
+        // Guard against single-word UI labels (e.g. "WhatsApp", "Chats") that
+        // actionExtractor may still return when OCR catches only app chrome.
+        const UI_LABEL_RE =
+          /^(whatsapp|telegram|instagram|facebook|gmail|chats|status|calls|search|home|inbox|messages|camera|notifications|settings)$/i;
+        const rawExtracted = (result.extractedTitle || '').trim();
+        const safeExtractedTitle =
+          rawExtracted && !UI_LABEL_RE.test(rawExtracted) ? rawExtracted : '';
+
         const title =
-          result.extractedTitle ||
+          safeExtractedTitle ||
           (capture.sender ? `${capture.sender}: ${text.slice(0, 60)}` : text.slice(0, 80)) ||
           'Captured task';
 
