@@ -1,6 +1,9 @@
 {
   "platforms": ["android"],
   "android": {
-    "modules": ["expo.modules.notificationlistener.NotificationListenerModule"]
+    "modules": [
+      "expo.modules.notificationlistener.NotificationListenerModule",
+      "expo.modules.notificationlistener.LlmInferenceModule"
+    ]
   }
 }

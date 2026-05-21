@@ -1,4 +1,5 @@
 export { default } from './NotificationListenerModule';
+export { default as LlmInference } from './LlmModule';
 export type {
   NotificationData,
   PersistentNotificationParams,

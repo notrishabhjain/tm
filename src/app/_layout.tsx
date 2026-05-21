@@ -15,6 +15,7 @@ import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
 import { runExtractionPipeline } from '@/domain/extraction';
 import { DEFAULT_PIPELINE_CONFIG } from '@/domain/extraction/seedConfig';
+import { extractTaskFromText as llmExtractTask, isLlmLoaded } from '@/services/llm-service';
 import NotificationListener from '../../modules/notification-listener/src';
 import '@/i18n';
 
@@ -179,37 +180,57 @@ export default function RootLayout(): React.JSX.Element {
         await NotificationListener.clearPendingCapture();
 
         const text = capture.extractedText || '';
-        const result = await runExtractionPipeline(
-          { text, title: capture.sender || undefined },
-          DEFAULT_PIPELINE_CONFIG
-        );
 
-        // Guard against single-word UI labels (e.g. "WhatsApp", "Chats") that
-        // actionExtractor may still return when OCR catches only app chrome.
-        const UI_LABEL_RE =
-          /^(whatsapp|telegram|instagram|facebook|gmail|chats|status|calls|search|home|inbox|messages|camera|notifications|settings)$/i;
-        const rawExtracted = (result.extractedTitle || '').trim();
-        const safeExtractedTitle =
-          rawExtracted && !UI_LABEL_RE.test(rawExtracted) ? rawExtracted : '';
+        // Try LLM first (Qwen3) when loaded — richer title + priority from OCR text.
+        // Fall back to rule engine when LLM is unavailable or returns nothing.
+        let finalTitle = '';
+        let finalPriority: import('@/domain/types').Priority = 'MEDIUM';
+        let finalDueDate: number | null = null;
 
-        const title =
-          safeExtractedTitle ||
-          (capture.sender ? `${capture.sender}: ${text.slice(0, 60)}` : text.slice(0, 80)) ||
-          'Captured task';
+        if (isLlmLoaded() && text.length > 10) {
+          const llmResult = await llmExtractTask(text);
+          if (llmResult?.title) {
+            finalTitle = llmResult.title;
+            finalPriority = llmResult.priority;
+            finalDueDate = llmResult.dueDate;
+          }
+        }
+
+        if (!finalTitle) {
+          const result = await runExtractionPipeline(
+            { text, title: capture.sender || undefined },
+            DEFAULT_PIPELINE_CONFIG
+          );
+
+          // Guard against single-word UI labels that actionExtractor may still
+          // return when OCR catches only app chrome.
+          const UI_LABEL_RE =
+            /^(whatsapp|telegram|instagram|facebook|gmail|chats|status|calls|search|home|inbox|messages|camera|notifications|settings)$/i;
+          const rawExtracted = (result.extractedTitle || '').trim();
+          const safeExtractedTitle =
+            rawExtracted && !UI_LABEL_RE.test(rawExtracted) ? rawExtracted : '';
+
+          finalTitle =
+            safeExtractedTitle ||
+            (capture.sender ? `${capture.sender}: ${text.slice(0, 60)}` : text.slice(0, 80)) ||
+            'Captured task';
+          finalPriority = result.priority;
+          finalDueDate = result.dueDate ?? null;
+        }
 
         const screenshotPath = capture.screenshotPath || null;
 
         const newTask = await taskRepo.createTask({
-          title: title.trim(),
+          title: finalTitle.trim(),
           body: text || undefined,
           sourceApp: capture.packageName || 'accessibility.capture',
           sender: capture.sender || undefined,
-          priority: result.priority,
-          confidence: 0.9,
+          priority: finalPriority,
+          confidence: isLlmLoaded() ? 0.92 : 0.9,
           needsConfirmation: false,
-          matchedKeywords: result.matchedKeywords,
-          language: result.language,
-          dueDate: result.dueDate ?? null,
+          matchedKeywords: [],
+          language: 'EN',
+          dueDate: finalDueDate,
           screenshotPath,
         });
 
