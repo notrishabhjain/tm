@@ -91,13 +91,11 @@ class NotificationListenerModule : Module() {
         }
 
         AsyncFunction("peekShareIntent") {
-            val text = pendingShareText ?: return@AsyncFunction null
-            mapOf("text" to text, "subject" to pendingShareSubject)
+            peekShareIntentData()
         }
 
         AsyncFunction("clearShareIntent") {
-            pendingShareText = null
-            pendingShareSubject = null
+            clearShareIntentData()
         }
 
         AsyncFunction("getLatestScreenshot") {
@@ -106,8 +104,7 @@ class NotificationListenerModule : Module() {
         }
 
         AsyncFunction("clearLatestScreenshot") {
-            val file = java.io.File(context.filesDir, "taskmind_share_screenshot.jpg")
-            if (file.exists()) file.delete()
+            java.io.File(context.filesDir, "taskmind_share_screenshot.jpg").delete()
         }
     }
 
@@ -129,6 +126,16 @@ class NotificationListenerModule : Module() {
             pendingShareText = null
             pendingShareSubject = null
             return mapOf("text" to text, "subject" to subject)
+        }
+
+        fun peekShareIntentData(): Map<String, String?>? {
+            val text = pendingShareText ?: return null
+            return mapOf("text" to text, "subject" to pendingShareSubject)
+        }
+
+        fun clearShareIntentData() {
+            pendingShareText = null
+            pendingShareSubject = null
         }
 
         fun sendNotificationEvent(data: Map<String, Any>) {
