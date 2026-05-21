@@ -45,6 +45,7 @@ export function initializeDatabase(): void {
       needs_confirmation INTEGER NOT NULL DEFAULT 0,
       calendar_event_id TEXT,
       due_date INTEGER,
+      screenshot_path TEXT,
       created_at INTEGER NOT NULL,
       completed_at INTEGER,
       deleted_at INTEGER
@@ -125,7 +126,10 @@ export function initializeDatabase(): void {
 
   // Safe incremental migrations for existing installs.
   // SQLite has no IF NOT EXISTS for ALTER TABLE, so we try/catch each addition.
-  const columnMigrations: string[] = ['ALTER TABLE tasks ADD COLUMN due_date INTEGER;'];
+  const columnMigrations: string[] = [
+    'ALTER TABLE tasks ADD COLUMN due_date INTEGER;',
+    'ALTER TABLE tasks ADD COLUMN screenshot_path TEXT;',
+  ];
   for (const sql of columnMigrations) {
     try {
       _sqlite.execSync(sql);

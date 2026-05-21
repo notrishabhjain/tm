@@ -18,6 +18,7 @@ export const tasks = sqliteTable(
     needsConfirmation: integer('needs_confirmation', { mode: 'boolean' }).notNull().default(false),
     calendarEventId: text('calendar_event_id'),
     dueDate: integer('due_date'),
+    screenshotPath: text('screenshot_path'),
     createdAt: integer('created_at').notNull(),
     completedAt: integer('completed_at'),
     deletedAt: integer('deleted_at'),

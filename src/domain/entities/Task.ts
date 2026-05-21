@@ -11,6 +11,7 @@ export function createTaskEntity(params: {
   confidence: number;
   needsConfirmation: boolean;
   dueDate: number | null;
+  screenshotPath: string | null;
   createdAt: number;
   completedAt: number | null;
   deletedAt: number | null;

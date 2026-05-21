@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Calendar from 'expo-calendar';
@@ -170,6 +170,18 @@ export default function TaskDetailScreen(): React.JSX.Element {
           </Text>
         </Pressable>
 
+        {/* Screenshot from accessibility capture */}
+        {task.screenshotPath ? (
+          <View style={styles.screenshotCard}>
+            <Text style={styles.screenshotLabel}>Captured screenshot</Text>
+            <Image
+              source={{ uri: `file://${task.screenshotPath}` }}
+              style={styles.screenshotImage}
+              resizeMode="contain"
+            />
+          </View>
+        ) : null}
+
         {/* Body / original message */}
         {task.body && (
           <View style={styles.originalCard}>
@@ -248,6 +260,26 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 13, color: Colors.onSurfaceVariantLight, fontWeight: '500' },
   infoValue: { fontSize: 13, color: Colors.onSurfaceLight, flex: 1, textAlign: 'right' },
+  screenshotCard: {
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 8,
+    padding: 10,
+    elevation: 1,
+  },
+  screenshotLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.onSurfaceVariantLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 8,
+  },
+  screenshotImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 6,
+    backgroundColor: Colors.surfaceVariantLight,
+  },
   originalCard: {
     backgroundColor: Colors.surfaceVariantLight,
     borderRadius: 8,

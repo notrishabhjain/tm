@@ -24,6 +24,7 @@ export interface Task {
   confidence: number;
   needsConfirmation: boolean;
   dueDate: number | null;
+  screenshotPath: string | null;
   createdAt: number;
   completedAt: number | null;
   deletedAt: number | null;

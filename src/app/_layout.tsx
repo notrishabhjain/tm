@@ -11,8 +11,14 @@ import { getSetting } from '@/data/storage/settings';
 import { seedDatabaseIfNeeded } from '@/services/db-seeder';
 import { handleNotification } from '@/services/notification-handler';
 import { restoreNudgeFromSettings } from '@/services/nudge-scheduler';
+import { TaskRepository } from '@/data/repositories/TaskRepository';
+import { db } from '@/data/db/client';
+import { runExtractionPipeline } from '@/domain/extraction';
+import { DEFAULT_PIPELINE_CONFIG } from '@/domain/extraction/seedConfig';
 import NotificationListener from '../../modules/notification-listener/src';
 import '@/i18n';
+
+const taskRepo = new TaskRepository(db);
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -79,6 +85,8 @@ export default function RootLayout(): React.JSX.Element {
   const dbReadyRef = useRef(false);
   const fontsReadyRef = useRef(false);
   const finalizedRef = useRef(false);
+  // Prevent double-processing when both onManualTrigger event AND AppState.active fire
+  const processingCaptureRef = useRef(false);
 
   const [fontsLoaded] = useFonts({
     'Inter-Regular': require('../../assets/fonts/Inter-Regular.ttf'),
@@ -152,20 +160,75 @@ export default function RootLayout(): React.JSX.Element {
     return () => sub.remove();
   }, []);
 
-  // Accessibility button manual trigger — navigate to share screen.
+  // Accessibility button: auto-create task from pending capture (SharedPreferences).
+  // Triggered by both the onManualTrigger event (if app is in foreground) and
+  // AppState.active (reliable fallback when app was backgrounded).
   useEffect(() => {
-    const sub = NotificationListener.addManualTriggerListener(() => {
-      router.push('/share');
-    });
-    return () => sub.remove();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const processCapture = async (): Promise<void> => {
+      if (processingCaptureRef.current) return;
+      try {
+        const capture = await NotificationListener.getPendingCapture();
+        if (!capture) return;
+        // Ignore stale captures older than 60 seconds
+        if (Date.now() - capture.timestamp > 60_000) {
+          await NotificationListener.clearPendingCapture();
+          return;
+        }
+        processingCaptureRef.current = true;
+        // Clear immediately to prevent double-processing
+        await NotificationListener.clearPendingCapture();
 
-  // Share intent — check whenever app comes to foreground.
-  useEffect(() => {
+        const text = capture.extractedText || '';
+        const result = await runExtractionPipeline(
+          { text, title: capture.sender || undefined },
+          DEFAULT_PIPELINE_CONFIG
+        );
+
+        const title =
+          result.extractedTitle ||
+          (capture.sender ? `${capture.sender}: ${text.slice(0, 60)}` : text.slice(0, 80)) ||
+          'Captured task';
+
+        const screenshotPath = capture.screenshotPath || null;
+
+        const newTask = await taskRepo.createTask({
+          title: title.trim(),
+          body: text || undefined,
+          sourceApp: capture.packageName || 'accessibility.capture',
+          sender: capture.sender || undefined,
+          priority: result.priority,
+          confidence: 0.9,
+          needsConfirmation: false,
+          matchedKeywords: result.matchedKeywords,
+          language: result.language,
+          dueDate: result.dueDate ?? null,
+          screenshotPath,
+        });
+
+        void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        // Navigate to the newly created task so user can review/confirm
+        router.push(`/task/${newTask.id}`);
+      } catch {
+        // Non-fatal — user stays in current screen
+      } finally {
+        processingCaptureRef.current = false;
+      }
+    };
+
+    const triggerSub = NotificationListener.addManualTriggerListener(() => {
+      void processCapture();
+    });
+
     const checkShare = (): void => {
       void (async () => {
         try {
+          // Check for accessibility captures first
+          const capture = await NotificationListener.getPendingCapture();
+          if (capture) {
+            void processCapture();
+            return;
+          }
+          // Fall back to share intent (from Android share menu)
           const intent = await NotificationListener.peekShareIntent();
           if (intent?.text) {
             router.push('/share');
@@ -177,10 +240,14 @@ export default function RootLayout(): React.JSX.Element {
     };
 
     checkShare();
-    const sub = AppState.addEventListener('change', (state) => {
+    const appStateSub = AppState.addEventListener('change', (state) => {
       if (state === 'active') checkShare();
     });
-    return () => sub.remove();
+
+    return () => {
+      triggerSub.remove();
+      appStateSub.remove();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

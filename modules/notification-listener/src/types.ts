@@ -30,3 +30,11 @@ export interface ManualTriggerData {
   sender: string;
   screenshotPath: string;
 }
+
+export interface AccessibilityCaptureData {
+  packageName: string;
+  extractedText: string;
+  sender: string;
+  screenshotPath: string;
+  timestamp: number;
+}

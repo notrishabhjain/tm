@@ -6,6 +6,7 @@ import android.content.Intent
 import android.provider.Settings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import org.json.JSONObject
 
 class NotificationListenerModule : Module() {
 
@@ -84,6 +85,28 @@ class NotificationListenerModule : Module() {
                 action = TaskMindForegroundService.ACTION_HIDE_NOTIFICATION
             }
             context.startService(intent)
+        }
+
+        AsyncFunction("getPendingCapture") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            val json = prefs.getString("pending_accessibility_capture", null) ?: return@AsyncFunction null
+            try {
+                val obj = JSONObject(json)
+                mapOf(
+                    "extractedText" to obj.optString("extractedText", ""),
+                    "sender" to obj.optString("sender", ""),
+                    "packageName" to obj.optString("packageName", ""),
+                    "screenshotPath" to obj.optString("screenshotPath", ""),
+                    "timestamp" to obj.optLong("timestamp", 0L),
+                )
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        AsyncFunction("clearPendingCapture") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            prefs.edit().remove("pending_accessibility_capture").apply()
         }
 
         AsyncFunction("getLastShareIntent") {
