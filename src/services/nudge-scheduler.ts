@@ -37,7 +37,6 @@ export async function scheduleNudge(frequencyMinutes: number): Promise<void> {
       android: {
         channelId: CHANNEL_ID,
         pressAction: { id: 'default', launchActivity: 'default' },
-        smallIcon: 'ic_popup_reminder',
         color: '#0A2540',
       },
     },

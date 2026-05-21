@@ -4,4 +4,5 @@ export type {
   PersistentNotificationParams,
   PermissionStatus,
   NotificationEvent,
+  ManualTriggerData,
 } from './types';

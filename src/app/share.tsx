@@ -115,16 +115,21 @@ export default function ShareScreen(): React.JSX.Element {
       if (screenshot) setScreenshotPath(screenshot);
 
       const p = parseWhatsAppShare(intent.text);
-      setParsed(p);
+      // For accessibility-captured text, sender is stored in intent.subject
+      const effectiveSender = p.sender || (intent.subject ?? '');
+      const effectiveParsed = { ...p, sender: effectiveSender };
+      setParsed(effectiveParsed);
 
       const pipelineResult = await runExtractionPipeline(
-        { text: p.message, title: p.sender || undefined },
+        { text: effectiveParsed.message, title: effectiveSender || undefined },
         PIPELINE_CONFIG
       );
 
       const suggestedTitle =
         pipelineResult.extractedTitle ||
-        (p.sender ? `${p.sender}: ${p.message.slice(0, 60)}` : p.message.slice(0, 80));
+        (effectiveSender
+          ? `${effectiveSender}: ${effectiveParsed.message.slice(0, 60)}`
+          : effectiveParsed.message.slice(0, 80));
       setTitle(suggestedTitle);
       setPriority(pipelineResult.priority);
       if (pipelineResult.dueDate) setDueDate(pipelineResult.dueDate);
@@ -142,7 +147,7 @@ export default function ShareScreen(): React.JSX.Element {
       await taskRepo.createTask({
         title: title.trim(),
         body: parsed.rawText,
-        sourceApp: 'com.whatsapp',
+        sourceApp: 'manual.capture',
         sender: parsed.sender || undefined,
         priority,
         confidence: 0.9,

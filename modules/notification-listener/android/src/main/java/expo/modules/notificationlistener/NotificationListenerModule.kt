@@ -15,7 +15,7 @@ class NotificationListenerModule : Module() {
     override fun definition() = ModuleDefinition {
         Name("NotificationListener")
 
-        Events("onNotification", "onQuickActionDoneTop", "onQuickActionOpen")
+        Events("onNotification", "onQuickActionDoneTop", "onQuickActionOpen", "onManualTrigger")
 
         OnCreate {
             instance = this@NotificationListenerModule
@@ -148,6 +148,18 @@ class NotificationListenerModule : Module() {
 
         fun sendQuickActionOpen() {
             instance?.sendEvent("onQuickActionOpen", emptyMap<String, Any>())
+        }
+
+        fun sendManualTriggerEvent(packageName: String, extractedText: String, sender: String, screenshotPath: String?) {
+            instance?.sendEvent(
+                "onManualTrigger",
+                mapOf(
+                    "packageName" to packageName,
+                    "extractedText" to extractedText,
+                    "sender" to sender,
+                    "screenshotPath" to (screenshotPath ?: ""),
+                )
+            )
         }
     }
 }

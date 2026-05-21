@@ -44,6 +44,7 @@ export function initializeDatabase(): void {
       matched_keywords TEXT NOT NULL DEFAULT '[]',
       needs_confirmation INTEGER NOT NULL DEFAULT 0,
       calendar_event_id TEXT,
+      due_date INTEGER,
       created_at INTEGER NOT NULL,
       completed_at INTEGER,
       deleted_at INTEGER
@@ -121,4 +122,15 @@ export function initializeDatabase(): void {
       created_at INTEGER NOT NULL
     );
   `);
+
+  // Safe incremental migrations for existing installs.
+  // SQLite has no IF NOT EXISTS for ALTER TABLE, so we try/catch each addition.
+  const columnMigrations: string[] = ['ALTER TABLE tasks ADD COLUMN due_date INTEGER;'];
+  for (const sql of columnMigrations) {
+    try {
+      _sqlite.execSync(sql);
+    } catch {
+      // Column already exists — safe to ignore duplicate column errors
+    }
+  }
 }

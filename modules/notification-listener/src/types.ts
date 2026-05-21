@@ -18,4 +18,15 @@ export interface PersistentNotificationParams {
 
 export type PermissionStatus = 'granted' | 'denied' | 'unknown';
 
-export type NotificationEvent = 'onNotification' | 'onQuickActionDoneTop' | 'onQuickActionOpen';
+export type NotificationEvent =
+  | 'onNotification'
+  | 'onQuickActionDoneTop'
+  | 'onQuickActionOpen'
+  | 'onManualTrigger';
+
+export interface ManualTriggerData {
+  packageName: string;
+  extractedText: string;
+  sender: string;
+  screenshotPath: string;
+}

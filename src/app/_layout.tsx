@@ -152,6 +152,15 @@ export default function RootLayout(): React.JSX.Element {
     return () => sub.remove();
   }, []);
 
+  // Accessibility button manual trigger — navigate to share screen.
+  useEffect(() => {
+    const sub = NotificationListener.addManualTriggerListener(() => {
+      router.push('/share');
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Share intent — check whenever app comes to foreground.
   useEffect(() => {
     const checkShare = (): void => {
