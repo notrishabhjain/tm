@@ -20,7 +20,7 @@ import {
 } from '@/services/model-manager';
 import { loadModel, isModelLoaded, resetModelLoadState } from '@/services/onnx-classifier';
 import { isLlmCached, downloadLlm, deleteLlm, getLlmSizeBytes } from '@/services/llm-manager';
-import { loadLlm, isLlmLoaded, unloadLlm } from '@/services/llm-service';
+import { loadLlm, isLlmLoaded, unloadLlm, getLlmLoadError } from '@/services/llm-service';
 
 type ModelStatus = 'checking' | 'not-downloaded' | 'downloading' | 'loading' | 'ready' | 'error';
 
@@ -155,8 +155,14 @@ function Qwen3Card(): React.JSX.Element {
     setStatus('loading');
     const ok = await loadLlm();
     setStatus(ok ? 'ready' : 'error');
-    if (!ok)
-      setErrorMsg('Model files present but failed to load. Try deleting and re-downloading.');
+    if (!ok) {
+      const detail = getLlmLoadError();
+      setErrorMsg(
+        detail
+          ? `Failed to load: ${detail}`
+          : 'Model files present but failed to load. Try deleting and re-downloading.'
+      );
+    }
   }, []);
 
   useEffect(() => {
@@ -181,7 +187,12 @@ function Qwen3Card(): React.JSX.Element {
         }
       } else {
         setStatus('error');
-        setErrorMsg('Download succeeded but model failed to load into memory.');
+        const detail = getLlmLoadError();
+        setErrorMsg(
+          detail
+            ? `Downloaded OK but failed to load: ${detail}`
+            : 'Download succeeded but model failed to load. Delete and re-download if this persists.'
+        );
       }
     } catch (err) {
       setStatus('error');

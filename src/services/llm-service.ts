@@ -13,25 +13,34 @@ import { getLlmModelPath } from './llm-manager';
 import type { Priority } from '@/domain/types';
 
 let llamaCtx: LlamaContext | null = null;
+let lastLoadError: string | null = null;
 
 export function isLlmLoaded(): boolean {
   return llamaCtx !== null;
 }
 
+export function getLlmLoadError(): string | null {
+  return lastLoadError;
+}
+
 export async function loadLlm(): Promise<boolean> {
   if (llamaCtx) return true;
+  lastLoadError = null;
   try {
     // llama.cpp requires a raw filesystem path — strip the file:// URI prefix
     // that expo-file-system returns on Android (same fix as onnx-classifier.ts)
     const modelPath = getLlmModelPath().replace(/^file:\/\//, '');
     llamaCtx = await initLlama({
       model: modelPath,
-      n_ctx: 2048,
+      // n_ctx: 512 keeps KV-cache at ~56 MB vs ~224 MB at 2048, making the model
+      // loadable on 3 GB RAM devices. Our prompts never exceed 300 tokens.
+      n_ctx: 512,
       n_threads: 4,
-      n_batch: 512,
+      n_batch: 128,
     });
     return true;
-  } catch {
+  } catch (err) {
+    lastLoadError = err instanceof Error ? err.message : String(err);
     llamaCtx = null;
     return false;
   }

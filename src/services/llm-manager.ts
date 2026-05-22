@@ -53,7 +53,26 @@ export async function downloadLlm(onProgress?: (fraction: number) => void): Prom
   );
 
   const result = await downloadResumable.downloadAsync();
-  if (!result?.uri) throw new Error('Model download failed — no URI returned');
+  if (!result?.uri) {
+    throw new Error('Download failed — no response from server');
+  }
+  // HuggingFace can return 302→CDN or 401/403/429 error pages that still
+  // resolve to a URI. Reject anything that isn't a 200.
+  if (result.status !== 200) {
+    await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => undefined);
+    throw new Error(`Download failed — server returned HTTP ${String(result.status)}`);
+  }
+  // Sanity-check the file is at least as large as the minimum expected size.
+  // A valid GGUF should be > 1 GB; reject anything suspiciously small.
+  const info = await FileSystem.getInfoAsync(localPath);
+  const downloadedBytes =
+    info.exists && 'size' in info && typeof info.size === 'number' ? info.size : 0;
+  if (downloadedBytes < MIN_SIZE_BYTES) {
+    await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => undefined);
+    throw new Error(
+      `Download incomplete — received ${String(Math.round(downloadedBytes / 1_000_000))} MB, expected ≥${String(Math.round(MIN_SIZE_BYTES / 1_000_000))} MB. Check your connection and try again.`
+    );
+  }
   onProgress?.(1);
 }
 
