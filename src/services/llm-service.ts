@@ -35,12 +35,11 @@ export async function loadLlm(): Promise<boolean> {
   const t0 = Date.now();
   try {
     const modelPath = getLlmModelPath().replace(/^file:\/\//, '');
-    // n_ctx=768: fits classification (~300 tok) and extraction (~500 tok) with headroom.
-    // use_mlock=false: avoids mlock syscall failures on RAM-constrained devices.
-    // Compatible with Qwen3 and Llama GGUF models.
+    // n_ctx=1024: richer prompts (few-shot examples) without OOM — only adds ~8 MB KV cache,
+    // not model weights. use_mlock=false avoids mlock syscall failures on constrained devices.
     llamaCtx = await initLlama({
       model: modelPath,
-      n_ctx: 768,
+      n_ctx: 1024,
       n_threads: 4,
       n_batch: 64,
       use_mlock: false,
@@ -72,7 +71,8 @@ const STOP_TOKENS = ['<|im_end|>', '<|endoftext|>', '<|eot_id|>'];
 const VALID_PRIORITIES = new Set<string>(['URGENT', 'HIGH', 'MEDIUM', 'LOW']);
 
 function parsePriority(raw: unknown): Priority {
-  return typeof raw === 'string' && VALID_PRIORITIES.has(raw) ? (raw as Priority) : 'MEDIUM';
+  const s = typeof raw === 'string' ? raw.toUpperCase() : '';
+  return VALID_PRIORITIES.has(s) ? (s as Priority) : 'MEDIUM';
 }
 
 function extractJson(raw: string): string {
@@ -92,6 +92,41 @@ function getRawText(result: unknown): string {
   return String(r.content ?? r.text ?? '');
 }
 
+// Strip Android status bar and common OCR noise before sending to the model.
+export function preprocessOcrText(text: string): string {
+  return text
+    .replace(/^\d{1,2}:\d{2}\s*(AM|PM)?\s*/gim, '')
+    .replace(/^\d+%\s*/gim, '')
+    .replace(/^(No SIM|WiFi|4G|5G|LTE|Jio|Airtel|BSNL|Vi)\b.*/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// Reject deadlines that are already past or implausibly far in the future (hallucinations).
+function sanitizeDeadline(isoStr: string | null | undefined): number | null {
+  if (!isoStr) return null;
+  const ts = Date.parse(isoStr);
+  if (isNaN(ts)) return null;
+  const now = Date.now();
+  if (ts < now - 24 * 3_600_000) return null;
+  if (ts > now + 2 * 365 * 24 * 3_600_000) return null;
+  return ts;
+}
+
+// Code-level overrides applied after LLM priority output — hybrid AI + rules.
+function applyPriorityHeuristics(
+  priority: Priority,
+  title: string,
+  deadline: number | null
+): Priority {
+  const text = title.toLowerCase();
+  if (deadline && deadline - Date.now() < 24 * 3_600_000) return 'URGENT';
+  if (/\b(asap|urgent|immediately|emergency|abhi|turant|bahut zaruri)\b/i.test(text))
+    return 'URGENT';
+  if (deadline && deadline - Date.now() < 72 * 3_600_000 && priority === 'MEDIUM') return 'HIGH';
+  return priority;
+}
+
 // ── Task 1: Notification classification (auto-triggered) ─────────────────────
 
 export interface FewShotExample {
@@ -105,33 +140,53 @@ export interface FewShotExample {
 export interface ClassifyResult {
   actionable: boolean;
   confidence: number;
+  decision: 'CREATE' | 'CONFIRM' | 'DISCARD';
   title: string | null;
   priority: Priority;
   durationMs: number;
+  language: 'en' | 'hi' | 'hinglish' | 'unknown';
+  spamProbability: number;
 }
 
+// 8 static few-shot examples covering the full scenario space.
+// Ordered: actionable first (anchors the model on positive examples).
+const CLASSIFICATION_STATIC_EXAMPLES = [
+  '[TASK] WhatsApp/Boss: "Send the updated report by 5pm today" → {"actionable":true,"confidence":92,"language":"en","spam_prob":2,"title":"Send updated report to Boss by 5pm","priority":"high"}',
+  '[TASK] SMS: "EMI due 25 May. Pay now to avoid penalty" → {"actionable":true,"confidence":94,"language":"en","spam_prob":5,"title":"Pay EMI before 25 May","priority":"urgent"}',
+  '[TASK] WhatsApp: "Kal tak payment kar dena bhai" → {"actionable":true,"confidence":88,"language":"hinglish","spam_prob":3,"title":"Make payment by tomorrow","priority":"high"}',
+  '[TASK] WhatsApp: "Client ko aaj shaam update dena, important hai" → {"actionable":true,"confidence":87,"language":"hinglish","spam_prob":2,"title":"Update client this evening","priority":"high"}',
+  '[SKIP] Gmail: "Your OTP is 847291. Do not share with anyone." → {"actionable":false,"confidence":99,"language":"en","spam_prob":99}',
+  '[SKIP] Flipkart: "Mega Sale — 70% off on electronics. Today only!" → {"actionable":false,"confidence":96,"language":"en","spam_prob":96}',
+  '[SKIP] Instagram: "Rahul liked your photo" → {"actionable":false,"confidence":98,"language":"en","spam_prob":90}',
+  '[SKIP] WhatsApp: "Haan bhai, milte hain kabhi" → {"actionable":false,"confidence":84,"language":"hinglish","spam_prob":8}',
+].join('\n');
+
+// /no_think: Qwen3 directive to skip chain-of-thought (faster); ignored by Llama models.
 function buildClassificationPrompt(examples: FewShotExample[]): string {
-  // /no_think: Qwen3 directive to skip chain-of-thought (faster); ignored by Llama models
   const base =
-    'You are a notification classifier. Decide if a notification requires the user to take action.\n\n' +
-    'Output ONLY valid JSON with no explanation:\n' +
-    '{"actionable":true,"confidence":0.85,"title":"Task title ≤80 chars","priority":"URGENT|HIGH|MEDIUM|LOW"}\n' +
-    'or {"actionable":false,"confidence":0.9,"title":null,"priority":null}\n\n' +
-    'Priority: URGENT=emergency/same-day deadline, HIGH=reply needed soon, MEDIUM=action needed, LOW=optional\n' +
-    '/no_think';
+    'You are a notification classifier. Determine if the notification requires the user to take action.\n\n' +
+    'ACTIONABLE: reply needed, payment due, work task, meeting, deadline, document to send, follow up, purchase\n' +
+    'NOT ACTIONABLE: OTP, promotion, ad, social like/follow, news, weather, casual greeting, spam\n\n' +
+    'Languages: English, Hindi, Hinglish — understand all three.\n\n' +
+    'Output ONLY valid JSON:\n' +
+    '{"actionable":true,"confidence":85,"language":"en|hi|hinglish","spam_prob":5,"title":"task ≤80 chars","priority":"urgent|high|medium|low"}\n' +
+    'or {"actionable":false,"confidence":90,"language":"en","spam_prob":85}\n\n' +
+    'Examples:\n' +
+    CLASSIFICATION_STATIC_EXAMPLES +
+    '\n/no_think';
 
   if (examples.length === 0) return base;
 
-  const lines = examples.map((ex) => {
-    const from = ex.sender ? ` From:${ex.sender}` : '';
-    const head = `App:${ex.appName}${from} | "${ex.text.slice(0, 80)}"`;
+  const userLines = examples.map((ex) => {
+    const from = ex.sender ? `/${ex.sender}` : '';
+    const head = `${ex.appName}${from}: "${ex.text.slice(0, 80)}"`;
     if (ex.decision === 'confirmed' && ex.title) {
       return `[TASK] ${head} → {"actionable":true,"title":"${ex.title.slice(0, 60)}"}`;
     }
     return `[SKIP] ${head} → {"actionable":false}`;
   });
 
-  return `${base}\n\nRecent examples from this user:\n${lines.join('\n')}`;
+  return `${base}\n\nYour recent decisions:\n${userLines.join('\n')}`;
 }
 
 export async function classifyNotification(params: {
@@ -141,8 +196,6 @@ export async function classifyNotification(params: {
   examples: FewShotExample[];
 }): Promise<ClassifyResult | null> {
   if (!llamaCtx || !params.text.trim()) return null;
-  // If another inference is running (e.g. screenshot extraction), skip and fall
-  // back to the rule engine — better than queueing or corrupting the context.
   if (inferenceInProgress) return null;
 
   inferenceInProgress = true;
@@ -156,7 +209,7 @@ export async function classifyNotification(params: {
           content: `App:${params.appName}${params.sender ? ` | From:${params.sender}` : ''}\n${params.text.slice(0, 400)}`,
         },
       ],
-      n_predict: 80,
+      n_predict: 100,
       temperature: 0.1,
       stop: STOP_TOKENS,
     });
@@ -166,23 +219,40 @@ export async function classifyNotification(params: {
     const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
 
     const actionable = Boolean(parsed.actionable);
-    const confidence =
-      typeof parsed.confidence === 'number'
-        ? Math.max(0, Math.min(1, parsed.confidence))
-        : actionable
-          ? 0.75
-          : 0.2;
+
+    // Normalize confidence: model may return 0-100 or 0-1
+    const rawConf =
+      typeof parsed.confidence === 'number' ? parsed.confidence : actionable ? 75 : 20;
+    const confidence = Math.max(0, Math.min(1, rawConf > 1 ? rawConf / 100 : rawConf));
+
+    const rawSpam = typeof parsed.spam_prob === 'number' ? parsed.spam_prob : actionable ? 5 : 80;
+    const spamProbability = Math.max(0, Math.min(1, rawSpam > 1 ? rawSpam / 100 : rawSpam));
+
+    const language = ((): ClassifyResult['language'] => {
+      const l = String(parsed.language ?? '').toLowerCase();
+      if (l === 'hi') return 'hi';
+      if (l === 'hinglish') return 'hinglish';
+      if (l === 'en') return 'en';
+      return 'unknown';
+    })();
+
     const title =
       actionable && typeof parsed.title === 'string' ? parsed.title.slice(0, 80).trim() : null;
-    const priority = actionable ? parsePriority(parsed.priority) : 'LOW';
 
-    const decision: 'CREATE' | 'CONFIRM' | 'DISCARD' = !actionable
+    const rawPriority = typeof parsed.priority === 'string' ? parsed.priority.toUpperCase() : '';
+    const priority = actionable ? parsePriority(rawPriority) : 'LOW';
+
+    // High spam probability overrides actionable — never create tasks for OTPs/promos.
+    const effectiveActionable = actionable && spamProbability < 0.7;
+
+    const decision: ClassifyResult['decision'] = !effectiveActionable
       ? 'DISCARD'
       : confidence >= 0.75
         ? 'CREATE'
         : confidence >= 0.35
           ? 'CONFIRM'
           : 'DISCARD';
+
     void logLlmInference({
       modelId: 'on-device-llm',
       durationMs,
@@ -191,7 +261,16 @@ export async function classifyNotification(params: {
       inputLength: params.text.length,
     });
 
-    return { actionable, confidence, title, priority, durationMs };
+    return {
+      actionable: effectiveActionable,
+      confidence,
+      decision,
+      title,
+      priority,
+      durationMs,
+      language,
+      spamProbability,
+    };
   } catch {
     return null;
   } finally {
@@ -201,23 +280,34 @@ export async function classifyNotification(params: {
 
 // ── Task 2: Screenshot / transcript extraction (on-demand) ───────────────────
 
-// /no_think: suppresses Qwen3 thinking tokens; Llama models treat it as plain text (harmless)
-const TASK_SYSTEM_PROMPT =
-  'You are a task extraction assistant. Given text from a phone screen or message, ' +
-  'extract the single most actionable task. Respond with ONLY a valid JSON object — ' +
-  'no markdown fences, no explanation. ' +
-  'JSON keys: "title" (string ≤120 chars), "priority" (one of URGENT HIGH MEDIUM LOW), ' +
-  '"dueDate" (ISO 8601 date string or null). /no_think';
-
-const TRANSCRIPT_SYSTEM_PROMPT =
-  'You are a task extraction assistant. Given a meeting transcript or long text, ' +
-  'extract ALL actionable tasks. Respond with ONLY a valid JSON array — ' +
-  'no markdown fences, no explanation. ' +
-  'Each element: {"title": string ≤120 chars, "priority": URGENT|HIGH|MEDIUM|LOW}. ' +
-  'Maximum 20 items. /no_think';
+// Base extraction prompt — current date + day injected at call time.
+// /no_think: suppresses Qwen3 thinking tokens; Llama models treat it as plain text.
+const TASK_SYSTEM_PROMPT_BASE =
+  'You are a task extraction engine. Extract actionable tasks from phone screen text.\n' +
+  'Chat apps (WhatsApp, Telegram): LATEST messages are at the END of text — focus there.\n' +
+  'Email: use subject line + body. Ignore: status bar, battery, nav buttons, app chrome.\n\n' +
+  'Extract ONLY if user must: pay, reply, submit, attend, call, send, schedule, follow up, buy.\n' +
+  'SKIP: OTPs, ads, promotions, social likes, greetings, passive info, completed items.\n' +
+  'Languages: English, Hindi, Hinglish — understand all.\n' +
+  'NEVER invent deadlines, names, or actions not present in the text. Set deadline null if uncertain.\n\n' +
+  'Output ONLY valid JSON:\n' +
+  '{"tasks":[{"task_heading":"≤12 words","task_details":"≤40 words","deadline":"ISO8601 or null",' +
+  '"priority":"urgent|high|medium|low","people":[],"tags":[],"confidence_score":0-100,"requires_followup":false}]}\n' +
+  'No task found: {"tasks":[]}\n\n' +
+  'E1:"Electricity bill due 23 May. Late fee applies after." → ' +
+  '{"tasks":[{"task_heading":"Pay electricity bill by 23 May","task_details":"Electricity bill due 23 May, late fee after deadline.","deadline":null,"priority":"urgent","people":[],"tags":["bill","payment"],"confidence_score":93,"requires_followup":false}]}\n' +
+  'E2:"Bro kal milte hain maybe" → {"tasks":[]}\n' +
+  'E3:"Please send revised DPR by Monday evening" → ' +
+  '{"tasks":[{"task_heading":"Send revised DPR by Monday evening","task_details":"Submit revised DPR document before Monday evening.","deadline":null,"priority":"high","people":[],"tags":["DPR","document"],"confidence_score":90,"requires_followup":false}]}\n' +
+  'E4:"Kal tak payment kar dena bhai" → ' +
+  '{"tasks":[{"task_heading":"Make payment by tomorrow","task_details":"Payment required by tomorrow.","deadline":null,"priority":"high","people":[],"tags":["payment"],"confidence_score":85,"requires_followup":false}]}\n' +
+  'E5:"Meeting with EY team Friday 3 PM. Discuss blockchain architecture." → ' +
+  '{"tasks":[{"task_heading":"Attend EY team meeting Friday 3 PM","task_details":"Meeting with EY team to discuss blockchain architecture.","deadline":null,"priority":"medium","people":["EY team"],"tags":["meeting","blockchain"],"confidence_score":93,"requires_followup":false}]}\n' +
+  '/no_think';
 
 export interface LlmTaskResult {
   title: string;
+  body: string | null;
   priority: Priority;
   dueDate: number | null;
 }
@@ -229,13 +319,34 @@ export async function extractTaskFromText(text: string): Promise<LlmTaskResult |
   inferenceInProgress = true;
   try {
     const t0 = Date.now();
+
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const dayOfWeek = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ][now.getDay()];
+    const systemPrompt = `Today: ${today} (${dayOfWeek}).\n${TASK_SYSTEM_PROMPT_BASE}`;
+
+    // Head (first 200 chars): app name, email subject, sender — gives context.
+    // Tail (last 700 chars): latest messages / email body — where the actual task lives.
+    // For WhatsApp, newest messages are at the BOTTOM of OCR output, so tail is critical.
+    const HEAD = 200;
+    const TAIL = 700;
+    const inputText =
+      text.length <= HEAD + TAIL ? text : `${text.slice(0, HEAD)}\n[...]\n${text.slice(-TAIL)}`;
+
     const result = await llamaCtx.completion({
       messages: [
-        { role: 'system', content: TASK_SYSTEM_PROMPT },
-        // 1000 chars ≈ 300 tokens; fits within n_ctx=768 with system prompt + output
-        { role: 'user', content: `Extract the main task from:\n\n${text.slice(0, 1000)}` },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Extract tasks from:\n\n${inputText}` },
       ],
-      n_predict: 120,
+      n_predict: 200,
       temperature: 0.1,
       stop: STOP_TOKENS,
     });
@@ -250,17 +361,30 @@ export async function extractTaskFromText(text: string): Promise<LlmTaskResult |
 
     const jsonStr = extractJson(getRawText(result));
     const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-    const title = String(parsed.title ?? '')
+
+    // Support both new {"tasks":[...]} schema and legacy flat object.
+    const tasksArr = Array.isArray(parsed.tasks) ? parsed.tasks : null;
+    if (tasksArr && tasksArr.length === 0) return null;
+    const first = (tasksArr ? tasksArr[0] : parsed) as Record<string, unknown>;
+
+    const title = String(first.task_heading ?? first.title ?? '')
       .slice(0, 120)
       .trim();
     if (!title) return null;
 
-    let dueDate: number | null = null;
-    if (typeof parsed.dueDate === 'string' && parsed.dueDate) {
-      const ts = Date.parse(parsed.dueDate);
-      if (!isNaN(ts)) dueDate = ts;
-    }
-    return { title, priority: parsePriority(parsed.priority), dueDate };
+    const body =
+      typeof first.task_details === 'string' && first.task_details
+        ? first.task_details.slice(0, 300).trim()
+        : null;
+
+    const deadline = sanitizeDeadline(typeof first.deadline === 'string' ? first.deadline : null);
+    const priority = applyPriorityHeuristics(
+      parsePriority(typeof first.priority === 'string' ? first.priority : ''),
+      title,
+      deadline
+    );
+
+    return { title, body, priority, dueDate: deadline };
   } catch {
     return null;
   } finally {
@@ -274,16 +398,19 @@ export async function extractTasksFromTranscript(
   if (!llamaCtx || !text.trim()) return [];
   if (inferenceInProgress) return [];
 
+  const TRANSCRIPT_SYSTEM_PROMPT =
+    'Extract ALL actionable tasks from meeting transcript or long text.\n' +
+    'Languages: English, Hindi, Hinglish. NEVER invent details. Max 20 tasks.\n' +
+    'SKIP: OTPs, ads, greetings, passive info.\n' +
+    'Output ONLY valid JSON array: [{"task_heading":"≤12 words","priority":"urgent|high|medium|low"}]\n' +
+    'No tasks: []\n/no_think';
+
   inferenceInProgress = true;
   try {
     const result = await llamaCtx.completion({
       messages: [
         { role: 'system', content: TRANSCRIPT_SYSTEM_PROMPT },
-        // 800 chars ≈ 250 tokens; fits within n_ctx=768 with system prompt + output
-        {
-          role: 'user',
-          content: `Extract all actionable tasks from:\n\n${text.slice(0, 800)}`,
-        },
+        { role: 'user', content: `Extract all tasks from:\n\n${text.slice(0, 800)}` },
       ],
       n_predict: 300,
       temperature: 0.1,
@@ -292,11 +419,11 @@ export async function extractTasksFromTranscript(
 
     const jsonStr = extractJson(getRawText(result));
     const parsed = JSON.parse(jsonStr);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
+    const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed.tasks) ? parsed.tasks : [];
+    return (arr as Record<string, unknown>[])
       .slice(0, 20)
-      .map((item: Record<string, unknown>) => ({
-        title: String(item.title ?? '')
+      .map((item) => ({
+        title: String(item.task_heading ?? item.title ?? '')
           .slice(0, 120)
           .trim(),
         priority: parsePriority(item.priority),

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { AppState, Text, View } from 'react-native';
+import { AppState, Text, ToastAndroid, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,6 +19,7 @@ import {
   extractTaskFromText as llmExtractTask,
   isLlmLoaded,
   loadLlm,
+  preprocessOcrText,
 } from '@/services/llm-service';
 import { isLlmCached } from '@/services/llm-manager';
 import NotificationListener from '../../modules/notification-listener/src';
@@ -176,6 +177,8 @@ export default function RootLayout(): React.JSX.Element {
   useEffect(() => {
     const processCapture = async (): Promise<void> => {
       if (processingCaptureRef.current) return;
+      // DB must be ready before writing tasks
+      if (!dbReadyRef.current) return;
       try {
         const capture = await NotificationListener.getPendingCapture();
         if (!capture) return;
@@ -187,12 +190,16 @@ export default function RootLayout(): React.JSX.Element {
         processingCaptureRef.current = true;
         // Clear immediately to prevent double-processing
         await NotificationListener.clearPendingCapture();
+        ToastAndroid.show('Processing screenshot…', ToastAndroid.LONG);
 
-        const text = capture.extractedText || '';
+        const rawText = capture.extractedText || '';
+        // Strip status bar / nav bar noise before sending to LLM or rule engine.
+        const text = preprocessOcrText(rawText);
 
-        // Try LLM first (Qwen3) when loaded — richer title + priority from OCR text.
+        // Try LLM first when loaded — richer title, details, and priority from OCR text.
         // Fall back to rule engine when LLM is unavailable or returns nothing.
         let finalTitle = '';
+        let finalBody: string | undefined;
         let finalPriority: import('@/domain/types').Priority = 'MEDIUM';
         let finalDueDate: number | null = null;
 
@@ -200,6 +207,7 @@ export default function RootLayout(): React.JSX.Element {
           const llmResult = await llmExtractTask(text);
           if (llmResult?.title) {
             finalTitle = llmResult.title;
+            finalBody = llmResult.body ?? undefined;
             finalPriority = llmResult.priority;
             finalDueDate = llmResult.dueDate;
           }
@@ -231,7 +239,7 @@ export default function RootLayout(): React.JSX.Element {
 
         const newTask = await taskRepo.createTask({
           title: finalTitle.trim(),
-          body: text || undefined,
+          body: finalBody || text || undefined,
           sourceApp: capture.packageName || 'accessibility.capture',
           sender: capture.sender || undefined,
           priority: finalPriority,
@@ -246,8 +254,11 @@ export default function RootLayout(): React.JSX.Element {
         void queryClient.invalidateQueries({ queryKey: ['tasks'] });
         // Navigate to the newly created task so user can review/confirm
         router.push(`/task/${newTask.id}`);
-      } catch {
-        // Non-fatal — user stays in current screen
+      } catch (err) {
+        ToastAndroid.show(
+          `Could not create task: ${err instanceof Error ? err.message : 'unknown error'}`,
+          ToastAndroid.LONG
+        );
       } finally {
         processingCaptureRef.current = false;
       }
