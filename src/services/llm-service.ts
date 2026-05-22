@@ -102,6 +102,60 @@ export function preprocessOcrText(text: string): string {
     .trim();
 }
 
+// Extract the most relevant portion of OCR text based on the source app.
+// This is the primary quality gate — a small model performs well on 10-15 clean
+// lines but poorly on a 900-char OCR dump of a full phone screen.
+export function extractAppSpecificText(ocrText: string, packageName: string): string {
+  const pkg = packageName.toLowerCase();
+  const lines = ocrText
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  // ── WhatsApp / WhatsApp Business ──────────────────────────────────────────
+  if (pkg.includes('whatsapp')) {
+    // Everything below the input bar is UI chrome — cut it off.
+    const inputMarkerIdx = lines.findIndex((l) =>
+      /^(type a message|message\.\.\.|reply|sticker|gif|attach|audio|camera)/i.test(l)
+    );
+    const messageLines = inputMarkerIdx > 1 ? lines.slice(0, inputMarkerIdx) : lines;
+    // Skip first line (contact/group name header) and take the last 15 message lines.
+    const messages = messageLines.slice(1).slice(-15);
+    return messages.join('\n') || ocrText.slice(-600);
+  }
+
+  // ── Telegram ──────────────────────────────────────────────────────────────
+  if (pkg.includes('telegram')) {
+    const inputMarkerIdx = lines.findIndex((l) =>
+      /^(message|type here|write a message|reply|attach)/i.test(l)
+    );
+    const messageLines = inputMarkerIdx > 1 ? lines.slice(0, inputMarkerIdx) : lines;
+    return messageLines.slice(1).slice(-15).join('\n') || ocrText.slice(-600);
+  }
+
+  // ── Gmail / generic email ─────────────────────────────────────────────────
+  if (pkg.includes('gmail') || pkg.includes('mail') || pkg.includes('outlook')) {
+    const subjectIdx = lines.findIndex((l) => /^subject[\s:]/i.test(l));
+    const fromIdx = lines.findIndex((l) => /^from[\s:]/i.test(l));
+    const startIdx = subjectIdx > -1 ? subjectIdx : fromIdx > -1 ? fromIdx : 0;
+    // Subject line + up to 30 body lines
+    return lines.slice(startIdx, startIdx + 30).join('\n') || ocrText.slice(0, 700);
+  }
+
+  // ── Slack / Teams / other work chat ──────────────────────────────────────
+  if (pkg.includes('slack') || pkg.includes('teams') || pkg.includes('discord')) {
+    // Take the last 15 lines (most recent messages at bottom)
+    return lines.slice(-15).join('\n') || ocrText.slice(-600);
+  }
+
+  // ── Default: head (context) + tail (latest content) ──────────────────────
+  const HEAD = 150;
+  const TAIL = 600;
+  return ocrText.length <= HEAD + TAIL
+    ? ocrText
+    : `${ocrText.slice(0, HEAD)}\n[...]\n${ocrText.slice(-TAIL)}`;
+}
+
 // Reject deadlines that are already past or implausibly far in the future (hallucinations).
 function sanitizeDeadline(isoStr: string | null | undefined): number | null {
   if (!isoStr) return null;
@@ -281,28 +335,28 @@ export async function classifyNotification(params: {
 // ── Task 2: Screenshot / transcript extraction (on-demand) ───────────────────
 
 // Base extraction prompt — current date + day injected at call time.
+// Input is already app-specific pre-processed text (extractAppSpecificText), so
+// the prompt focuses on task recognition, not on navigating OCR layout.
 // /no_think: suppresses Qwen3 thinking tokens; Llama models treat it as plain text.
 const TASK_SYSTEM_PROMPT_BASE =
-  'You are a task extraction engine. Extract actionable tasks from phone screen text.\n' +
-  'Chat apps (WhatsApp, Telegram): LATEST messages are at the END of text — focus there.\n' +
-  'Email: use subject line + body. Ignore: status bar, battery, nav buttons, app chrome.\n\n' +
-  'Extract ONLY if user must: pay, reply, submit, attend, call, send, schedule, follow up, buy.\n' +
-  'SKIP: OTPs, ads, promotions, social likes, greetings, passive info, completed items.\n' +
+  'You are a task extraction engine. Extract the most actionable task from the text.\n\n' +
+  'Extract ONLY if user must: pay, reply, submit, attend, call, send, buy, complete, follow up.\n' +
+  'SKIP: greetings, casual chat, passive info, OTPs, ads.\n' +
   'Languages: English, Hindi, Hinglish — understand all.\n' +
-  'NEVER invent deadlines, names, or actions not present in the text. Set deadline null if uncertain.\n\n' +
+  'NEVER invent deadlines, names, or actions. Set deadline null if uncertain.\n\n' +
   'Output ONLY valid JSON:\n' +
   '{"tasks":[{"task_heading":"≤12 words","task_details":"≤40 words","deadline":"ISO8601 or null",' +
   '"priority":"urgent|high|medium|low","people":[],"tags":[],"confidence_score":0-100,"requires_followup":false}]}\n' +
-  'No task found: {"tasks":[]}\n\n' +
+  'No task: {"tasks":[]}\n\n' +
   'E1:"Electricity bill due 23 May. Late fee applies after." → ' +
-  '{"tasks":[{"task_heading":"Pay electricity bill by 23 May","task_details":"Electricity bill due 23 May, late fee after deadline.","deadline":null,"priority":"urgent","people":[],"tags":["bill","payment"],"confidence_score":93,"requires_followup":false}]}\n' +
-  'E2:"Bro kal milte hain maybe" → {"tasks":[]}\n' +
+  '{"tasks":[{"task_heading":"Pay electricity bill by 23 May","task_details":"Bill due 23 May, late fee after deadline.","deadline":null,"priority":"urgent","people":[],"tags":["bill","payment"],"confidence_score":93,"requires_followup":false}]}\n' +
+  'E2:"Haan bhai, milte hain kabhi" → {"tasks":[]}\n' +
   'E3:"Please send revised DPR by Monday evening" → ' +
-  '{"tasks":[{"task_heading":"Send revised DPR by Monday evening","task_details":"Submit revised DPR document before Monday evening.","deadline":null,"priority":"high","people":[],"tags":["DPR","document"],"confidence_score":90,"requires_followup":false}]}\n' +
+  '{"tasks":[{"task_heading":"Send revised DPR by Monday evening","task_details":"Submit revised DPR before Monday evening.","deadline":null,"priority":"high","people":[],"tags":["DPR","document"],"confidence_score":90,"requires_followup":false}]}\n' +
   'E4:"Kal tak payment kar dena bhai" → ' +
   '{"tasks":[{"task_heading":"Make payment by tomorrow","task_details":"Payment required by tomorrow.","deadline":null,"priority":"high","people":[],"tags":["payment"],"confidence_score":85,"requires_followup":false}]}\n' +
   'E5:"Meeting with EY team Friday 3 PM. Discuss blockchain architecture." → ' +
-  '{"tasks":[{"task_heading":"Attend EY team meeting Friday 3 PM","task_details":"Meeting with EY team to discuss blockchain architecture.","deadline":null,"priority":"medium","people":["EY team"],"tags":["meeting","blockchain"],"confidence_score":93,"requires_followup":false}]}\n' +
+  '{"tasks":[{"task_heading":"Attend EY meeting Friday 3 PM","task_details":"Meeting with EY team on blockchain architecture.","deadline":null,"priority":"medium","people":["EY team"],"tags":["meeting","blockchain"],"confidence_score":93,"requires_followup":false}]}\n' +
   '/no_think';
 
 export interface LlmTaskResult {

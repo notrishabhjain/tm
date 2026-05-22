@@ -20,6 +20,7 @@ import {
   isLlmLoaded,
   loadLlm,
   preprocessOcrText,
+  extractAppSpecificText,
 } from '@/services/llm-service';
 import { isLlmCached } from '@/services/llm-manager';
 import NotificationListener from '../../modules/notification-listener/src';
@@ -193,8 +194,12 @@ export default function RootLayout(): React.JSX.Element {
         ToastAndroid.show('Processing screenshot…', ToastAndroid.LONG);
 
         const rawText = capture.extractedText || '';
-        // Strip status bar / nav bar noise before sending to LLM or rule engine.
-        const text = preprocessOcrText(rawText);
+        // Stage 1: strip status bar / nav bar noise.
+        // Stage 2: extract only the relevant portion based on the source app
+        //   (last 15 messages for WhatsApp/Telegram, subject+body for email, etc.)
+        //   so the LLM receives 10-15 clean lines instead of a 900-char OCR dump.
+        const cleaned = preprocessOcrText(rawText);
+        const text = extractAppSpecificText(cleaned, capture.packageName || '');
 
         // Try LLM first when loaded — richer title, details, and priority from OCR text.
         // Fall back to rule engine when LLM is unavailable or returns nothing.
