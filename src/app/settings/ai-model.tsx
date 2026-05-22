@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
 import { Colors } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
 import * as FileSystem from 'expo-file-system';
@@ -21,13 +22,17 @@ import {
 import { loadModel, isModelLoaded, resetModelLoadState } from '@/services/onnx-classifier';
 import {
   isLlmCached,
-  downloadLlm,
   deleteLlm,
   getLlmSizeBytes,
+  importLlmFromUri,
+  LARGE_GGUF_DISPLAY_REPO,
+  LARGE_GGUF_DISPLAY_FILENAME,
   isSmallLlmCached,
-  downloadSmallLlm,
   deleteSmallLlm,
   getSmallLlmSizeBytes,
+  importSmallLlmFromUri,
+  SMALL_GGUF_DISPLAY_REPO,
+  SMALL_GGUF_DISPLAY_FILENAME,
 } from '@/services/llm-manager';
 import {
   loadLlm,
@@ -40,7 +45,14 @@ import {
   getSmallLlmLoadError,
 } from '@/services/llm-service';
 
-type ModelStatus = 'checking' | 'not-downloaded' | 'downloading' | 'loading' | 'ready' | 'error';
+type ModelStatus =
+  | 'checking'
+  | 'not-downloaded'
+  | 'downloading'
+  | 'copying'
+  | 'loading'
+  | 'ready'
+  | 'error';
 
 // ── MiniLM card ───────────────────────────────────────────────────────────────
 
@@ -149,7 +161,6 @@ function MiniLmCard(): React.JSX.Element {
 
 function SmallLlmCard(): React.JSX.Element {
   const [status, setStatus] = useState<ModelStatus>('checking');
-  const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const [sizeMb, setSizeMb] = useState<number | null>(null);
 
@@ -178,7 +189,7 @@ function SmallLlmCard(): React.JSX.Element {
       setErrorMsg(
         detail
           ? `Failed to load: ${detail}`
-          : 'Model files present but failed to load. Try deleting and re-downloading.'
+          : 'Model present but failed to load. Try deleting and re-importing.'
       );
     }
   }, []);
@@ -187,12 +198,17 @@ function SmallLlmCard(): React.JSX.Element {
     void refresh();
   }, [refresh]);
 
-  const handleDownload = async (): Promise<void> => {
-    setStatus('downloading');
-    setProgress(0);
+  const handleImport = async (): Promise<void> => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: false,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setStatus('copying');
     setErrorMsg('');
     try {
-      await downloadSmallLlm((p) => setProgress(p));
+      await importSmallLlmFromUri(asset.uri, asset.size);
       setStatus('loading');
       const ok = await loadSmallLlm();
       if (ok) {
@@ -208,8 +224,8 @@ function SmallLlmCard(): React.JSX.Element {
         const detail = getSmallLlmLoadError();
         setErrorMsg(
           detail
-            ? `Downloaded OK but failed to load: ${detail}`
-            : 'Download succeeded but model failed to load. Delete and re-download if this persists.'
+            ? `Copied OK but failed to load: ${detail}`
+            : `File copied but model failed to load. Make sure you selected "${SMALL_GGUF_DISPLAY_FILENAME}".`
         );
       }
     } catch (err) {
@@ -243,15 +259,16 @@ function SmallLlmCard(): React.JSX.Element {
   return (
     <ModelCard
       name="Qwen3-0.6B Q4_K_M (classifier)"
-      badge="LLM · ~380 MB download"
+      badge="LLM · ~380 MB"
       description="Fast on-device LLM for notification classification. Understands context, negation, and intent — not just keywords. Learns from your confirm/reject history via few-shot examples. Stays loaded for background use."
       status={status}
-      progress={progress}
+      progress={0}
       errorMsg={errorMsg}
       sizeLabel={sizeMb !== null && status === 'ready' ? `${sizeMb} MB on device` : undefined}
-      onDownload={() => void handleDownload()}
+      onImport={() => void handleImport()}
+      huggingFaceRepo={SMALL_GGUF_DISPLAY_REPO}
+      modelFileName={SMALL_GGUF_DISPLAY_FILENAME}
       onDelete={handleDelete}
-      downloadLabel="Download (~380 MB)"
     />
   );
 }
@@ -260,7 +277,6 @@ function SmallLlmCard(): React.JSX.Element {
 
 function Qwen3Card(): React.JSX.Element {
   const [status, setStatus] = useState<ModelStatus>('checking');
-  const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const [sizeMb, setSizeMb] = useState<number | null>(null);
 
@@ -289,7 +305,7 @@ function Qwen3Card(): React.JSX.Element {
       setErrorMsg(
         detail
           ? `Failed to load: ${detail}`
-          : 'Model files present but failed to load. Try deleting and re-downloading.'
+          : 'Model present but failed to load. Try deleting and re-importing.'
       );
     }
   }, []);
@@ -298,12 +314,17 @@ function Qwen3Card(): React.JSX.Element {
     void refresh();
   }, [refresh]);
 
-  const handleDownload = async (): Promise<void> => {
-    setStatus('downloading');
-    setProgress(0);
+  const handleImport = async (): Promise<void> => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: false,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setStatus('copying');
     setErrorMsg('');
     try {
-      await downloadLlm((p) => setProgress(p));
+      await importLlmFromUri(asset.uri, asset.size);
       setStatus('loading');
       const ok = await loadLlm();
       if (ok) {
@@ -319,8 +340,8 @@ function Qwen3Card(): React.JSX.Element {
         const detail = getLlmLoadError();
         setErrorMsg(
           detail
-            ? `Downloaded OK but failed to load: ${detail}`
-            : 'Download succeeded but model failed to load. Delete and re-download if this persists.'
+            ? `Copied OK but failed to load: ${detail}`
+            : `File copied but model failed to load. Make sure you selected "${LARGE_GGUF_DISPLAY_FILENAME}".`
         );
       }
     } catch (err) {
@@ -354,15 +375,16 @@ function Qwen3Card(): React.JSX.Element {
   return (
     <ModelCard
       name="Qwen3-1.7B Q4_K_M (extractor)"
-      badge="LLM · ~1.1 GB download"
+      badge="LLM · ~1.1 GB"
       description="Larger model for rich task extraction from screenshots and meeting transcripts. Loaded on-demand when needed. Requires ~1.2 GB free RAM."
       status={status}
-      progress={progress}
+      progress={0}
       errorMsg={errorMsg}
       sizeLabel={sizeMb !== null && status === 'ready' ? `${sizeMb} MB on device` : undefined}
-      onDownload={() => void handleDownload()}
+      onImport={() => void handleImport()}
+      huggingFaceRepo={LARGE_GGUF_DISPLAY_REPO}
+      modelFileName={LARGE_GGUF_DISPLAY_FILENAME}
       onDelete={handleDelete}
-      downloadLabel="Download (~1.1 GB)"
     />
   );
 }
@@ -377,9 +399,14 @@ interface ModelCardProps {
   progress: number;
   errorMsg: string;
   sizeLabel?: string;
-  onDownload: () => void;
+  // Download-from-server mode (MiniLM only)
+  onDownload?: () => void;
+  downloadLabel?: string;
+  // Import-from-file mode (LLM cards)
+  onImport?: () => void;
+  huggingFaceRepo?: string;
+  modelFileName?: string;
   onDelete: () => void;
-  downloadLabel: string;
 }
 
 function ModelCard({
@@ -391,8 +418,11 @@ function ModelCard({
   errorMsg,
   sizeLabel,
   onDownload,
-  onDelete,
   downloadLabel,
+  onImport,
+  huggingFaceRepo,
+  modelFileName,
+  onDelete,
 }: ModelCardProps): React.JSX.Element {
   return (
     <View style={styles.card}>
@@ -422,13 +452,32 @@ function ModelCard({
       )}
 
       <View style={styles.actionArea}>
-        {(status === 'not-downloaded' || status === 'error') && (
-          <Button label={downloadLabel} variant="primary" onPress={onDownload} />
+        {(status === 'not-downloaded' || status === 'error') && onImport && (
+          <View style={styles.importSection}>
+            <View style={styles.downloadInfoBox}>
+              <Text style={styles.downloadInfoLabel}>Get this file from HuggingFace:</Text>
+              <Text style={styles.downloadInfoRepo}>huggingface.co/{huggingFaceRepo}</Text>
+              <Text style={styles.downloadInfoFile}>Filename: {modelFileName}</Text>
+              <Text style={styles.downloadInfoNote}>
+                Download on any device, transfer to phone, then select below.
+              </Text>
+            </View>
+            <Button label="Select GGUF File from Storage" variant="primary" onPress={onImport} />
+          </View>
+        )}
+        {(status === 'not-downloaded' || status === 'error') && onDownload && !onImport && (
+          <Button label={downloadLabel ?? 'Download'} variant="primary" onPress={onDownload} />
         )}
         {status === 'downloading' && (
           <View style={styles.centerRow}>
             <ActivityIndicator color={Colors.primary500} />
             <Text style={styles.downloadingText}>Downloading… {Math.round(progress * 100)}%</Text>
+          </View>
+        )}
+        {status === 'copying' && (
+          <View style={styles.centerRow}>
+            <ActivityIndicator color={Colors.primary500} />
+            <Text style={styles.downloadingText}>Copying to app storage…</Text>
           </View>
         )}
         {status === 'loading' && (
@@ -489,6 +538,7 @@ function StatusIndicator({ status }: { status: ModelStatus }): React.JSX.Element
     checking: { color: Colors.onSurfaceVariantLight, label: 'Checking…' },
     'not-downloaded': { color: Colors.onSurfaceVariantLight, label: 'Not downloaded' },
     downloading: { color: Colors.warning, label: 'Downloading' },
+    copying: { color: Colors.warning, label: 'Copying' },
     loading: { color: Colors.warning, label: 'Loading' },
     ready: { color: Colors.success, label: 'Ready' },
     error: { color: Colors.error, label: 'Error' },
@@ -568,6 +618,36 @@ const styles = StyleSheet.create({
   actionArea: { marginTop: 4 },
   centerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
   downloadingText: { fontSize: 14, color: Colors.onSurfaceVariantLight },
+  importSection: { gap: 10 },
+  downloadInfoBox: {
+    backgroundColor: Colors.surfaceVariantLight,
+    borderRadius: 8,
+    padding: 12,
+    gap: 4,
+  },
+  downloadInfoLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.onSurfaceVariantLight,
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  downloadInfoRepo: {
+    fontSize: 13,
+    color: Colors.primary500,
+    fontWeight: '500',
+  },
+  downloadInfoFile: {
+    fontSize: 12,
+    color: Colors.onSurfaceLight,
+    fontFamily: 'JetBrainsMono-Regular',
+  },
+  downloadInfoNote: {
+    fontSize: 11,
+    color: Colors.onSurfaceVariantLight,
+    marginTop: 4,
+    lineHeight: 16,
+  },
   infoCard: {
     backgroundColor: Colors.surfaceVariantLight,
     borderRadius: 10,
