@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { AppState, Text, View } from 'react-native';
+import { AppState, Text, ToastAndroid, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -176,6 +176,8 @@ export default function RootLayout(): React.JSX.Element {
   useEffect(() => {
     const processCapture = async (): Promise<void> => {
       if (processingCaptureRef.current) return;
+      // DB must be ready before writing tasks
+      if (!dbReadyRef.current) return;
       try {
         const capture = await NotificationListener.getPendingCapture();
         if (!capture) return;
@@ -187,6 +189,7 @@ export default function RootLayout(): React.JSX.Element {
         processingCaptureRef.current = true;
         // Clear immediately to prevent double-processing
         await NotificationListener.clearPendingCapture();
+        ToastAndroid.show('Processing screenshot…', ToastAndroid.LONG);
 
         const text = capture.extractedText || '';
 
@@ -246,8 +249,11 @@ export default function RootLayout(): React.JSX.Element {
         void queryClient.invalidateQueries({ queryKey: ['tasks'] });
         // Navigate to the newly created task so user can review/confirm
         router.push(`/task/${newTask.id}`);
-      } catch {
-        // Non-fatal — user stays in current screen
+      } catch (err) {
+        ToastAndroid.show(
+          `Could not create task: ${err instanceof Error ? err.message : 'unknown error'}`,
+          ToastAndroid.LONG
+        );
       } finally {
         processingCaptureRef.current = false;
       }

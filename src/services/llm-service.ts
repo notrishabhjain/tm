@@ -203,11 +203,11 @@ export async function classifyNotification(params: {
 
 // /no_think: suppresses Qwen3 thinking tokens; Llama models treat it as plain text (harmless)
 const TASK_SYSTEM_PROMPT =
-  'You are a task extraction assistant. Given text from a phone screen or message, ' +
-  'extract the single most actionable task. Respond with ONLY a valid JSON object — ' +
-  'no markdown fences, no explanation. ' +
-  'JSON keys: "title" (string ≤120 chars), "priority" (one of URGENT HIGH MEDIUM LOW), ' +
-  '"dueDate" (ISO 8601 date string or null). /no_think';
+  'You are a task extraction assistant. Extract the single most actionable task from phone screen text. ' +
+  'Chat apps (WhatsApp, Telegram): focus on the LATEST messages at the END of the text — ignore old messages at top. ' +
+  'Email: use the subject line and body. Ignore UI chrome (app name, status bar, Back/Send buttons). ' +
+  'Output ONLY valid JSON, no markdown, no explanation: ' +
+  '{"title":"specific action ≤120 chars","priority":"URGENT|HIGH|MEDIUM|LOW","dueDate":"ISO8601 or null"} /no_think';
 
 const TRANSCRIPT_SYSTEM_PROMPT =
   'You are a task extraction assistant. Given a meeting transcript or long text, ' +
@@ -229,11 +229,18 @@ export async function extractTaskFromText(text: string): Promise<LlmTaskResult |
   inferenceInProgress = true;
   try {
     const t0 = Date.now();
+    // Head (first 200 chars): app name, email subject, sender — gives context.
+    // Tail (last 700 chars): latest chat messages / email body — where the actual task lives.
+    // WhatsApp/chat: newest messages are at the BOTTOM of OCR output, so tail is critical.
+    const HEAD = 200;
+    const TAIL = 700;
+    const inputText =
+      text.length <= HEAD + TAIL ? text : `${text.slice(0, HEAD)}\n[...]\n${text.slice(-TAIL)}`;
+
     const result = await llamaCtx.completion({
       messages: [
         { role: 'system', content: TASK_SYSTEM_PROMPT },
-        // 1000 chars ≈ 300 tokens; fits within n_ctx=768 with system prompt + output
-        { role: 'user', content: `Extract the main task from:\n\n${text.slice(0, 1000)}` },
+        { role: 'user', content: `Extract the task from:\n\n${inputText}` },
       ],
       n_predict: 120,
       temperature: 0.1,
