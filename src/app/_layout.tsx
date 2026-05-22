@@ -11,22 +11,10 @@ import { getSetting } from '@/data/storage/settings';
 import { seedDatabaseIfNeeded } from '@/services/db-seeder';
 import { handleNotification } from '@/services/notification-handler';
 import { restoreNudgeFromSettings } from '@/services/nudge-scheduler';
-import { TaskRepository } from '@/data/repositories/TaskRepository';
-import { db } from '@/data/db/client';
-import { runExtractionPipeline } from '@/domain/extraction';
-import { DEFAULT_PIPELINE_CONFIG } from '@/domain/extraction/seedConfig';
-import {
-  extractTaskFromText as llmExtractTask,
-  isLlmLoaded,
-  loadLlm,
-  preprocessOcrText,
-  extractAppSpecificText,
-} from '@/services/llm-service';
+import { loadLlm } from '@/services/llm-service';
 import { isLlmCached } from '@/services/llm-manager';
 import NotificationListener from '../../modules/notification-listener/src';
 import '@/i18n';
-
-const taskRepo = new TaskRepository(db);
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -191,77 +179,23 @@ export default function RootLayout(): React.JSX.Element {
         processingCaptureRef.current = true;
         // Clear immediately to prevent double-processing
         await NotificationListener.clearPendingCapture();
-        ToastAndroid.show('Processing screenshot…', ToastAndroid.LONG);
 
-        const rawText = capture.extractedText || '';
-        // Stage 1: strip status bar / nav bar noise.
-        // Stage 2: extract only the relevant portion based on the source app
-        //   (last 15 messages for WhatsApp/Telegram, subject+body for email, etc.)
-        //   so the LLM receives 10-15 clean lines instead of a 900-char OCR dump.
-        const cleaned = preprocessOcrText(rawText);
-        const text = extractAppSpecificText(cleaned, capture.packageName || '');
-
-        // Try LLM first when loaded — richer title, details, and priority from OCR text.
-        // Fall back to rule engine when LLM is unavailable or returns nothing.
-        let finalTitle = '';
-        let finalBody: string | undefined;
-        let finalPriority: import('@/domain/types').Priority = 'MEDIUM';
-        let finalDueDate: number | null = null;
-
-        if (isLlmLoaded() && text.length > 10) {
-          const llmResult = await llmExtractTask(text);
-          if (llmResult?.title) {
-            finalTitle = llmResult.title;
-            finalBody = llmResult.body ?? undefined;
-            finalPriority = llmResult.priority;
-            finalDueDate = llmResult.dueDate;
-          }
-        }
-
-        if (!finalTitle) {
-          const result = await runExtractionPipeline(
-            { text, title: capture.sender || undefined },
-            DEFAULT_PIPELINE_CONFIG
-          );
-
-          // Guard against single-word UI labels that actionExtractor may still
-          // return when OCR catches only app chrome.
-          const UI_LABEL_RE =
-            /^(whatsapp|telegram|instagram|facebook|gmail|chats|status|calls|search|home|inbox|messages|camera|notifications|settings)$/i;
-          const rawExtracted = (result.extractedTitle || '').trim();
-          const safeExtractedTitle =
-            rawExtracted && !UI_LABEL_RE.test(rawExtracted) ? rawExtracted : '';
-
-          finalTitle =
-            safeExtractedTitle ||
-            (capture.sender ? `${capture.sender}: ${text.slice(0, 60)}` : text.slice(0, 80)) ||
-            'Captured task';
-          finalPriority = result.priority;
-          finalDueDate = result.dueDate ?? null;
-        }
-
-        const screenshotPath = capture.screenshotPath || null;
-
-        const newTask = await taskRepo.createTask({
-          title: finalTitle.trim(),
-          body: finalBody || text || undefined,
-          sourceApp: capture.packageName || 'accessibility.capture',
-          sender: capture.sender || undefined,
-          priority: finalPriority,
-          confidence: isLlmLoaded() ? 0.92 : 0.9,
-          needsConfirmation: false,
-          matchedKeywords: [],
-          language: 'EN',
-          dueDate: finalDueDate,
-          screenshotPath,
+        // Navigate to share screen for user review.
+        // The share screen runs extraction (LLM → rule engine) and pre-fills the
+        // title field, but the user confirms before the task is saved. This prevents
+        // silent wrong tasks from bad OCR or model errors.
+        router.push({
+          pathname: '/share',
+          params: {
+            captureText: capture.extractedText || '',
+            packageName: capture.packageName || '',
+            sender: capture.sender || '',
+            screenshotPath: capture.screenshotPath || '',
+          },
         });
-
-        void queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        // Navigate to the newly created task so user can review/confirm
-        router.push(`/task/${newTask.id}`);
       } catch (err) {
         ToastAndroid.show(
-          `Could not create task: ${err instanceof Error ? err.message : 'unknown error'}`,
+          `Could not open capture: ${err instanceof Error ? err.message : 'unknown error'}`,
           ToastAndroid.LONG
         );
       } finally {

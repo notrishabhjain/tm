@@ -9,7 +9,7 @@ import {
   Image,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
 import { PriorityChip } from '@/ui/components/PriorityChip';
@@ -21,6 +21,12 @@ import type { PipelineConfig } from '@/domain/extraction';
 import type { Keyword } from '@/domain/extraction/ruleEngine';
 import type { Priority } from '@/domain/types';
 import seedKeywordsRaw from '../../assets/seed-keywords.json';
+import {
+  extractTaskFromText,
+  preprocessOcrText,
+  extractAppSpecificText,
+  isLlmLoaded,
+} from '@/services/llm-service';
 
 type RawKeyword = { keyword: string; language: string; priority_hint: string };
 
@@ -86,6 +92,15 @@ function formatDueDate(ts: number): string {
 
 export default function ShareScreen(): React.JSX.Element {
   const router = useRouter();
+  // Params present when opened from accessibility screenshot capture.
+  // Absent when opened from Android share intent.
+  const params = useLocalSearchParams<{
+    captureText?: string;
+    packageName?: string;
+    sender?: string;
+    screenshotPath?: string;
+  }>();
+
   const [parsed, setParsed] = useState<ParsedShare | null>(null);
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Priority>('MEDIUM');
@@ -101,6 +116,53 @@ export default function ShareScreen(): React.JSX.Element {
 
   const loadShare = async (): Promise<void> => {
     try {
+      // ── Accessibility screenshot capture (params passed from _layout.tsx) ──
+      if (params.captureText !== undefined) {
+        if (params.screenshotPath) setScreenshotPath(params.screenshotPath);
+
+        const rawOcr = params.captureText || '';
+        const cleaned = preprocessOcrText(rawOcr);
+        const focusedText = extractAppSpecificText(cleaned, params.packageName || '');
+        const sender = params.sender || '';
+
+        setParsed({
+          sender,
+          message: focusedText || rawOcr,
+          timestamp: new Date().toLocaleString(),
+          rawText: rawOcr,
+        });
+
+        if (focusedText.trim()) {
+          // Try LLM first — it understands Hindi/Hinglish and extracts better titles.
+          if (isLlmLoaded()) {
+            const llmResult = await extractTaskFromText(focusedText);
+            if (llmResult?.title) {
+              setTitle(llmResult.title);
+              setPriority(llmResult.priority);
+              if (llmResult.dueDate) setDueDate(llmResult.dueDate);
+              setLoading(false);
+              return;
+            }
+          }
+          // Fall back to rule engine.
+          const pipelineResult = await runExtractionPipeline(
+            { text: focusedText, title: sender || undefined },
+            PIPELINE_CONFIG
+          );
+          const suggestedTitle =
+            pipelineResult.extractedTitle ||
+            (sender ? `${sender}: ${focusedText.slice(0, 60)}` : focusedText.slice(0, 80));
+          setTitle(suggestedTitle);
+          setPriority(pipelineResult.priority);
+          if (pipelineResult.dueDate) setDueDate(pipelineResult.dueDate);
+        } else {
+          setError('No readable text found in screenshot. Please type the task manually.');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // ── Android share intent ───────────────────────────────────────────────
       const [intent, screenshot] = await Promise.all([
         NotificationListener.peekShareIntent(),
         NotificationListener.getLatestScreenshot(),
@@ -116,7 +178,6 @@ export default function ShareScreen(): React.JSX.Element {
 
       const rawText = intent?.text ?? '';
       const p = parseWhatsAppShare(rawText);
-      // For accessibility-captured text, sender is stored in intent.subject
       const effectiveSender = p.sender || (intent?.subject ?? '');
       const effectiveParsed = { ...p, sender: effectiveSender };
       setParsed(effectiveParsed);
@@ -136,7 +197,7 @@ export default function ShareScreen(): React.JSX.Element {
         if (pipelineResult.dueDate) setDueDate(pipelineResult.dueDate);
       }
     } catch {
-      setError('Could not read shared content. Please try again.');
+      setError('Could not read captured content. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -148,8 +209,8 @@ export default function ShareScreen(): React.JSX.Element {
     try {
       await taskRepo.createTask({
         title: title.trim(),
-        body: parsed.rawText,
-        sourceApp: 'manual.capture',
+        body: parsed.message || parsed.rawText,
+        sourceApp: params.packageName || 'manual.capture',
         sender: parsed.sender || undefined,
         priority,
         confidence: 0.9,
