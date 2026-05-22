@@ -104,6 +104,29 @@ async function getFewShotExamples(): Promise<FewShotExample[]> {
   }
 }
 
+async function isRecentDuplicate(title: string): Promise<boolean> {
+  const oneHourAgo = Date.now() - 3_600_000;
+  try {
+    const recent = (await db
+      .select({ title: tasks.title })
+      .from(tasks)
+      .where(and(isNull(tasks.deletedAt), gt(tasks.createdAt, oneHourAgo)))
+      .limit(15)) as Array<{ title: string }>;
+
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+    const newNorm = norm(title);
+    return recent.some((t) => {
+      const existing = norm(t.title);
+      return (
+        existing === newNorm ||
+        (newNorm.length > 15 && (existing.includes(newNorm) || newNorm.includes(existing)))
+      );
+    });
+  } catch {
+    return false;
+  }
+}
+
 export async function handleNotification(taskData: {
   notification: NotificationData;
 }): Promise<void> {
@@ -164,7 +187,7 @@ export async function handleNotification(taskData: {
   const senderStatsRepo = new SenderStatsRepository(db);
   const taskRepo = new TaskRepository(db);
 
-  // ── Primary: LLM classification (Qwen3-0.6B) when loaded ────────────────────
+  // ── Primary: LLM classification when loaded ──────────────────────────────────
   if (isLlmLoaded()) {
     const examples = await getFewShotExamples();
     const appName = notification.packageName.split('.').pop() ?? notification.packageName;
@@ -177,17 +200,14 @@ export async function handleNotification(taskData: {
     });
 
     if (llmResult !== null) {
-      const decision: 'CREATE' | 'CONFIRM' | 'DISCARD' = !llmResult.actionable
-        ? 'DISCARD'
-        : llmResult.confidence >= 0.75
-          ? 'CREATE'
-          : llmResult.confidence >= 0.35
-            ? 'CONFIRM'
-            : 'DISCARD';
+      // decision is computed inside classifyNotification (includes spam guard)
+      const { decision } = llmResult;
+      const detectedLang: import('@/domain/types').Language =
+        llmResult.language === 'hi' ? 'HI' : llmResult.language === 'hinglish' ? 'HI-EN' : 'EN';
 
       logExtractionDecision({
         input: pipelineText,
-        language: 'EN',
+        language: detectedLang,
         ruleScore: 0,
         modelScore: llmResult.confidence,
         finalScore: llmResult.confidence,
@@ -198,12 +218,14 @@ export async function handleNotification(taskData: {
 
       if (decision === 'DISCARD') {
         const discardedRepo = new DiscardedLogRepository(db);
+        const reason =
+          llmResult.spamProbability >= 0.7 ? 'SPAM_OR_OTP' : ('LOW_CONFIDENCE' as const);
         await discardedRepo.insert({
           notificationId: `${notification.packageName}-${notification.postTime}`,
           sourceApp: notification.packageName,
           sender: notification.title,
           bodyPreview: pipelineText.slice(0, 100),
-          reason: 'LOW_CONFIDENCE',
+          reason,
           confidence: llmResult.confidence,
           createdAt: Date.now(),
         });
@@ -211,8 +233,16 @@ export async function handleNotification(taskData: {
         return;
       }
 
+      const taskTitle = llmResult.title || pipelineText.slice(0, 120);
+
+      // Skip if an identical task was already created in the last hour.
+      if (decision === 'CREATE' && (await isRecentDuplicate(taskTitle))) {
+        await refreshPersistentNotification(taskRepo);
+        return;
+      }
+
       await taskRepo.createTask({
-        title: llmResult.title || pipelineText.slice(0, 120),
+        title: taskTitle,
         body: notification.bigText || notification.text,
         sourceApp: notification.packageName,
         sender: notification.title,
@@ -220,7 +250,7 @@ export async function handleNotification(taskData: {
         confidence: llmResult.confidence,
         needsConfirmation: decision === 'CONFIRM',
         matchedKeywords: ['llm_classification'],
-        language: 'EN',
+        language: detectedLang,
       });
 
       if (decision === 'CREATE') {

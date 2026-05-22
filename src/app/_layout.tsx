@@ -19,6 +19,7 @@ import {
   extractTaskFromText as llmExtractTask,
   isLlmLoaded,
   loadLlm,
+  preprocessOcrText,
 } from '@/services/llm-service';
 import { isLlmCached } from '@/services/llm-manager';
 import NotificationListener from '../../modules/notification-listener/src';
@@ -191,11 +192,14 @@ export default function RootLayout(): React.JSX.Element {
         await NotificationListener.clearPendingCapture();
         ToastAndroid.show('Processing screenshot…', ToastAndroid.LONG);
 
-        const text = capture.extractedText || '';
+        const rawText = capture.extractedText || '';
+        // Strip status bar / nav bar noise before sending to LLM or rule engine.
+        const text = preprocessOcrText(rawText);
 
-        // Try LLM first (Qwen3) when loaded — richer title + priority from OCR text.
+        // Try LLM first when loaded — richer title, details, and priority from OCR text.
         // Fall back to rule engine when LLM is unavailable or returns nothing.
         let finalTitle = '';
+        let finalBody: string | undefined;
         let finalPriority: import('@/domain/types').Priority = 'MEDIUM';
         let finalDueDate: number | null = null;
 
@@ -203,6 +207,7 @@ export default function RootLayout(): React.JSX.Element {
           const llmResult = await llmExtractTask(text);
           if (llmResult?.title) {
             finalTitle = llmResult.title;
+            finalBody = llmResult.body ?? undefined;
             finalPriority = llmResult.priority;
             finalDueDate = llmResult.dueDate;
           }
@@ -234,7 +239,7 @@ export default function RootLayout(): React.JSX.Element {
 
         const newTask = await taskRepo.createTask({
           title: finalTitle.trim(),
-          body: text || undefined,
+          body: finalBody || text || undefined,
           sourceApp: capture.packageName || 'accessibility.capture',
           sender: capture.sender || undefined,
           priority: finalPriority,
