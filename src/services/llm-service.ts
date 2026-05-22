@@ -21,8 +21,11 @@ export function isLlmLoaded(): boolean {
 export async function loadLlm(): Promise<boolean> {
   if (llamaCtx) return true;
   try {
+    // llama.cpp requires a raw filesystem path — strip the file:// URI prefix
+    // that expo-file-system returns on Android (same fix as onnx-classifier.ts)
+    const modelPath = getLlmModelPath().replace(/^file:\/\//, '');
     llamaCtx = await initLlama({
-      model: getLlmModelPath(),
+      model: modelPath,
       n_ctx: 2048,
       n_threads: 4,
       n_batch: 512,
