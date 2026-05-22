@@ -176,7 +176,9 @@ function SmallLlmCard(): React.JSX.Element {
     if (!ok) {
       const detail = getSmallLlmLoadError();
       setErrorMsg(
-        detail ? `Failed to load: ${detail}` : 'Model files present but failed to load. Try deleting and re-downloading.'
+        detail
+          ? `Failed to load: ${detail}`
+          : 'Model files present but failed to load. Try deleting and re-downloading.'
       );
     }
   }, []);
@@ -285,7 +287,9 @@ function Qwen3Card(): React.JSX.Element {
     if (!ok) {
       const detail = getLlmLoadError();
       setErrorMsg(
-        detail ? `Failed to load: ${detail}` : 'Model files present but failed to load. Try deleting and re-downloading.'
+        detail
+          ? `Failed to load: ${detail}`
+          : 'Model files present but failed to load. Try deleting and re-downloading.'
       );
     }
   }, []);

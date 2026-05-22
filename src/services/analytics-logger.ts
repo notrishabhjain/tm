@@ -4,7 +4,9 @@ import { llmMetrics } from '@/data/db/schema';
 export async function logLlmLoad(modelId: string, durationMs: number): Promise<void> {
   try {
     initializeDatabase();
-    await db.insert(llmMetrics).values({ modelId, eventType: 'load', durationMs, createdAt: Date.now() });
+    await db
+      .insert(llmMetrics)
+      .values({ modelId, eventType: 'load', durationMs, createdAt: Date.now() });
   } catch {
     /* non-fatal */
   }

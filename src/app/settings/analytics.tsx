@@ -1,12 +1,5 @@
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { desc, eq, gt, and, sql } from 'drizzle-orm';
@@ -153,7 +146,6 @@ export default function AnalyticsScreen(): React.JSX.Element {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-
         {/* ── Summary cards ── */}
         <Text style={styles.sectionLabel}>LAST 7 DAYS</Text>
         {loadingSummary ? (
@@ -180,13 +172,19 @@ export default function AnalyticsScreen(): React.JSX.Element {
           <ModelStatusRow
             label="Qwen3-0.6B (classifier)"
             loaded={isSmallLlmLoaded()}
-            lastLoadMs={loadHistory.find((r: { modelId: string }) => r.modelId === 'qwen3-0.6b')?.durationMs ?? null}
+            lastLoadMs={
+              loadHistory.find((r: { modelId: string }) => r.modelId === 'qwen3-0.6b')
+                ?.durationMs ?? null
+            }
           />
           <View style={styles.divider} />
           <ModelStatusRow
             label="Qwen3-1.7B (extractor)"
             loaded={isLlmLoaded()}
-            lastLoadMs={loadHistory.find((r: { modelId: string }) => r.modelId === 'qwen3-1.7b')?.durationMs ?? null}
+            lastLoadMs={
+              loadHistory.find((r: { modelId: string }) => r.modelId === 'qwen3-1.7b')
+                ?.durationMs ?? null
+            }
           />
         </View>
 
@@ -215,7 +213,14 @@ export default function AnalyticsScreen(): React.JSX.Element {
           <>
             <Text style={[styles.sectionLabel, { marginTop: 20 }]}>LOAD HISTORY</Text>
             <View style={styles.card}>
-              {(loadHistory as Array<{ id: number; modelId: string; durationMs: number; createdAt: number }>).map((row, i) => (
+              {(
+                loadHistory as Array<{
+                  id: number;
+                  modelId: string;
+                  durationMs: number;
+                  createdAt: number;
+                }>
+              ).map((row, i) => (
                 <View key={row.id} style={[styles.logRow, i > 0 && styles.logRowBorder]}>
                   <View style={styles.logModelBadge}>
                     <Text style={styles.logModelText}>{modelLabel(row.modelId)}</Text>
@@ -235,7 +240,17 @@ export default function AnalyticsScreen(): React.JSX.Element {
               RECENT INFERENCES ({recentInferences.length})
             </Text>
             <View style={styles.card}>
-              {(recentInferences as Array<{ id: number; modelId: string; durationMs: number; decision: string | null; confidence: number | null; inputLength: number | null; createdAt: number }>).map((row, i) => (
+              {(
+                recentInferences as Array<{
+                  id: number;
+                  modelId: string;
+                  durationMs: number;
+                  decision: string | null;
+                  confidence: number | null;
+                  inputLength: number | null;
+                  createdAt: number;
+                }>
+              ).map((row, i) => (
                 <View key={row.id} style={[styles.inferenceRow, i > 0 && styles.logRowBorder]}>
                   <View style={styles.inferenceLeft}>
                     <View style={styles.logModelBadge}>
@@ -248,18 +263,14 @@ export default function AnalyticsScreen(): React.JSX.Element {
                         { backgroundColor: decisionColor(row.decision) + '22' },
                       ]}
                     >
-                      <Text
-                        style={[styles.decisionText, { color: decisionColor(row.decision) }]}
-                      >
+                      <Text style={[styles.decisionText, { color: decisionColor(row.decision) }]}>
                         {row.decision ?? '—'}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.inferenceRight}>
                     {row.confidence !== null && row.confidence !== undefined && (
-                      <Text style={styles.confidenceText}>
-                        {Math.round(row.confidence * 100)}%
-                      </Text>
+                      <Text style={styles.confidenceText}>{Math.round(row.confidence * 100)}%</Text>
                     )}
                     <Text style={styles.logTime}>{relativeTime(row.createdAt)}</Text>
                   </View>
@@ -314,7 +325,12 @@ function ModelStatusRow({
 }): React.JSX.Element {
   return (
     <View style={styles.modelStatusRow}>
-      <View style={[styles.statusDot, { backgroundColor: loaded ? Colors.success : Colors.onSurfaceVariantLight }]} />
+      <View
+        style={[
+          styles.statusDot,
+          { backgroundColor: loaded ? Colors.success : Colors.onSurfaceVariantLight },
+        ]}
+      />
       <Text style={styles.modelStatusLabel}>{label}</Text>
       <Text style={styles.modelStatusRight}>
         {loaded ? 'Loaded' : 'Not loaded'}
@@ -399,7 +415,12 @@ const styles = StyleSheet.create({
   modelStatusLabel: { fontSize: 13, color: Colors.onSurfaceLight, flex: 1 },
   modelStatusRight: { fontSize: 12, color: Colors.onSurfaceVariantLight },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  breakdownLabel: { fontSize: 11, fontWeight: '600', color: Colors.onSurfaceVariantLight, width: 90 },
+  breakdownLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.onSurfaceVariantLight,
+    width: 90,
+  },
   breakdownTrack: {
     flex: 1,
     height: 8,
@@ -409,7 +430,12 @@ const styles = StyleSheet.create({
   },
   breakdownFill: { height: '100%', borderRadius: 4 },
   breakdownPct: { fontSize: 12, fontWeight: '600', width: 36, textAlign: 'right' },
-  feedbackRow: { marginTop: 4, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.outlineLight },
+  feedbackRow: {
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.outlineLight,
+  },
   feedbackText: { fontSize: 12, color: Colors.onSurfaceVariantLight },
   logRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logRowBorder: { paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.outlineLight },
@@ -437,5 +463,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   emptyTitle: { fontSize: 15, fontWeight: '600', color: Colors.onSurfaceLight },
-  emptyDesc: { fontSize: 13, color: Colors.onSurfaceVariantLight, textAlign: 'center', lineHeight: 20 },
+  emptyDesc: {
+    fontSize: 13,
+    color: Colors.onSurfaceVariantLight,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });

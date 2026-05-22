@@ -41,27 +41,50 @@ async function getFewShotExamples(): Promise<FewShotExample[]> {
   try {
     const [positives, negatives] = await Promise.all([
       db
-        .select({ body: tasks.body, title: tasks.title, sourceApp: tasks.sourceApp, sender: tasks.sender })
+        .select({
+          body: tasks.body,
+          title: tasks.title,
+          sourceApp: tasks.sourceApp,
+          sender: tasks.sender,
+        })
         .from(tasks)
         .where(and(isNull(tasks.deletedAt), gt(tasks.createdAt, sevenDaysAgo)))
         .orderBy(desc(tasks.createdAt))
         .limit(4),
       db
-        .select({ bodyPreview: discardedLogTable.bodyPreview, sourceApp: discardedLogTable.sourceApp, sender: discardedLogTable.sender })
+        .select({
+          bodyPreview: discardedLogTable.bodyPreview,
+          sourceApp: discardedLogTable.sourceApp,
+          sender: discardedLogTable.sender,
+        })
         .from(discardedLogTable)
-        .where(and(eq(discardedLogTable.reason, 'USER_REJECTED'), gt(discardedLogTable.createdAt, sevenDaysAgo)))
+        .where(
+          and(
+            eq(discardedLogTable.reason, 'USER_REJECTED'),
+            gt(discardedLogTable.createdAt, sevenDaysAgo)
+          )
+        )
         .orderBy(desc(discardedLogTable.createdAt))
         .limit(4),
     ]);
 
-    const pos: FewShotExample[] = (positives as Array<{ body: string | null; title: string; sourceApp: string; sender: string | null }>).map((t) => ({
+    const pos: FewShotExample[] = (
+      positives as Array<{
+        body: string | null;
+        title: string;
+        sourceApp: string;
+        sender: string | null;
+      }>
+    ).map((t) => ({
       appName: t.sourceApp.split('.').pop() ?? t.sourceApp,
       sender: t.sender ?? null,
       text: ((t.body ?? t.title) || '').slice(0, 100),
       decision: 'confirmed' as const,
       title: t.title,
     }));
-    const neg: FewShotExample[] = (negatives as Array<{ bodyPreview: string; sourceApp: string; sender: string | null }>).map((d) => ({
+    const neg: FewShotExample[] = (
+      negatives as Array<{ bodyPreview: string; sourceApp: string; sender: string | null }>
+    ).map((d) => ({
       appName: d.sourceApp.split('.').pop() ?? d.sourceApp,
       sender: d.sender ?? null,
       text: d.bodyPreview.slice(0, 100),
