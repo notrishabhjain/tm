@@ -3,9 +3,14 @@ import { db } from '@/data/db/client';
 import { tasks, senderStats, learnedKeywords } from '@/data/db/schema';
 import type { DiscardReason } from '@/domain/types';
 import type { NotificationData } from '../../modules/notification-listener/src/types';
+import { getSetting } from '@/data/storage/settings';
+import { loadModel } from './model-manager';
+import { runInference } from './intent-model';
 
 export interface ScoringResult {
   score: number;
+  ruleScore: number;
+  modelScore: number | null;
   decision: 'CREATE' | 'CONFIRM' | 'DISCARD';
   forceInbox: boolean;
   signals: string[];
@@ -919,6 +924,8 @@ export async function scoreNotification(notification: NotificationData): Promise
   if (forced.force) {
     return {
       score: 0,
+      ruleScore: 0,
+      modelScore: null,
       decision: 'DISCARD',
       forceInbox: false,
       signals: [forced.signal],
@@ -951,24 +958,47 @@ export async function scoreNotification(notification: NotificationData): Promise
   }
 
   const rawScore = Math.max(0, Math.min(1, acc.score));
+
+  // ── On-device intent model (optional second pass) ─────────────────────────
+  const modelWeight = getSetting('model_weight');
+  let modelScore: number | null = null;
+  let finalScore = rawScore;
+
+  if (modelWeight > 0) {
+    try {
+      const model = await loadModel();
+      if (model.version !== '0.0.0' && model.weights.length > 0) {
+        modelScore = runInference(latestMessage, model);
+        // Linear blend: finalScore = ruleScore*(1-w) + modelScore*w
+        finalScore = rawScore * (1 - modelWeight) + modelScore * modelWeight;
+        finalScore = Math.max(0, Math.min(1, finalScore));
+        acc.signals.push(modelScore >= 0.5 ? 'model_positive' : 'model_negative');
+      }
+    } catch {
+      /* model inference failed — rule-only fallback */
+    }
+  }
+
   const forceInbox = checkForceInbox(latestMessage, acc.signals, senderInfo.effectiveTrust);
 
   let decision: 'CREATE' | 'CONFIRM' | 'DISCARD';
   if (senderInfo.isUnknown || forceInbox) {
     decision = 'CONFIRM';
-  } else if (rawScore >= senderInfo.thresholds.createThreshold) {
+  } else if (finalScore >= senderInfo.thresholds.createThreshold) {
     decision = 'CREATE';
-  } else if (rawScore <= senderInfo.thresholds.discardThreshold) {
+  } else if (finalScore <= senderInfo.thresholds.discardThreshold) {
     decision = 'DISCARD';
   } else {
     decision = 'CONFIRM';
   }
 
-  const priority = derivePriority(rawScore, acc.signals);
+  const priority = derivePriority(finalScore, acc.signals);
   const extractedDeadline = extractDeadline(latestMessage);
 
   return {
-    score: rawScore,
+    score: finalScore,
+    ruleScore: rawScore,
+    modelScore,
     decision,
     forceInbox,
     signals: acc.signals,

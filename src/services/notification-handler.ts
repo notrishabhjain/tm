@@ -114,8 +114,8 @@ export async function handleNotification(taskData: {
   logExtractionDecision({
     input: notification.bigText || notification.text,
     language: 'EN',
-    ruleScore: result.score,
-    modelScore: 0,
+    ruleScore: result.ruleScore,
+    modelScore: result.modelScore ?? 0,
     finalScore: result.score,
     matchedKeywords: result.signals,
     decision: result.decision,

@@ -22,6 +22,7 @@ export interface AppSettings {
   model_weight: number;
   model_downloaded: boolean;
   model_version: string;
+  model_url: string;
   email_enabled: boolean;
   email_send_time: string;
   auto_backup_enabled: boolean;
@@ -42,6 +43,7 @@ const DEFAULTS: AppSettings = {
   model_weight: 0.0,
   model_downloaded: false,
   model_version: '',
+  model_url: '',
   email_enabled: false,
   email_send_time: '21:00',
   auto_backup_enabled: true,
