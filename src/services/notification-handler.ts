@@ -13,6 +13,23 @@ import { scoreNotification, buildSenderKey } from './signal-scorer';
 import { resolveCancellation } from './cancellation-resolver';
 import { extractTitle } from './title-extractor';
 
+// Jaccard similarity on word tokens — used for near-duplicate task detection.
+function titleSimilarity(a: string, b: string): number {
+  const tokens = (s: string): Set<string> =>
+    new Set(
+      s
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .split(/\s+/)
+        .filter(Boolean)
+    );
+  const ta = tokens(a);
+  const tb = tokens(b);
+  if (ta.size === 0 && tb.size === 0) return 1;
+  const intersection = [...ta].filter((x) => tb.has(x)).length;
+  return intersection / (ta.size + tb.size - intersection);
+}
+
 export async function handleNotification(taskData: {
   notification: NotificationData;
 }): Promise<void> {
@@ -112,6 +129,21 @@ export async function handleNotification(taskData: {
     notification.title ?? '',
     notification.packageName
   );
+
+  if (notification.title) {
+    try {
+      const recent = await taskRepo.getRecentBySenderAndApp(
+        notification.title,
+        notification.packageName
+      );
+      if (recent.some((t) => titleSimilarity(t.title, candidateTitle) >= 0.7)) {
+        logCapturedNotification(notification, 'FILTERED');
+        return;
+      }
+    } catch {
+      /* non-fatal — dedup is best-effort */
+    }
+  }
 
   // ── Create task ──────────────────────────────────────────────────────────────
   const needsConfirmation = result.decision === 'CONFIRM';

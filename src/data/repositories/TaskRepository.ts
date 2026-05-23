@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, not, lt, gte } from 'drizzle-orm';
+import { eq, and, desc, isNull, not, lt, gte, gt } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { tasks } from '../db/schema';
 import type { Task, Priority, TaskStatus } from '@/domain/types';
@@ -165,6 +165,28 @@ export class TaskRepository {
         )
       );
     return rows.length;
+  }
+
+  async getRecentBySenderAndApp(
+    sender: string,
+    sourceApp: string,
+    windowMs = 2 * 60 * 60 * 1000
+  ): Promise<{ id: string; title: string }[]> {
+    const cutoff = Date.now() - windowMs;
+    const rows = await this.db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.sender, sender),
+          eq(tasks.sourceApp, sourceApp),
+          isNull(tasks.deletedAt),
+          gt(tasks.createdAt, cutoff)
+        )
+      )
+      .orderBy(desc(tasks.createdAt))
+      .limit(10);
+    return rows as { id: string; title: string }[];
   }
 
   async countByStatus(): Promise<Record<string, number>> {
