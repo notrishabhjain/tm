@@ -19,7 +19,7 @@ export function EmptyState({
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <Text style={styles.icon}>✓</Text>
+        <View style={styles.iconDot} />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{description}</Text>
@@ -46,9 +46,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  icon: {
-    fontSize: 28,
-    color: Colors.primary500,
+  iconDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.primary500,
   },
   title: {
     fontSize: 18,

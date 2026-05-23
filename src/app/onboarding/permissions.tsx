@@ -56,7 +56,7 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
           <Text style={styles.statusText}>
             Notification Access:{' '}
             <Text style={{ fontWeight: '700' }}>
-              {status === 'granted' ? 'Granted ✓' : 'Not granted'}
+              {status === 'granted' ? 'Granted' : 'Not granted'}
             </Text>
           </Text>
         </View>

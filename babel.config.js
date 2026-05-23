@@ -9,7 +9,6 @@ module.exports = function (api) {
           include: ['EXPO_PUBLIC_COMMIT_SHA', 'NODE_ENV'],
         },
       ],
-      'react-native-reanimated/plugin',
     ],
   };
 };

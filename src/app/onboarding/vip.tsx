@@ -59,15 +59,15 @@ export default function OnboardingVipScreen(): React.JSX.Element {
         </View>
 
         <Pressable style={styles.contactPickerBtn} onPress={() => setPickerVisible(true)}>
-          <Text style={styles.contactPickerText}>📇 Pick from Contacts</Text>
+          <Text style={styles.contactPickerText}>Pick from Contacts</Text>
         </Pressable>
 
         {vips.map((v) => (
           <View key={v} style={styles.vipRow}>
-            <Text style={styles.urgentDot}>🔴</Text>
+            <View style={styles.urgentDot} />
             <Text style={styles.vipName}>{v}</Text>
             <Pressable onPress={() => removeVip(v)} hitSlop={8}>
-              <Text style={styles.removeBtn}>✕</Text>
+              <Text style={styles.removeBtn}>Remove</Text>
             </Pressable>
           </View>
         ))}
@@ -168,9 +168,9 @@ const styles = StyleSheet.create({
     gap: 10,
     elevation: 1,
   },
-  urgentDot: { fontSize: 12 },
+  urgentDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.urgentFg },
   vipName: { flex: 1, fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '500' },
-  removeBtn: { fontSize: 16, color: Colors.error, fontWeight: '700' },
+  removeBtn: { fontSize: 13, color: Colors.error, fontWeight: '600' },
   emptyHint: { fontSize: 13, color: Colors.onSurfaceVariantLight, fontStyle: 'italic' },
   footer: { padding: 24, gap: 12 },
 });

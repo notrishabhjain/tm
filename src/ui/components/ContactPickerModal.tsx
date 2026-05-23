@@ -89,7 +89,7 @@ export function ContactPickerModal({
             Pick a Contact{allContacts.length > 0 ? ` (${allContacts.length})` : ''}
           </Text>
           <Pressable onPress={onClose} hitSlop={12} style={styles.closeHit}>
-            <Text style={styles.closeBtn}>✕</Text>
+            <Text style={styles.closeBtn}>Close</Text>
           </Pressable>
         </View>
 
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 17, fontWeight: '600', color: Colors.onSurfaceLight },
   closeHit: { padding: 4 },
-  closeBtn: { fontSize: 18, color: Colors.error, fontWeight: '700' },
+  closeBtn: { fontSize: 14, color: Colors.onSurfaceVariantLight, fontWeight: '600' },
   searchBar: {
     paddingHorizontal: 16,
     paddingVertical: 10,

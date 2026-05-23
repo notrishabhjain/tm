@@ -134,7 +134,7 @@ function HistoryTaskRow({ task }: { task: Task }): React.JSX.Element {
         </Text>
       </View>
       <View style={styles.doneBadge}>
-        <Text style={styles.doneText}>✓</Text>
+        <Text style={styles.doneText}>Done</Text>
       </View>
     </View>
   );

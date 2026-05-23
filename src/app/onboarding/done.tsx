@@ -27,7 +27,7 @@ export default function OnboardingDoneScreen(): React.JSX.Element {
     >
       <View style={styles.content}>
         <View style={styles.checkCircle}>
-          <Text style={styles.checkIcon}>✓</Text>
+          <View style={styles.checkFill} />
         </View>
         <Text style={styles.title}>You're all set!</Text>
         <Text style={styles.description}>
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  checkIcon: { fontSize: 36, color: Colors.white, fontWeight: '700' },
+  checkFill: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.white },
   title: {
     fontSize: 28,
     fontWeight: '700',

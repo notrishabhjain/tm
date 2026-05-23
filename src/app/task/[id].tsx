@@ -166,7 +166,7 @@ export default function TaskDetailScreen(): React.JSX.Element {
           disabled={calendarAdded}
         >
           <Text style={styles.calendarBtnText}>
-            {calendarAdded ? '✓ Added to Calendar' : '+ Add to Calendar'}
+            {calendarAdded ? 'Added to Calendar' : 'Add to Calendar'}
           </Text>
         </Pressable>
 

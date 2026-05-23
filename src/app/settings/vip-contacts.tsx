@@ -109,7 +109,7 @@ export default function VipContactsScreen(): React.JSX.Element {
                   onPress={() => handleRemove(contact.id, contact.displayName)}
                   hitSlop={8}
                 >
-                  <Text style={styles.removeBtn}>✕</Text>
+                  <Text style={styles.removeBtn}>Remove</Text>
                 </Pressable>
               </View>
             ))}
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   rowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.outlineLight },
   urgentDot: { fontSize: 12 },
   contactName: { flex: 1, fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '500' },
-  removeBtn: { fontSize: 16, color: Colors.error, fontWeight: '700' },
+  removeBtn: { fontSize: 13, color: Colors.error, fontWeight: '600' },
   contactPickerBtn: {
     height: 44,
     borderRadius: 8,

@@ -293,7 +293,7 @@ function CandidateRow({
       onPress={onToggle}
     >
       <View style={[styles.checkbox, candidate.selected && styles.checkboxSelected]}>
-        {candidate.selected && <Text style={styles.checkmark}>✓</Text>}
+        {candidate.selected && <View style={styles.checkmarkFill} />}
       </View>
       <View style={styles.candidateContent}>
         <Text style={styles.candidateSentence} numberOfLines={3}>
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary500,
     borderColor: Colors.primary500,
   },
-  checkmark: { fontSize: 13, color: Colors.white, fontWeight: '700' },
+  checkmarkFill: { width: 10, height: 10, borderRadius: 2, backgroundColor: Colors.white },
   candidateContent: { flex: 1, gap: 6 },
   candidateSentence: { fontSize: 13, color: Colors.onSurfaceLight, lineHeight: 19 },
   candidateMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
