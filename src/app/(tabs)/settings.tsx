@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
@@ -90,9 +90,9 @@ export default function SettingsScreen(): React.JSX.Element {
           label="Notification Access"
           subtitle={
             permissionStatus === 'granted'
-              ? '✓ Granted'
+              ? 'Granted'
               : permissionStatus === 'denied'
-                ? '✗ Not granted — tap to fix'
+                ? 'Not granted — tap to fix'
                 : 'Checking…'
           }
           subtitleColor={permissionStatus === 'granted' ? Colors.success : undefined}
@@ -120,33 +120,22 @@ export default function SettingsScreen(): React.JSX.Element {
 
       <Section title="Intelligence">
         <NavRow
-          label="Priority Rules"
-          subtitle="Rule-based mode"
-          onPress={() => {
-            Alert.alert(
-              'Priority Rules',
-              'TaskMind uses keyword matching to determine task priority.\n\nURGENT: deadline, urgent, asap, emergency\nHIGH: important, need, must, required\nMEDIUM: call, reply, check, update\nLOW: fyi, info, update\n\nVIP contacts always create URGENT tasks.',
-              [{ text: 'OK' }]
-            );
-          }}
+          label="Signal Engine"
+          subtitle="17-signal deterministic scorer, no AI models"
+          onPress={() => void router.push('/settings/ai-model')}
         />
         <NavRow
           label="Learned Vocabulary"
           onPress={() => void router.push('/settings/vocabulary')}
         />
         <NavRow
-          label="AI Models"
-          subtitle="0.6B classifier · 1.7B extractor · MiniLM"
-          onPress={() => void router.push('/settings/ai-model')}
-        />
-        <NavRow
-          label="AI Analytics"
-          subtitle="Inference speed, accuracy, decision log"
+          label="Analytics"
+          subtitle="Decision log, accuracy"
           onPress={() => void router.push('/settings/analytics')}
         />
         <NavRow
           label="Analyze Text"
-          subtitle="Extract tasks from meetings or text"
+          subtitle="Extract tasks from long text"
           onPress={() => void router.push('/settings/transcript-import')}
         />
       </Section>

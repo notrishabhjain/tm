@@ -50,7 +50,7 @@ export default function OnboardingAppsScreen(): React.JSX.Element {
             accessibilityState={{ checked: item.selected }}
           >
             <View style={[styles.checkbox, item.selected && styles.checkboxSelected]}>
-              {item.selected && <Text style={styles.checkmark}>✓</Text>}
+              {item.selected && <View style={styles.checkmarkFill} />}
             </View>
             <Text style={styles.appName}>{item.displayName}</Text>
           </Pressable>
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary500,
     borderColor: Colors.primary500,
   },
-  checkmark: { fontSize: 14, color: Colors.white, fontWeight: '700' },
+  checkmarkFill: { width: 10, height: 10, borderRadius: 2, backgroundColor: Colors.white },
   appName: { fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '500' },
   footer: { padding: 24, paddingTop: 16 },
 });

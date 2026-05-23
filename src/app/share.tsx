@@ -242,7 +242,7 @@ export default function ShareScreen(): React.JSX.Element {
           {saving ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.createBtnText}>✓ Create Task</Text>
+            <Text style={styles.createBtnText}>Create Task</Text>
           )}
         </Pressable>
         <Button

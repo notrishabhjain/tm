@@ -125,7 +125,7 @@ export function TaskCard({
           accessibilityLabel="Mark complete"
           hitSlop={8}
         >
-          <Text style={styles.completeIcon}>✓</Text>
+          <Text style={styles.completeIcon}>Done</Text>
         </Pressable>
         <Pressable
           onPress={handleDelete}
@@ -133,7 +133,7 @@ export function TaskCard({
           accessibilityLabel="Delete task"
           hitSlop={8}
         >
-          <Text style={styles.deleteIcon}>✕</Text>
+          <Text style={styles.deleteIcon}>Del</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -220,21 +220,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    width: 36,
+    width: 44,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: Colors.surfaceVariantLight,
   },
   completeIcon: {
-    fontSize: 16,
+    fontSize: 12,
     color: Colors.success,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   deleteIcon: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.error,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

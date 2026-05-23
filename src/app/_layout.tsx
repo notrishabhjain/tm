@@ -12,7 +12,6 @@ import { seedDatabaseIfNeeded } from '@/services/db-seeder';
 import { handleNotification } from '@/services/notification-handler';
 import { restoreNudgeFromSettings } from '@/services/nudge-scheduler';
 import NotificationListener from '../../modules/notification-listener/src';
-import '@/i18n';
 
 void SplashScreen.preventAutoHideAsync();
 
