@@ -1,10 +1,9 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
 import { getPriorityColor } from '@/ui/theme/colors';
 import { EmptyState } from '@/ui/components/EmptyState';
-import { Button } from '@/ui/components/Button';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { SenderStatsRepository } from '@/data/repositories/SenderStatsRepository';
 import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogRepository';
@@ -32,7 +31,6 @@ export default function ConfirmationsScreen(): React.JSX.Element {
       await taskRepo.confirmTask(task.id);
       const senderKey = task.sender ?? task.sourceApp;
       await senderStatsRepo.incrementConfirm(senderKey);
-      // User confirming a task is strong signal — record n-grams
       const text = task.body ?? task.title;
       const ngrams = extractNgrams(text, 'EN');
       if (ngrams.length > 0) {
@@ -41,6 +39,20 @@ export default function ConfirmationsScreen(): React.JSX.Element {
         } catch {
           // Non-fatal
         }
+      }
+    },
+    onMutate: async (task: Task) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks', 'confirmation'] });
+      const previous = queryClient.getQueryData<Task[]>(['tasks', 'confirmation']);
+      queryClient.setQueryData<Task[]>(
+        ['tasks', 'confirmation'],
+        (old) => old?.filter((t) => t.id !== task.id) ?? []
+      );
+      return { previous };
+    },
+    onError: (_err, _task, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['tasks', 'confirmation'], context.previous);
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
@@ -61,26 +73,25 @@ export default function ConfirmationsScreen(): React.JSX.Element {
       await senderStatsRepo.incrementReject(senderKey);
       await taskRepo.deleteTask(task.id);
     },
+    onMutate: async (task: Task) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks', 'confirmation'] });
+      const previous = queryClient.getQueryData<Task[]>(['tasks', 'confirmation']);
+      queryClient.setQueryData<Task[]>(
+        ['tasks', 'confirmation'],
+        (old) => old?.filter((t) => t.id !== task.id) ?? []
+      );
+      return { previous };
+    },
+    onError: (_err, _task, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['tasks', 'confirmation'], context.previous);
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
       void queryClient.invalidateQueries({ queryKey: ['discarded-log'] });
     },
   });
-
-  const handleConfirm = (task: Task): void => {
-    confirmMutation.mutate(task);
-  };
-
-  const handleReject = (task: Task): void => {
-    Alert.alert('Skip this task?', 'This notification will be moved to discarded history.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Skip',
-        style: 'destructive',
-        onPress: () => rejectMutation.mutate(task),
-      },
-    ]);
-  };
 
   return (
     <View style={styles.container}>
@@ -96,7 +107,11 @@ export default function ConfirmationsScreen(): React.JSX.Element {
         data={tasks}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <ConfirmationCard task={item} onConfirm={handleConfirm} onReject={handleReject} />
+          <ConfirmationCard
+            task={item}
+            onConfirm={(t) => confirmMutation.mutate(t)}
+            onReject={(t) => rejectMutation.mutate(t)}
+          />
         )}
         contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
         ListEmptyComponent={
@@ -122,39 +137,82 @@ function ConfirmationCard({
   onReject: (task: Task) => void;
 }): React.JSX.Element {
   const priorityColor = getPriorityColor(task.priority);
+  const DEPTH = 4;
 
   return (
-    <View style={styles.card}>
-      <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
-      <View style={styles.cardContent}>
-        <Text style={styles.taskText}>{task.title}</Text>
-        {task.body != null && task.body !== task.title && (
-          <Text style={styles.taskBody} numberOfLines={3}>
-            {task.body}
-          </Text>
-        )}
-        <View style={styles.metaRow}>
-          <Text style={styles.sourceMeta}>
-            {task.sender ? `${task.sender} · ` : ''}
-            {task.sourceApp.split('.').pop() ?? task.sourceApp}
-          </Text>
-          <Text style={styles.confidence}>{Math.round(task.confidence * 100)}% confident</Text>
-        </View>
-        <View style={styles.buttonRow}>
-          <Button
-            label="Yes, add task"
-            variant="primary"
-            onPress={() => onConfirm(task)}
-            style={styles.confirmButton}
-          />
-          <Button
-            label="No, skip"
-            variant="destructive"
-            onPress={() => onReject(task)}
-            style={styles.rejectButton}
-          />
+    <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
+      <View style={[styles.cardShadow, { backgroundColor: priorityColor }]} />
+      <View style={[styles.card, { borderColor: priorityColor }]}>
+        <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
+        <View style={styles.cardContent}>
+          <Text style={styles.taskText}>{task.title}</Text>
+          {task.body != null && task.body !== task.title && (
+            <Text style={styles.taskBody} numberOfLines={3}>
+              {task.body}
+            </Text>
+          )}
+          <View style={styles.metaRow}>
+            <Text style={styles.sourceMeta}>
+              {task.sender ? `${task.sender} · ` : ''}
+              {task.sourceApp.split('.').pop() ?? task.sourceApp}
+            </Text>
+            <Text style={styles.confidence}>{Math.round(task.confidence * 100)}% conf</Text>
+          </View>
+          <View style={styles.buttonRow}>
+            <NeoButton
+              label="Add task"
+              onPress={() => onConfirm(task)}
+              bgColor={Colors.primary900}
+              shadowColor={Colors.black}
+              textColor={Colors.white}
+              style={styles.confirmButton}
+            />
+            <NeoButton
+              label="Skip"
+              onPress={() => onReject(task)}
+              bgColor={Colors.urgentFg}
+              shadowColor="#8B1C1C"
+              textColor={Colors.white}
+              style={styles.rejectButton}
+            />
+          </View>
         </View>
       </View>
+    </View>
+  );
+}
+
+function NeoButton({
+  label,
+  onPress,
+  bgColor,
+  shadowColor,
+  textColor,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  bgColor: string;
+  shadowColor: string;
+  textColor: string;
+  style?: object;
+}): React.JSX.Element {
+  const DEPTH = 3;
+  return (
+    <View style={[styles.neoButtonWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }, style]}>
+      <View style={[styles.neoButtonShadow, { backgroundColor: shadowColor }]} />
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.neoButton,
+          { backgroundColor: bgColor, borderColor: shadowColor },
+          pressed && { transform: [{ translateX: DEPTH }, { translateY: DEPTH }] },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+      >
+        <Text style={[styles.neoButtonText, { color: textColor }]}>{label}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -165,15 +223,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.backgroundLight,
   },
   header: {
-    padding: 16,
-    backgroundColor: Colors.surfaceVariantLight,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.outlineLight,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.primary900,
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.black,
   },
   headerText: {
     fontSize: 13,
-    color: Colors.onSurfaceVariantLight,
-    fontWeight: '500',
+    color: Colors.white,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   list: {
     paddingVertical: 8,
@@ -181,13 +241,24 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flex: 1,
   },
+  cardWrapper: {
+    marginHorizontal: 16,
+    marginVertical: 6,
+    position: 'relative',
+  },
+  cardShadow: {
+    position: 'absolute',
+    top: 4,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
   card: {
     flexDirection: 'row',
     backgroundColor: Colors.surfaceLight,
-    marginHorizontal: 16,
-    marginVertical: 6,
-    borderRadius: 8,
-    elevation: 2,
+    borderWidth: 2,
+    borderRadius: 2,
     overflow: 'hidden',
   },
   priorityBar: {
@@ -199,7 +270,7 @@ const styles = StyleSheet.create({
   },
   taskText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.onSurfaceLight,
     lineHeight: 21,
     marginBottom: 4,
@@ -230,10 +301,31 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 1,
-    height: 40,
   },
   rejectButton: {
     flex: 1,
+  },
+  neoButtonWrapper: {
+    position: 'relative',
+  },
+  neoButtonShadow: {
+    position: 'absolute',
+    top: 3,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
+  neoButton: {
     height: 40,
+    borderWidth: 2,
+    borderRadius: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  neoButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });

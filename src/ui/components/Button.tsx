@@ -1,21 +1,39 @@
 import React from 'react';
-import {
-  Pressable,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  type PressableProps,
-  type ViewStyle,
-} from 'react-native';
+import { Pressable, Text, View, StyleSheet, ActivityIndicator, type ViewStyle } from 'react-native';
 import { Colors } from '../theme/colors';
 
-interface ButtonProps extends PressableProps {
+interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'destructive';
   label: string;
   loading?: boolean;
   fullWidth?: boolean;
   style?: ViewStyle;
+  disabled?: boolean;
+  onPress?: () => void;
 }
+
+const DEPTH = 4;
+
+const VARIANT_STYLES = {
+  primary: {
+    bg: Colors.primary900,
+    shadow: Colors.neoShadowDefault,
+    border: Colors.neoShadowDefault,
+    text: Colors.white,
+  },
+  secondary: {
+    bg: Colors.white,
+    shadow: Colors.primary900,
+    border: Colors.primary900,
+    text: Colors.primary900,
+  },
+  destructive: {
+    bg: Colors.urgentFg,
+    shadow: Colors.neoShadowUrgent,
+    border: Colors.neoShadowUrgent,
+    text: Colors.white,
+  },
+};
 
 export function Button({
   variant = 'primary',
@@ -24,77 +42,75 @@ export function Button({
   fullWidth = false,
   style,
   disabled,
-  ...rest
+  onPress,
 }: ButtonProps): React.JSX.Element {
   const isDisabled = disabled ?? loading;
-
-  const containerStyle = [
-    styles.base,
-    variant === 'primary' && styles.primary,
-    variant === 'secondary' && styles.secondary,
-    variant === 'destructive' && styles.destructive,
-    isDisabled && styles.disabled,
-    fullWidth && styles.fullWidth,
-    style,
-  ];
-
-  const textColor =
-    variant === 'secondary'
-      ? Colors.primary500
-      : variant === 'destructive'
-        ? Colors.white
-        : Colors.white;
+  const v = VARIANT_STYLES[variant];
 
   return (
-    <Pressable
-      {...rest}
-      disabled={isDisabled}
-      style={({ pressed }) => [containerStyle, pressed && !isDisabled && styles.pressed]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
+    <View
+      style={[
+        styles.wrapper,
+        { paddingRight: DEPTH, paddingBottom: DEPTH },
+        fullWidth && styles.fullWidth,
+        style,
+      ]}
     >
-      {loading ? (
-        <ActivityIndicator color={textColor} size="small" />
-      ) : (
-        <Text style={[styles.label, { color: textColor }]}>{label}</Text>
-      )}
-    </Pressable>
+      {/* Shadow layer */}
+      <View style={[styles.shadow, { backgroundColor: v.shadow }]} />
+
+      <Pressable
+        onPress={isDisabled ? undefined : onPress}
+        style={({ pressed }) => [
+          styles.button,
+          { backgroundColor: v.bg, borderColor: v.border },
+          isDisabled && styles.disabled,
+          pressed && !isDisabled && { transform: [{ translateX: DEPTH }, { translateY: DEPTH }] },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled: isDisabled }}
+      >
+        {loading ? (
+          <ActivityIndicator color={v.text} size="small" />
+        ) : (
+          <Text style={[styles.label, { color: v.text }]}>{label}</Text>
+        )}
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  base: {
-    height: 48,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    minWidth: 80,
-  },
-  primary: {
-    backgroundColor: Colors.primary500,
-  },
-  secondary: {
-    backgroundColor: Colors.transparent,
-    borderWidth: 1,
-    borderColor: Colors.primary500,
-  },
-  destructive: {
-    backgroundColor: Colors.error,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  pressed: {
-    opacity: 0.8,
+  wrapper: {
+    position: 'relative',
   },
   fullWidth: {
-    width: '100%',
+    alignSelf: 'stretch',
+  },
+  shadow: {
+    position: 'absolute',
+    top: DEPTH,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
+  button: {
+    height: 48,
+    paddingHorizontal: 24,
+    borderRadius: 2,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  disabled: {
+    opacity: 0.45,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.25,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });

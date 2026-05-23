@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { getPriorityColor } from '../theme/colors';
-import { Colors } from '../theme/colors';
+import { getPriorityColor, Colors } from '../theme/colors';
 import { PriorityChip } from './PriorityChip';
 import type { Task } from '@/domain/types';
 
@@ -36,6 +35,16 @@ function getSourceLabel(sourceApp: string): string {
   return labels[sourceApp] ?? sourceApp.split('.').pop() ?? sourceApp;
 }
 
+function getPriorityShadow(priorityColor: string): string {
+  const shadowMap: Record<string, string> = {
+    [Colors.urgentFg]: Colors.neoShadowUrgent,
+    [Colors.highFg]: Colors.neoShadowHigh,
+    [Colors.mediumFg]: Colors.neoShadowMedium,
+    [Colors.lowFg]: Colors.neoShadowLow,
+  };
+  return shadowMap[priorityColor] ?? Colors.neoShadowDefault;
+}
+
 function DueDateBadge({ dueDate }: { dueDate: number }): React.JSX.Element {
   const now = Date.now();
   const diffMs = dueDate - now;
@@ -62,11 +71,13 @@ function DueDateBadge({ dueDate }: { dueDate: number }): React.JSX.Element {
     textColor = Colors.onSurfaceVariantLight;
   }
   return (
-    <View style={[styles.dueBadge, { backgroundColor: bgColor }]}>
+    <View style={[styles.dueBadge, { backgroundColor: bgColor, borderColor: textColor }]}>
       <Text style={[styles.dueBadgeText, { color: textColor }]}>{label}</Text>
     </View>
   );
 }
+
+const DEPTH = 4;
 
 export function TaskCard({
   task,
@@ -75,83 +86,99 @@ export function TaskCard({
   onDelete,
 }: TaskCardProps): React.JSX.Element {
   const priorityColor = getPriorityColor(task.priority);
+  const shadowColor = getPriorityShadow(priorityColor);
 
   const handlePress = useCallback(() => onPress?.(task), [onPress, task]);
   const handleComplete = useCallback(() => onComplete?.(task), [onComplete, task]);
   const handleDelete = useCallback(() => onDelete?.(task), [onDelete, task]);
 
   return (
-    <Pressable
-      onPress={handlePress}
-      style={({ pressed }) => [styles.container, pressed && styles.pressed]}
-      accessibilityRole="button"
-      accessibilityLabel={`${task.priority} priority task: ${task.title}`}
-    >
-      {/* Priority indicator bar */}
-      <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
+    <View style={[styles.wrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
+      {/* NeoPop depth shadow */}
+      <View style={[styles.shadow, { backgroundColor: shadowColor }]} />
 
-      <View style={styles.content}>
-        {/* Task title */}
-        <Text style={styles.title} numberOfLines={2}>
-          {task.title}
-        </Text>
+      {/* Main card */}
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [
+          styles.card,
+          { borderColor: priorityColor },
+          pressed && { transform: [{ translateX: 2 }, { translateY: 2 }] },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`${task.priority} priority task: ${task.title}`}
+      >
+        {/* Priority indicator bar */}
+        <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
 
-        {/* Source and time row */}
-        <View style={styles.metaRow}>
-          <Text style={styles.source}>
-            {task.sender ? `${task.sender} · ` : ''}
-            {getSourceLabel(task.sourceApp)}
+        <View style={styles.content}>
+          <Text style={styles.title} numberOfLines={2}>
+            {task.title}
           </Text>
-          <Text style={styles.time}>{formatRelativeTime(task.createdAt)}</Text>
+
+          <View style={styles.metaRow}>
+            <Text style={styles.source} numberOfLines={1}>
+              {task.sender ? `${task.sender} · ` : ''}
+              {getSourceLabel(task.sourceApp)}
+            </Text>
+            <Text style={styles.time}>{formatRelativeTime(task.createdAt)}</Text>
+          </View>
+
+          <View style={styles.chipsRow}>
+            <PriorityChip priority={task.priority} />
+            {task.needsConfirmation && (
+              <View style={[styles.confirmChip, { borderColor: Colors.primary500 }]}>
+                <Text style={styles.confirmChipText}>CONFIRM</Text>
+              </View>
+            )}
+            {task.dueDate && <DueDateBadge dueDate={task.dueDate} />}
+          </View>
         </View>
 
-        {/* Chips row */}
-        <View style={styles.chipsRow}>
-          <PriorityChip priority={task.priority} />
-          {task.needsConfirmation && (
-            <View style={styles.confirmChip}>
-              <Text style={styles.confirmChipText}>CONFIRM</Text>
-            </View>
-          )}
-          {task.dueDate && <DueDateBadge dueDate={task.dueDate} />}
+        {/* Quick actions */}
+        <View style={styles.actions}>
+          <Pressable
+            onPress={handleComplete}
+            style={styles.actionButton}
+            accessibilityLabel="Mark complete"
+            hitSlop={8}
+          >
+            <Text style={[styles.actionText, { color: Colors.success }]}>Done</Text>
+          </Pressable>
+          <Pressable
+            onPress={handleDelete}
+            style={styles.actionButton}
+            accessibilityLabel="Delete task"
+            hitSlop={8}
+          >
+            <Text style={[styles.actionText, { color: Colors.urgentFg }]}>Del</Text>
+          </Pressable>
         </View>
-      </View>
-
-      {/* Quick actions */}
-      <View style={styles.actions}>
-        <Pressable
-          onPress={handleComplete}
-          style={styles.actionButton}
-          accessibilityLabel="Mark complete"
-          hitSlop={8}
-        >
-          <Text style={styles.completeIcon}>Done</Text>
-        </Pressable>
-        <Pressable
-          onPress={handleDelete}
-          style={styles.actionButton}
-          accessibilityLabel="Delete task"
-          hitSlop={8}
-        >
-          <Text style={styles.deleteIcon}>Del</Text>
-        </Pressable>
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
+    marginHorizontal: 16,
+    marginVertical: 5,
+    position: 'relative',
+  },
+  shadow: {
+    position: 'absolute',
+    top: DEPTH,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
+  card: {
     flexDirection: 'row',
     backgroundColor: Colors.surfaceLight,
-    marginHorizontal: 16,
-    marginVertical: 4,
-    borderRadius: 8,
-    elevation: 2,
+    borderWidth: 2,
+    borderRadius: 2,
     overflow: 'hidden',
-  },
-  pressed: {
-    opacity: 0.9,
   },
   priorityBar: {
     width: 4,
@@ -162,22 +189,23 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: Colors.onSurfaceLight,
-    lineHeight: 22,
-    marginBottom: 6,
+    lineHeight: 21,
+    marginBottom: 5,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 7,
   },
   source: {
     fontSize: 12,
     color: Colors.onSurfaceVariantLight,
     flex: 1,
+    fontWeight: '500',
   },
   time: {
     fontSize: 11,
@@ -189,23 +217,24 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   confirmChip: {
-    height: 24,
-    paddingHorizontal: 10,
-    borderRadius: 4,
-    backgroundColor: Colors.primary100,
+    height: 22,
+    paddingHorizontal: 8,
+    borderRadius: 2,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   confirmChipText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
     color: Colors.primary500,
     letterSpacing: 0.5,
   },
   dueBadge: {
-    height: 24,
+    height: 22,
     paddingHorizontal: 8,
-    borderRadius: 4,
+    borderRadius: 2,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -221,21 +250,16 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     width: 44,
-    height: 36,
-    borderRadius: 6,
+    height: 34,
+    borderRadius: 2,
+    borderWidth: 1.5,
+    borderColor: Colors.outlineLight,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: Colors.surfaceVariantLight,
   },
-  completeIcon: {
-    fontSize: 12,
-    color: Colors.success,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  deleteIcon: {
-    fontSize: 12,
-    color: Colors.error,
+  actionText: {
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.3,
   },

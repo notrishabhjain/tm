@@ -1,5 +1,6 @@
 package expo.modules.notificationlistener
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -21,7 +22,18 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
 
         private val CARRIER_SENDER_REGEX = Regex("""^[A-Z]{2,3}-[A-Z0-9]{3,8}$""")
         private val OTP_DIGIT_REGEX = Regex("""\b\d{4,8}\b""")
-        private val AGGREGATE_BADGE_REGEX = Regex("""^\d+ new (message|notification|email|mail)""", RegexOption.IGNORE_CASE)
+        private val AGGREGATE_BADGE_REGEX = Regex(
+            """^(\d+\s+(new\s+)?(message|notification|email|mail|unread))""",
+            RegexOption.IGNORE_CASE
+        )
+        private val CALL_TEXT_REGEX = Regex(
+            """(incoming|missed|ongoing|voice|video)\s+call""",
+            RegexOption.IGNORE_CASE
+        )
+        private val SYNC_TEXT_REGEX = Regex(
+            """^(syncing|sync complete|downloading|uploading|backing up)""",
+            RegexOption.IGNORE_CASE
+        )
 
         private val SYSTEM_PACKAGE_PREFIXES = listOf(
             "com.android.",
@@ -82,9 +94,10 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         val title = extras.getCharSequence("android.title")?.toString() ?: return
         val text = extras.getCharSequence("android.text")?.toString() ?: ""
         val bigText = extras.getCharSequence("android.bigText")?.toString() ?: text
+        val category = sbn.notification.category ?: ""
 
         // Hard discard filter (applied before deduplication)
-        if (shouldDiscard(packageName, title, text, bigText)) return
+        if (shouldDiscard(packageName, title, text, bigText, category)) return
 
         // Deduplication: same (package, title, text) within 5 seconds
         val dedupKey = "$packageName|$title|$text"
@@ -106,9 +119,6 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
 
         // Extract MessagingStyle conversation thread
         val thread: List<Map<String, Any>> = extractThread(sbn)
-
-        // Extract Android metadata
-        val category = sbn.notification.category ?: ""
         val channelId = sbn.notification.channelId ?: ""
         val importance = try {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -155,13 +165,22 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         packageName: String,
         title: String,
         text: String,
-        bigText: String
+        bigText: String,
+        category: String
     ): Boolean {
         // Zero content
         if (text.isBlank() && bigText.isBlank()) return true
 
         // System/sync packages
         if (SYSTEM_PACKAGE_PREFIXES.any { packageName.startsWith(it) }) return true
+
+        // Call notifications (Android category or text pattern)
+        if (category == Notification.CATEGORY_CALL) return true
+        if (CALL_TEXT_REGEX.containsMatchIn(text) || CALL_TEXT_REGEX.containsMatchIn(title)) return true
+
+        // Sync/progress/download notifications
+        if (category == Notification.CATEGORY_PROGRESS) return true
+        if (SYNC_TEXT_REGEX.containsMatchIn(text) || SYNC_TEXT_REGEX.containsMatchIn(title)) return true
 
         // Carrier sender ID pattern (e.g. "VM-AMAZON", "AD-HDFC")
         if (CARRIER_SENDER_REGEX.matches(title)) return true
@@ -173,7 +192,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
              text.contains("one time", ignoreCase = true))
         ) return true
 
-        // Aggregate badge notifications
+        // Aggregate badge notifications ("3 new messages", "5 unread", etc.)
         if (AGGREGATE_BADGE_REGEX.containsMatchIn(text)) return true
 
         return false

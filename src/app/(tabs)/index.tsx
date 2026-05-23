@@ -49,11 +49,39 @@ export default function HomeScreen(): React.JSX.Element {
 
   const completeMutation = useMutation({
     mutationFn: (id: string) => taskRepo.completeTask(id),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks', 'pending'] });
+      const previous = queryClient.getQueryData<Task[]>(['tasks', 'pending']);
+      queryClient.setQueryData<Task[]>(
+        ['tasks', 'pending'],
+        (old) => old?.filter((t) => t.id !== id) ?? []
+      );
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['tasks', 'pending'], context.previous);
+      }
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => taskRepo.deleteTask(id),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks', 'pending'] });
+      const previous = queryClient.getQueryData<Task[]>(['tasks', 'pending']);
+      queryClient.setQueryData<Task[]>(
+        ['tasks', 'pending'],
+        (old) => old?.filter((t) => t.id !== id) ?? []
+      );
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['tasks', 'pending'], context.previous);
+      }
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   });
 
@@ -75,11 +103,13 @@ export default function HomeScreen(): React.JSX.Element {
 
   return (
     <View style={styles.container}>
-      {/* Stats strip */}
+      {/* Stats strip — NeoPop dark band */}
       <View style={styles.statsStrip}>
-        <StatItem label="Pending" value={tasks.length} />
-        <StatItem label="Urgent" value={urgentCount} valueColor={Colors.urgentFg} />
-        <StatItem label="Done today" value={todayCount} valueColor={Colors.success} />
+        <StatItem label="PENDING" value={tasks.length} />
+        <View style={styles.statDivider} />
+        <StatItem label="URGENT" value={urgentCount} valueColor={Colors.urgentFg} />
+        <View style={styles.statDivider} />
+        <StatItem label="DONE TODAY" value={todayCount} valueColor={Colors.success} />
       </View>
 
       {/* Filter chips */}
@@ -137,7 +167,7 @@ export default function HomeScreen(): React.JSX.Element {
 function StatItem({
   label,
   value,
-  valueColor = Colors.onSurfaceLight,
+  valueColor = Colors.white,
 }: {
   label: string;
   value: number;
@@ -179,25 +209,33 @@ const styles = StyleSheet.create({
   },
   statsStrip: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceVariantLight,
-    paddingVertical: 12,
+    backgroundColor: Colors.primary900,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.outlineLight,
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.black,
+    alignItems: 'center',
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
   statValue: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.onSurfaceLight,
+    fontSize: 24,
+    fontWeight: '800',
+    color: Colors.white,
   },
   statLabel: {
-    fontSize: 11,
-    color: Colors.onSurfaceVariantLight,
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.65)',
     marginTop: 2,
+    fontWeight: '600',
+    letterSpacing: 0.8,
   },
   filterRow: {
     flexDirection: 'row',
@@ -205,15 +243,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 8,
     backgroundColor: Colors.surfaceLight,
-    borderBottomWidth: 1,
+    borderBottomWidth: 2,
     borderBottomColor: Colors.outlineLight,
   },
   filterChip: {
-    height: 32,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.outlineLight,
+    height: 30,
+    paddingHorizontal: 12,
+    borderRadius: 2,
+    borderWidth: 2,
+    borderColor: Colors.onSurfaceVariantLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -222,15 +260,17 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary900,
   },
   filterChipText: {
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.onSurfaceVariantLight,
-    fontWeight: '500',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   filterChipTextActive: {
     color: Colors.white,
   },
   list: {
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   emptyContainer: {
     flex: 1,
@@ -239,15 +279,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 16,
     right: 16,
-    backgroundColor: 'rgba(214, 40, 40, 0.85)',
-    borderRadius: 4,
+    backgroundColor: Colors.urgentFg,
+    borderRadius: 2,
+    borderWidth: 1.5,
+    borderColor: Colors.neoShadowUrgent,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   debugText: {
     color: Colors.white,
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 1.5,
   },
 });

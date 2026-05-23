@@ -48,6 +48,13 @@ export const Colors = {
   white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
+
+  // NeoPop depth shadows (darker variants for 3D offset layer)
+  neoShadowDefault: '#08192E',
+  neoShadowUrgent: '#8B1C1C',
+  neoShadowHigh: '#7A3A00',
+  neoShadowMedium: '#1A3359',
+  neoShadowLow: '#3D4450',
 } as const;
 
 export function getPriorityColor(priority: Priority): string {
