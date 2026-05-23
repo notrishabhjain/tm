@@ -1,6 +1,7 @@
 import { eq, and, isNull, gt } from 'drizzle-orm';
 import { db } from '@/data/db/client';
 import { tasks, senderStats, learnedKeywords } from '@/data/db/schema';
+import type { DiscardReason } from '@/domain/types';
 import type { NotificationData } from '../../modules/notification-listener/src/types';
 
 export interface ScoringResult {
@@ -10,6 +11,7 @@ export interface ScoringResult {
   signals: string[];
   priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
   extractedDeadline: number | null;
+  discardReason: DiscardReason | null;
 }
 
 type Tier = 'VIP_WORK' | 'VIP_PERSONAL' | 'WORK' | 'INFO' | 'UNKNOWN';
@@ -209,19 +211,133 @@ function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+// ── Force discard — definitive non-tasks ──────────────────────────────────────
+// These categories are NEVER actionable tasks. They bypass scoring entirely and
+// are discarded with a specific reason. Order matters: most specific first.
+
+interface ForceDiscardResult {
+  force: boolean;
+  reason: DiscardReason | null;
+  signal: string;
+}
+
+const NO_DISCARD: ForceDiscardResult = { force: false, reason: null, signal: '' };
+
+function checkForceDiscard(text: string, packageName: string): ForceDiscardResult {
+  const t = text.trim();
+  const lower = t.toLowerCase();
+
+  // Empty / near-empty — no actionable content
+  if (t.length < 3 || wordCount(t) === 0) {
+    return { force: true, reason: 'TOO_SHORT', signal: 'empty_content' };
+  }
+
+  // System / OS-level notifications
+  if (
+    packageName === 'android' ||
+    packageName === 'com.android.systemui' ||
+    packageName === 'com.google.android.gms' ||
+    /\b(app update available|new version available|software update|system update available|please update the app)\b/i.test(
+      lower
+    )
+  ) {
+    return { force: true, reason: 'FILTERED', signal: 'system_message' };
+  }
+
+  // OTP / 2FA verification codes — extremely common false positive
+  if (
+    /\b(otp|one[- ]time (?:password|code|pin)|verification code|security code|login code|auth(?:entication)? code)\b/i.test(
+      lower
+    ) ||
+    /\b(?:code|otp|pin)\s*(?:is|:)?\s*\d{4,8}\b/i.test(lower) ||
+    /^\d{4,8}\s+is\s+(?:your|the)\b/i.test(lower) ||
+    /\b\d{4,8}\b[^.]{0,40}\b(?:expires?|valid for|do not share|kisi ko mat|share na karein)\b/i.test(
+      lower
+    )
+  ) {
+    return { force: true, reason: 'SPAM_OR_OTP', signal: 'otp_code' };
+  }
+
+  // Bank / payment transaction confirmations (informational, not a task)
+  if (
+    /(?:rs\.?|inr|usd|eur|gbp|\$|₹|€|£)\s?[\d,]+(?:\.\d{1,2})?\s*(?:has been |was |is )?(?:debited|credited|withdrawn|deposited|spent|received|transferred|refunded)\b/i.test(
+      lower
+    ) ||
+    /\b(?:debited|credited)\b[^.]{0,40}(?:rs\.?|inr|\$|₹)\s?[\d,]+/i.test(lower) ||
+    /\b(?:txn|transaction|payment) (?:of |id |ref |successful|completed|received|done)\b/i.test(
+      lower
+    ) ||
+    /\b(?:upi|imps|neft|rtgs|paytm|gpay|phonepe)\b[^.]{0,30}\b(?:received|sent|successful|credited|debited)\b/i.test(
+      lower
+    )
+  ) {
+    return { force: true, reason: 'ANTI_PATTERN', signal: 'transaction_alert' };
+  }
+
+  // Order / shipment status updates (informational)
+  if (
+    /\b(?:your order|order #?\d|order id|tracking (?:id|number)|shipment|package|parcel|delivery)\b[^.]{0,80}\b(?:dispatched|shipped|delivered|out for delivery|in transit|arriving|has arrived|on its way|picked up)\b/i.test(
+      lower
+    ) ||
+    /\b(?:expected|estimated) delivery\b/i.test(lower) ||
+    /\bhas been (?:delivered|shipped|dispatched)\b/i.test(lower)
+  ) {
+    return { force: true, reason: 'ANTI_PATTERN', signal: 'shipment_status' };
+  }
+
+  // Promotional / marketing
+  if (
+    /\b(?:\d{1,3}%\s*off|flat\s*\d{1,3}%|upto\s*\d{1,3}%|limited[- ]time|exclusive offer|mega sale|sale ends|hurry|last chance|buy now|shop now|order now|grab (?:it|now|yours)|use code\s*[a-z0-9]+|coupon code|cashback|lowest price|deal of the day)\b/i.test(
+      lower
+    ) ||
+    /\b(?:click here|tap (?:here|to (?:view|claim|open|shop|see))|download now|install now|subscribe now|learn more →)\b/i.test(
+      lower
+    )
+  ) {
+    return { force: true, reason: 'ANTI_PATTERN', signal: 'promotional' };
+  }
+
+  // News headlines / live updates / sports scores
+  if (
+    /^(?:breaking|live|just in|exclusive|news|update|alert)\s*[:|-]/i.test(lower) ||
+    /\b\d{1,3}\s*[-/]\s*\d{1,3}\b[^.]{0,30}\b(?:vs\.?|innings|wickets?|runs?|goals?|sets?|quarter|fulltime|half[- ]time)\b/i.test(
+      lower
+    ) ||
+    /\b(?:match|test|odi|t20|ipl|premier league)\b[^.]{0,40}\b(?:won by|beat|defeated|drew|live score)\b/i.test(
+      lower
+    )
+  ) {
+    return { force: true, reason: 'ANTI_PATTERN', signal: 'news_or_sports' };
+  }
+
+  return NO_DISCARD;
+}
+
+// ── URL helper ─────────────────────────────────────────────────────────────────
+
+function hasUrl(text: string): boolean {
+  return /\bhttps?:\/\/|\bwww\.|\b\S+\.(?:com|in|org|net|io|co|ly|app)\b/i.test(text);
+}
+
+const ACTION_VERBS =
+  'send|share|submit|review|check|call|update|prepare|confirm|fill|upload|forward|reply|provide|schedule|fix|complete|attend|join|arrange|handle|ensure|finalize|approve|sign|book|pay|order|email|draft|verify|coordinate|follow up';
+
 // ── Priority derivation ───────────────────────────────────────────────────────
 
 function derivePriority(score: number, signals: string[]): 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW' {
   const hasDeadline = signals.includes('deadline_en') || signals.includes('deadline_hi');
   const hasFinancial = signals.includes('financial_urgency');
   const hasImperative =
-    signals.includes('direct_imperative_en') || signals.includes('direct_hi_verb');
+    signals.includes('direct_imperative_en') ||
+    signals.includes('direct_hi_verb') ||
+    signals.includes('hinglish_action');
   const hasScheduleChange = signals.includes('schedule_change');
   if ((hasDeadline || hasFinancial) && score >= 0.6) return 'URGENT';
   if ((hasDeadline || hasFinancial) && score >= 0.35) return 'HIGH';
   if (hasImperative && score >= 0.5) return 'HIGH';
   if (hasScheduleChange && score >= 0.4) return 'HIGH';
-  if (signals.includes('at_mention_specific')) return 'HIGH';
+  if (signals.includes('at_mention_specific') || signals.includes('approval_request'))
+    return 'HIGH';
   if (score >= 0.65) return 'HIGH';
   if (score >= 0.38) return 'MEDIUM';
   return 'LOW';
@@ -362,12 +478,16 @@ function evalPositiveSignals(
     applySignal(acc, 'managerial_awareness', 0.2);
   }
 
-  // learned_keyword_match (positive, capped at +0.20)
+  // learned_keyword_match (positive, up to 2 distinct matches, each capped at +0.15)
+  let matchApplied = 0;
+  const seenMatch = new Set<string>();
   for (const kw of activeKws) {
-    if (kw.weight > 0 && latestMessage.toLowerCase().includes(kw.ngram.toLowerCase())) {
-      const weight = Math.min(kw.weight, 0.2);
-      applySignal(acc, 'learned_keyword_match', weight);
-      break; // apply once per signal name (first match)
+    if (matchApplied >= 2) break;
+    const ngram = kw.ngram.toLowerCase();
+    if (kw.weight > 0 && !seenMatch.has(ngram) && latestMessage.toLowerCase().includes(ngram)) {
+      seenMatch.add(ngram);
+      applySignal(acc, 'learned_keyword_match', Math.min(kw.weight, 0.15));
+      matchApplied += 1;
     }
   }
 
@@ -415,9 +535,80 @@ function evalPositiveSignals(
     applySignal(acc, 'approval_request', 0.3);
   }
 
+  // hinglish_action — Hindi verb suffix attached to English action word
+  // e.g. "send kar do", "review kar lo", "submit karna", "share karo"
+  if (
+    new RegExp(
+      `\\b(${ACTION_VERBS})\\s+(kar\\s?(do|lo|na|dena|len?a|o)|kr\\s?do|krna)\\b`,
+      'i'
+    ).test(latestMessage)
+  ) {
+    applySignal(acc, 'hinglish_action', 0.4);
+  }
+
+  // polite_request — softened imperative phrasing
+  if (
+    new RegExp(
+      `\\b(can you|could you|would you (mind|be able)|are you able to|when you get a chance|whenever you can|if possible)\\b.{0,60}\\b(${ACTION_VERBS})\\b`,
+      'i'
+    ).test(latestMessage)
+  ) {
+    applySignal(acc, 'polite_request', 0.25);
+  }
+
+  // compound_action — two or more distinct action verbs (multi-step ask)
+  {
+    const verbMatches = latestMessage
+      .toLowerCase()
+      .match(new RegExp(`\\b(${ACTION_VERBS})\\b`, 'g'));
+    const distinct = new Set(verbMatches ?? []);
+    if (distinct.size >= 2) {
+      applySignal(acc, 'compound_action', 0.15);
+    }
+  }
+
+  // quoted_reply — replying to a prior message (WhatsApp/Slack quote block)
+  if (/(^|\n)\s*>\s?\S/.test(latestMessage) || /\breplying to\b/i.test(latestMessage)) {
+    applySignal(acc, 'quoted_reply', 0.15);
+  }
+
+  // number_quantifier — concrete quantity tied to an action ("send 3 files")
+  if (
+    new RegExp(`\\b(${ACTION_VERBS})\\b.{0,20}\\b\\d{1,4}\\b`, 'i').test(latestMessage) ||
+    /\bby \d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(latestMessage)
+  ) {
+    applySignal(acc, 'number_quantifier', 0.1);
+  }
+
   // question_mark
   if (latestMessage.trimEnd().endsWith('?')) {
     applySignal(acc, 'question_mark', 0.08);
+  }
+}
+
+// ── Length-based prior ─────────────────────────────────────────────────────────
+// Very short messages need an explicit action signal to be credible; very long
+// messages are usually forwards/newsletters. Applied after all other signals.
+
+function applyLengthPrior(acc: SignalAccumulator, latestMessage: string): void {
+  const wc = wordCount(latestMessage);
+  const hasActionSignal = acc.signals.some(
+    (s) =>
+      s === 'direct_imperative_en' ||
+      s === 'direct_hi_verb' ||
+      s === 'hinglish_action' ||
+      s === 'bare_imperative_hi' ||
+      s === 'polite_request' ||
+      s === 'approval_request' ||
+      s === 'meeting_invite'
+  );
+  // 1-2 word message with no explicit action → likely a greeting/reaction
+  if (wc <= 2 && !hasActionSignal) {
+    applySignal(acc, 'too_terse', -0.2);
+  }
+  // 60-150 word message with no action verb → likely informational/forward
+  if (wc >= 60 && wc <= 150 && !hasActionSignal) {
+    applySignal(acc, 'verbose_informational', -0.15);
   }
 }
 
@@ -473,12 +664,61 @@ function evalNegativeSignals(
     applySignal(acc, 'long_forwarded', -0.5);
   }
 
-  // learned_keyword_reject (negative, capped at -0.20)
+  // negation_action — explicit cancellation of an action ("don't send", "no need to")
+  if (
+    new RegExp(
+      `\\b(don'?t|do not|no need to|need not|please (?:don'?t|do not)|mat\\b|nahi\\b|na karna|rehne do|chhod do)\\b.{0,30}\\b(${ACTION_VERBS}|karo|karna|bhejo|bhejna)\\b`,
+      'i'
+    ).test(latestMessage)
+  ) {
+    applySignal(acc, 'negation_action', -0.35);
+  }
+
+  // self_completed — sender reporting THEY already did it (past tense / future self)
+  if (
+    /\b(i (?:have |'ve )?(?:already )?(?:sent|shared|submitted|done|completed|finished|forwarded|updated|fixed|handled)|i'?ll (?:send|share|do|handle|take care)|i will (?:send|share|do|handle)|main (?:bhej|kar) (?:diya|dunga|dungi|diya hai)|bhej diya|kar diya|ho gaya mera)\b/i.test(
+      latestMessage
+    )
+  ) {
+    applySignal(acc, 'self_completed', -0.35);
+  }
+
+  // auto_reply — out-of-office / automated acknowledgement
+  if (
+    /\b(out of (?:office|the office)|on (?:leave|vacation|holiday)|away from my desk|will (?:get back|revert|respond) (?:to you )?(?:soon|shortly|asap)|auto[- ]?reply|automatic reply|currently unavailable|thank you for (?:your )?(?:email|message), )\b/i.test(
+      latestMessage
+    )
+  ) {
+    applySignal(acc, 'auto_reply', -0.4);
+  }
+
+  // forward_chain — forwarded email/message header
+  if (
+    /^\s*(?:fw|fwd|forwarded)\s*:/i.test(latestMessage) ||
+    /-{3,}\s*forwarded message/i.test(latestMessage)
+  ) {
+    applySignal(acc, 'forward_chain', -0.3);
+  }
+
+  // link_share — short message dominated by a URL (article / link drop)
+  if (wc <= 12 && hasUrl(latestMessage)) {
+    const withoutUrl = latestMessage.replace(/\bhttps?:\/\/\S+/gi, '').trim();
+    if (wordCount(withoutUrl) <= 6) {
+      applySignal(acc, 'link_share', -0.25);
+    }
+  }
+
+  // learned_keyword_reject (negative, up to 2 distinct matches, total capped at -0.30)
+  let rejectApplied = 0;
+  const seenReject = new Set<string>();
   for (const kw of activeKws) {
-    if (kw.weight < 0 && latestMessage.toLowerCase().includes(kw.ngram.toLowerCase())) {
-      const weight = Math.max(kw.weight, -0.2);
+    if (rejectApplied >= 2) break;
+    const ngram = kw.ngram.toLowerCase();
+    if (kw.weight < 0 && !seenReject.has(ngram) && latestMessage.toLowerCase().includes(ngram)) {
+      seenReject.add(ngram);
+      const weight = Math.max(kw.weight, -0.15);
       applySignal(acc, 'learned_keyword_reject', weight);
-      break;
+      rejectApplied += 1;
     }
   }
 }
@@ -514,6 +754,20 @@ export async function scoreNotification(notification: NotificationData): Promise
     ''
   ).trim();
 
+  // ── Force discard — definitive non-tasks bypass scoring entirely ─────────────
+  const forced = checkForceDiscard(latestMessage, notification.packageName);
+  if (forced.force) {
+    return {
+      score: 0,
+      decision: 'DISCARD',
+      forceInbox: false,
+      signals: [forced.signal],
+      priority: 'LOW',
+      extractedDeadline: null,
+      discardReason: forced.reason,
+    };
+  }
+
   const threadText = (notification.thread ?? []).map((m) => m.text).join(' ');
   const fullText = `${latestMessage} ${threadText}`;
 
@@ -529,6 +783,7 @@ export async function scoreNotification(notification: NotificationData): Promise
 
   evalPositiveSignals(acc, latestMessage, fullText, senderInfo.tier, activeKws, hasThreadCtx);
   evalNegativeSignals(acc, latestMessage, activeKws);
+  applyLengthPrior(acc, latestMessage);
 
   const rawScore = Math.max(0, Math.min(1, acc.score));
   const forceInbox = checkForceInbox(latestMessage, acc.signals, senderInfo.effectiveTrust);
@@ -554,5 +809,6 @@ export async function scoreNotification(notification: NotificationData): Promise
     signals: acc.signals,
     priority,
     extractedDeadline,
+    discardReason: decision === 'DISCARD' ? 'LOW_CONFIDENCE' : null,
   };
 }

@@ -98,7 +98,7 @@ export async function handleNotification(taskData: {
       sourceApp: notification.packageName,
       sender: notification.title,
       bodyPreview: (notification.bigText || notification.text).slice(0, 100),
-      reason: 'LOW_CONFIDENCE',
+      reason: result.discardReason ?? 'LOW_CONFIDENCE',
       confidence: result.score,
       createdAt: Date.now(),
     });
