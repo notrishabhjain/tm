@@ -73,10 +73,7 @@ export default function NudgesScreen(): React.JSX.Element {
                 accessibilityState={{ selected: frequencyMinutes === opt.value }}
               >
                 <View
-                  style={[
-                    styles.radio,
-                    frequencyMinutes === opt.value && styles.radioSelected,
-                  ]}
+                  style={[styles.radio, frequencyMinutes === opt.value && styles.radioSelected]}
                 />
                 <Text
                   style={[

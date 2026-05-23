@@ -148,11 +148,7 @@ export default function TaskDetailScreen(): React.JSX.Element {
                 })}
               />
             )}
-            <InfoRow
-              label="Confidence"
-              value={`${Math.round(task.confidence * 100)}%`}
-              last
-            />
+            <InfoRow label="Confidence" value={`${Math.round(task.confidence * 100)}%`} last />
           </View>
         </View>
 
@@ -171,16 +167,20 @@ export default function TaskDetailScreen(): React.JSX.Element {
                 borderColor: calendarAdded ? Colors.success : Colors.primary900,
                 backgroundColor: calendarAdded ? Colors.successBg : Colors.surfaceLight,
               },
-              pressed && !calendarAdded && {
-                transform: [{ translateX: DEPTH }, { translateY: DEPTH }],
-              },
+              pressed &&
+                !calendarAdded && {
+                  transform: [{ translateX: DEPTH }, { translateY: DEPTH }],
+                },
             ]}
             onPress={handleAddToCalendar}
             disabled={calendarAdded}
             accessibilityRole="button"
           >
             <Text
-              style={[styles.calendarBtnText, { color: calendarAdded ? Colors.success : Colors.primary900 }]}
+              style={[
+                styles.calendarBtnText,
+                { color: calendarAdded ? Colors.success : Colors.primary900 },
+              ]}
             >
               {calendarAdded ? 'Added to Calendar' : 'Add to Calendar'}
             </Text>
@@ -289,7 +289,13 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.outlineLight,
   },
   infoLabel: { fontSize: 13, color: Colors.onSurfaceVariantLight, fontWeight: '600' },
-  infoValue: { fontSize: 13, color: Colors.onSurfaceLight, flex: 1, textAlign: 'right', fontWeight: '500' },
+  infoValue: {
+    fontSize: 13,
+    color: Colors.onSurfaceLight,
+    flex: 1,
+    textAlign: 'right',
+    fontWeight: '500',
+  },
   calendarBtn: {
     height: 48,
     borderWidth: 2,

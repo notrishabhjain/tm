@@ -67,8 +67,8 @@ export default function VipContactsScreen(): React.JSX.Element {
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.description}>
-          Messages from VIP contacts always create URGENT tasks and skip the confirmation queue.
-          Add names as they appear in notification senders.
+          Messages from VIP contacts always create URGENT tasks and skip the confirmation queue. Add
+          names as they appear in notification senders.
         </Text>
 
         {/* Input row */}
@@ -85,7 +85,10 @@ export default function VipContactsScreen(): React.JSX.Element {
               returnKeyType="done"
             />
             <Pressable
-              style={({ pressed }) => [styles.addBtn, pressed && { transform: [{ translateX: DEPTH }, { translateY: DEPTH }] }]}
+              style={({ pressed }) => [
+                styles.addBtn,
+                pressed && { transform: [{ translateX: DEPTH }, { translateY: DEPTH }] },
+              ]}
               onPress={handleAdd}
               accessibilityRole="button"
             >

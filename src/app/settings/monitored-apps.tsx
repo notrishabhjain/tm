@@ -42,7 +42,13 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
   });
 
   const addAppMutation = useMutation({
-    mutationFn: async ({ packageName, displayName }: { packageName: string; displayName: string }) => {
+    mutationFn: async ({
+      packageName,
+      displayName,
+    }: {
+      packageName: string;
+      displayName: string;
+    }) => {
       await repo.upsert(packageName, displayName);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['monitored-apps'] }),
@@ -157,7 +163,8 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
                   text: 'Add',
                   onPress: (pkg) => {
                     const trimmed = pkg?.trim();
-                    if (trimmed) addAppMutation.mutate({ packageName: trimmed, displayName: trimmed });
+                    if (trimmed)
+                      addAppMutation.mutate({ packageName: trimmed, displayName: trimmed });
                   },
                 },
               ],
@@ -189,7 +196,12 @@ const styles = StyleSheet.create({
   backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
   title: { fontSize: 17, fontWeight: '800', color: Colors.white },
   content: { padding: 16, paddingBottom: 32 },
-  description: { fontSize: 13, color: Colors.onSurfaceVariantLight, lineHeight: 20, marginBottom: 16 },
+  description: {
+    fontSize: 13,
+    color: Colors.onSurfaceVariantLight,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
