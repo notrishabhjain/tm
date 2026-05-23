@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, Switch, StyleSheet, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  Switch,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
 import { getSetting, setSetting } from '@/data/storage/settings';
@@ -16,6 +25,10 @@ const FREQUENCY_OPTIONS = [
 
 const DEPTH = 4;
 
+function isValidTime(t: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(t.trim());
+}
+
 export default function NudgesScreen(): React.JSX.Element {
   const router = useRouter();
   const [frequencyMinutes, setFrequencyMinutes] = useState<number>(
@@ -24,10 +37,14 @@ export default function NudgesScreen(): React.JSX.Element {
   const [urgentOverride, setUrgentOverride] = useState<boolean>(
     getSetting('urgent_override_quiet')
   );
+  const [quietStart, setQuietStart] = useState<string>(getSetting('quiet_hours_start'));
+  const [quietEnd, setQuietEnd] = useState<string>(getSetting('quiet_hours_end'));
+  const [quietEnabled, setQuietEnabled] = useState<boolean>(frequencyMinutes > 0);
 
   const handleFrequency = (value: number): void => {
     setFrequencyMinutes(value);
     setSetting('nudge_freq_minutes', value);
+    setQuietEnabled(value > 0);
     if (value === 0) {
       void cancelNudge();
     } else {
@@ -38,6 +55,20 @@ export default function NudgesScreen(): React.JSX.Element {
   const handleUrgentOverride = (value: boolean): void => {
     setUrgentOverride(value);
     setSetting('urgent_override_quiet', value);
+  };
+
+  const handleSaveQuietHours = (): void => {
+    if (!isValidTime(quietStart)) {
+      Alert.alert('Invalid time', 'Start time must be in HH:MM format (e.g. 22:00).');
+      return;
+    }
+    if (!isValidTime(quietEnd)) {
+      Alert.alert('Invalid time', 'End time must be in HH:MM format (e.g. 07:00).');
+      return;
+    }
+    setSetting('quiet_hours_start', quietStart.trim());
+    setSetting('quiet_hours_end', quietEnd.trim());
+    Alert.alert('Saved', `Quiet hours set to ${quietStart.trim()} – ${quietEnd.trim()}.`);
   };
 
   return (
@@ -85,6 +116,71 @@ export default function NudgesScreen(): React.JSX.Element {
                 </Text>
               </Pressable>
             ))}
+          </View>
+        </View>
+
+        {/* Quiet Hours */}
+        <Text style={styles.sectionLabel}>QUIET HOURS</Text>
+        <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
+          <View style={styles.cardShadow} />
+          <View style={styles.card}>
+            <View style={styles.quietRow}>
+              <View style={styles.quietField}>
+                <Text style={styles.quietFieldLabel}>FROM</Text>
+                <View
+                  style={[
+                    styles.timeInputWrapper,
+                    { paddingRight: DEPTH / 2, paddingBottom: DEPTH / 2 },
+                  ]}
+                >
+                  <View style={styles.timeInputShadow} />
+                  <TextInput
+                    style={[styles.timeInput, !quietEnabled && styles.timeInputDisabled]}
+                    value={quietStart}
+                    onChangeText={setQuietStart}
+                    placeholder="22:00"
+                    placeholderTextColor={Colors.onSurfaceVariantLight}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                    editable={quietEnabled}
+                    selectTextOnFocus
+                  />
+                </View>
+              </View>
+              <Text style={styles.quietSeparator}>—</Text>
+              <View style={styles.quietField}>
+                <Text style={styles.quietFieldLabel}>TO</Text>
+                <View
+                  style={[
+                    styles.timeInputWrapper,
+                    { paddingRight: DEPTH / 2, paddingBottom: DEPTH / 2 },
+                  ]}
+                >
+                  <View style={styles.timeInputShadow} />
+                  <TextInput
+                    style={[styles.timeInput, !quietEnabled && styles.timeInputDisabled]}
+                    value={quietEnd}
+                    onChangeText={setQuietEnd}
+                    placeholder="07:00"
+                    placeholderTextColor={Colors.onSurfaceVariantLight}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                    editable={quietEnabled}
+                    selectTextOnFocus
+                  />
+                </View>
+              </View>
+              <Pressable
+                style={[styles.saveTimeBtn, !quietEnabled && styles.saveTimeBtnDisabled]}
+                onPress={handleSaveQuietHours}
+                disabled={!quietEnabled}
+              >
+                <Text style={styles.saveTimeBtnText}>Save</Text>
+              </Pressable>
+            </View>
+            {!quietEnabled && (
+              <Text style={styles.quietDisabledHint}>Enable nudges to configure quiet hours</Text>
+            )}
           </View>
         </View>
 
@@ -180,6 +276,74 @@ const styles = StyleSheet.create({
   radioSelected: { borderColor: Colors.primary900, backgroundColor: Colors.primary900 },
   optionLabel: { fontSize: 15, color: Colors.onSurfaceLight },
   optionLabelSelected: { color: Colors.primary900, fontWeight: '700' },
+  quietRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  quietField: { gap: 6 },
+  quietFieldLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: Colors.onSurfaceVariantLight,
+    letterSpacing: 0.8,
+  },
+  timeInputWrapper: { position: 'relative' },
+  timeInputShadow: {
+    position: 'absolute',
+    top: DEPTH / 2,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.neoShadowDefault,
+    borderRadius: 2,
+  },
+  timeInput: {
+    width: 72,
+    height: 42,
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 2,
+    borderColor: Colors.primary900,
+    borderRadius: 2,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.onSurfaceLight,
+  },
+  timeInputDisabled: {
+    borderColor: Colors.outlineLight,
+    color: Colors.onSurfaceVariantLight,
+    backgroundColor: Colors.backgroundLight,
+  },
+  quietSeparator: {
+    fontSize: 18,
+    color: Colors.onSurfaceVariantLight,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  saveTimeBtn: {
+    flex: 1,
+    height: 42,
+    backgroundColor: Colors.primary900,
+    borderRadius: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.black,
+  },
+  saveTimeBtnDisabled: {
+    backgroundColor: Colors.outlineLight,
+    borderColor: Colors.outlineLight,
+  },
+  saveTimeBtnText: { fontSize: 13, fontWeight: '800', color: Colors.white, letterSpacing: 0.5 },
+  quietDisabledHint: {
+    fontSize: 12,
+    color: Colors.onSurfaceVariantLight,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -6,11 +6,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider } from '@/ui/theme';
-import { initializeDatabase } from '@/data/db/client';
+import { initializeDatabase, db } from '@/data/db/client';
 import { getSetting } from '@/data/storage/settings';
 import { seedDatabaseIfNeeded } from '@/services/db-seeder';
 import { handleNotification } from '@/services/notification-handler';
 import { restoreNudgeFromSettings } from '@/services/nudge-scheduler';
+import { TaskRepository } from '@/data/repositories/TaskRepository';
 import NotificationListener from '../../modules/notification-listener/src';
 
 void SplashScreen.preventAutoHideAsync();
@@ -118,6 +119,12 @@ export default function RootLayout(): React.JSX.Element {
         await seedDatabaseIfNeeded();
         const nudgeFreq = getSetting('nudge_freq_minutes');
         void restoreNudgeFromSettings(nudgeFreq);
+        // Purge tasks archived > 30 days ago (non-fatal)
+        try {
+          await new TaskRepository(db).purgeOldArchivedTasks();
+        } catch {
+          /* non-fatal */
+        }
       } catch (err) {
         console.error('DB init error (non-fatal):', err);
       }
@@ -204,6 +211,10 @@ export default function RootLayout(): React.JSX.Element {
                 <Stack.Screen
                   name="settings/transcript-import"
                   options={{ presentation: 'card' }}
+                />
+                <Stack.Screen
+                  name="task/create"
+                  options={{ presentation: 'modal', headerShown: false }}
                 />
                 <Stack.Screen
                   name="share"

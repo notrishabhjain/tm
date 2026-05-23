@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { getPriorityColor, Colors } from '../theme/colors';
 import { PriorityChip } from './PriorityChip';
 import type { Task } from '@/domain/types';
@@ -88,9 +89,18 @@ export function TaskCard({
   const priorityColor = getPriorityColor(task.priority);
   const shadowColor = getPriorityShadow(priorityColor);
 
-  const handlePress = useCallback(() => onPress?.(task), [onPress, task]);
-  const handleComplete = useCallback(() => onComplete?.(task), [onComplete, task]);
-  const handleDelete = useCallback(() => onDelete?.(task), [onDelete, task]);
+  const handlePress = useCallback(() => {
+    void Haptics.selectionAsync();
+    onPress?.(task);
+  }, [onPress, task]);
+  const handleComplete = useCallback(() => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    onComplete?.(task);
+  }, [onComplete, task]);
+  const handleDelete = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onDelete?.(task);
+  }, [onDelete, task]);
 
   return (
     <View style={[styles.wrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>

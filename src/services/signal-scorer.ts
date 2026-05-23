@@ -212,13 +212,18 @@ function wordCount(text: string): number {
 // ── Priority derivation ───────────────────────────────────────────────────────
 
 function derivePriority(score: number, signals: string[]): 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW' {
-  const hasDeadline = signals.includes('deadline_en');
-  if (hasDeadline && score >= 0.65) return 'URGENT';
-  if (hasDeadline && score >= 0.4) return 'HIGH';
-  if (signals.includes('at_mention_specific') || signals.includes('direct_imperative_en'))
-    return 'HIGH';
+  const hasDeadline = signals.includes('deadline_en') || signals.includes('deadline_hi');
+  const hasFinancial = signals.includes('financial_urgency');
+  const hasImperative =
+    signals.includes('direct_imperative_en') || signals.includes('direct_hi_verb');
+  const hasScheduleChange = signals.includes('schedule_change');
+  if ((hasDeadline || hasFinancial) && score >= 0.6) return 'URGENT';
+  if ((hasDeadline || hasFinancial) && score >= 0.35) return 'HIGH';
+  if (hasImperative && score >= 0.5) return 'HIGH';
+  if (hasScheduleChange && score >= 0.4) return 'HIGH';
+  if (signals.includes('at_mention_specific')) return 'HIGH';
   if (score >= 0.65) return 'HIGH';
-  if (score >= 0.4) return 'MEDIUM';
+  if (score >= 0.38) return 'MEDIUM';
   return 'LOW';
 }
 
@@ -371,9 +376,43 @@ function evalPositiveSignals(
     applySignal(acc, 'thread_context_boost', 0.2);
   }
 
-  // deadline_hi
-  if (/\b(aaj|kal\b|abhi|jaldi|is hafte|agle hafte|turant)\b/i.test(latestMessage)) {
-    applySignal(acc, 'deadline_hi', 0.1);
+  // deadline_hi — stronger Hindi deadline signals
+  if (
+    /\b(aaj tak|aaj hi|kal tak|abhi|jaldi karo|is hafte|agle hafte|turant|jaldi|abhi bhejo|aaj bhejna)\b/i.test(
+      latestMessage
+    )
+  ) {
+    applySignal(acc, 'deadline_hi', 0.25);
+  } else if (/\b(aaj|kal)\b/i.test(latestMessage)) {
+    applySignal(acc, 'deadline_hi', 0.12);
+  }
+
+  // financial_urgency — payment, invoice, bill alerts
+  if (
+    /\b(payment due|invoice|overdue|bill due|emi due|outstanding|pay now|clear dues|amount due|last date|due date|payment pending|unpaid)\b/i.test(
+      latestMessage
+    )
+  ) {
+    applySignal(acc, 'financial_urgency', 0.35);
+  }
+
+  // meeting_invite — calendar/meeting actions
+  if (
+    /\b(meeting|call scheduled|stand-?up|sync|interview|demo scheduled|team call|1:1|one.on.one|zoom|meet\.google)\b/i.test(
+      latestMessage
+    ) &&
+    /\b(join|accept|decline|respond|rsvp|confirm attendance|attending)\b/i.test(latestMessage)
+  ) {
+    applySignal(acc, 'meeting_invite', 0.3);
+  }
+
+  // approval_request
+  if (
+    /\b(approve|approval needed|waiting for your approval|please approve|sign off|sanction|authorize|authorize this|needs your ok)\b/i.test(
+      latestMessage
+    )
+  ) {
+    applySignal(acc, 'approval_request', 0.3);
   }
 
   // question_mark
@@ -475,7 +514,7 @@ export async function scoreNotification(notification: NotificationData): Promise
     ''
   ).trim();
 
-  const threadText = notification.thread.map((m) => m.text).join(' ');
+  const threadText = (notification.thread ?? []).map((m) => m.text).join(' ');
   const fullText = `${latestMessage} ${threadText}`;
 
   const senderKey = buildSenderKey(notification.packageName, notification.title ?? '');

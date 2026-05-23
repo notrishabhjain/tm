@@ -3,6 +3,8 @@ import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
 import { Button } from '@/ui/components/Button';
+import { db, initializeDatabase } from '@/data/db/client';
+import { MonitoredAppRepository } from '@/data/repositories/MonitoredAppRepository';
 
 const DEFAULT_APPS = [
   { packageName: 'com.whatsapp', displayName: 'WhatsApp', selected: true },
@@ -26,6 +28,16 @@ export default function OnboardingAppsScreen(): React.JSX.Element {
   };
 
   const handleContinue = async (): Promise<void> => {
+    const selected = apps.filter((a) => a.selected);
+    if (selected.length > 0) {
+      try {
+        initializeDatabase();
+        const repo = new MonitoredAppRepository(db);
+        await Promise.all(selected.map((a) => repo.upsert(a.packageName, a.displayName)));
+      } catch {
+        // Non-fatal — user can configure in Settings
+      }
+    }
     void router.push('/onboarding/vip');
   };
 
