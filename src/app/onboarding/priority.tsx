@@ -43,7 +43,7 @@ export default function OnboardingPriorityScreen(): React.JSX.Element {
       <View style={styles.content}>
         <Text style={styles.stepLabel}>STEP 4 OF 5</Text>
         <Text style={styles.title}>How Priorities Work</Text>
-        <Text style={styles.description}>
+        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           TaskMind automatically assigns priorities based on keywords and urgency signals in your
           notifications.
         </Text>
@@ -55,17 +55,22 @@ export default function OnboardingPriorityScreen(): React.JSX.Element {
               style={[styles.levelWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}
             >
               <View style={[styles.levelShadow, { backgroundColor: level.shadow }]} />
-              <View style={[styles.levelCard, { borderColor: level.fg }]}>
+              <View
+                style={[
+                  styles.levelCard,
+                  { borderColor: level.fg, backgroundColor: theme.surface },
+                ]}
+              >
                 <View style={[styles.badge, { backgroundColor: level.fg }]}>
                   <Text style={styles.badgeText}>{level.label}</Text>
                 </View>
-                <Text style={styles.levelDesc}>{level.desc}</Text>
+                <Text style={[styles.levelDesc, { color: theme.onSurface }]}>{level.desc}</Text>
               </View>
             </View>
           ))}
         </View>
 
-        <Text style={styles.learnNote}>
+        <Text style={[styles.learnNote, { color: theme.onSurfaceVariant }]}>
           TaskMind learns from your confirmations and dismissals over time.
         </Text>
       </View>
@@ -80,7 +85,6 @@ export default function OnboardingPriorityScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundLight,
     padding: 24,
     justifyContent: 'space-between',
   },
@@ -95,7 +99,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: Colors.primary900, marginBottom: 12 },
   description: {
     fontSize: 14,
-    color: Colors.onSurfaceVariantLight,
     lineHeight: 22,
     marginBottom: 20,
   },
@@ -113,7 +116,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderRadius: 2,
     padding: 12,
@@ -127,10 +129,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgeText: { fontSize: 11, fontWeight: '800', color: Colors.white, letterSpacing: 0.5 },
-  levelDesc: { flex: 1, fontSize: 12, color: Colors.onSurfaceLight, lineHeight: 18 },
+  levelDesc: { flex: 1, fontSize: 12, lineHeight: 18 },
   learnNote: {
     fontSize: 12,
-    color: Colors.onSurfaceVariantLight,
     lineHeight: 18,
   },
   footer: {},

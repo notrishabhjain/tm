@@ -54,7 +54,7 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
       <View style={styles.content}>
         <Text style={styles.stepLabel}>STEP 1 OF 4</Text>
         <Text style={styles.title}>Grant Notification Access</Text>
-        <Text style={styles.description}>
+        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           TaskMind needs Notification Access to read your notifications and identify actionable
           tasks. This permission is required for the app to work.
         </Text>
@@ -67,7 +67,13 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
             ]}
           />
           <View
-            style={[styles.statusCard, { borderColor: granted ? Colors.success : Colors.urgentFg }]}
+            style={[
+              styles.statusCard,
+              {
+                borderColor: granted ? Colors.success : Colors.urgentFg,
+                backgroundColor: theme.surface,
+              },
+            ]}
           >
             <View
               style={[
@@ -75,7 +81,7 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
                 { backgroundColor: granted ? Colors.success : Colors.urgentFg },
               ]}
             />
-            <Text style={styles.statusText}>
+            <Text style={[styles.statusText, { color: theme.onSurface }]}>
               Notification Access:{' '}
               <Text
                 style={[styles.statusBold, { color: granted ? Colors.success : Colors.urgentFg }]}
@@ -86,7 +92,7 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
           </View>
         </View>
 
-        <Text style={styles.stepsTitle}>How to grant access:</Text>
+        <Text style={[styles.stepsTitle, { color: theme.onSurface }]}>How to grant access:</Text>
         {[
           'Tap "Open Settings" below',
           'Find TaskMind in the list',
@@ -95,7 +101,7 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
         ].map((step, i) => (
           <View key={i} style={styles.stepRow}>
             <Text style={styles.stepNum}>{i + 1}.</Text>
-            <Text style={styles.step}>{step}</Text>
+            <Text style={[styles.step, { color: theme.onSurfaceVariant }]}>{step}</Text>
           </View>
         ))}
       </View>
@@ -123,7 +129,6 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundLight,
     paddingHorizontal: 24,
     justifyContent: 'space-between',
   },
@@ -138,7 +143,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: Colors.primary900, marginBottom: 12 },
   description: {
     fontSize: 14,
-    color: Colors.onSurfaceVariantLight,
     lineHeight: 22,
     marginBottom: 20,
   },
@@ -155,22 +159,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Colors.surfaceLight,
     padding: 16,
     borderWidth: 2,
     borderRadius: 2,
   },
   statusDot: { width: 10, height: 10, borderRadius: 2 },
-  statusText: { fontSize: 14, color: Colors.onSurfaceLight },
+  statusText: { fontSize: 14 },
   statusBold: { fontWeight: '700' },
   stepsTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.onSurfaceLight,
     marginBottom: 10,
   },
   stepRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
   stepNum: { fontSize: 13, fontWeight: '700', color: Colors.primary900, minWidth: 16 },
-  step: { fontSize: 13, color: Colors.onSurfaceVariantLight },
+  step: { fontSize: 13 },
   footer: { gap: 12 },
 });

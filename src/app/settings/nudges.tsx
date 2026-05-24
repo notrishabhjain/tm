@@ -74,7 +74,7 @@ export default function NudgesScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
           <Text style={styles.backText}>Back</Text>
@@ -84,7 +84,7 @@ export default function NudgesScreen(): React.JSX.Element {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.description}>
+        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           TaskMind shows a persistent notification reminding you of pending tasks. Configure how
           often it nudges you.
         </Text>
@@ -92,13 +92,16 @@ export default function NudgesScreen(): React.JSX.Element {
         <Text style={styles.sectionLabel}>NUDGE FREQUENCY</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
             {FREQUENCY_OPTIONS.map((opt, i) => (
               <Pressable
                 key={opt.value}
                 style={[
                   styles.optionRow,
-                  i < FREQUENCY_OPTIONS.length - 1 && styles.rowBorder,
+                  i < FREQUENCY_OPTIONS.length - 1 && {
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.outline,
+                  },
                   frequencyMinutes === opt.value && styles.optionSelected,
                 ]}
                 onPress={() => handleFrequency(opt.value)}
@@ -106,11 +109,16 @@ export default function NudgesScreen(): React.JSX.Element {
                 accessibilityState={{ selected: frequencyMinutes === opt.value }}
               >
                 <View
-                  style={[styles.radio, frequencyMinutes === opt.value && styles.radioSelected]}
+                  style={[
+                    styles.radio,
+                    { borderColor: theme.onSurfaceVariant },
+                    frequencyMinutes === opt.value && styles.radioSelected,
+                  ]}
                 />
                 <Text
                   style={[
                     styles.optionLabel,
+                    { color: theme.onSurface },
                     frequencyMinutes === opt.value && styles.optionLabelSelected,
                   ]}
                 >
@@ -125,10 +133,12 @@ export default function NudgesScreen(): React.JSX.Element {
         <Text style={styles.sectionLabel}>QUIET HOURS</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
             <View style={styles.quietRow}>
               <View style={styles.quietField}>
-                <Text style={styles.quietFieldLabel}>FROM</Text>
+                <Text style={[styles.quietFieldLabel, { color: theme.onSurfaceVariant }]}>
+                  FROM
+                </Text>
                 <View
                   style={[
                     styles.timeInputWrapper,
@@ -137,7 +147,15 @@ export default function NudgesScreen(): React.JSX.Element {
                 >
                   <View style={styles.timeInputShadow} />
                   <TextInput
-                    style={[styles.timeInput, !quietEnabled && styles.timeInputDisabled]}
+                    style={[
+                      styles.timeInput,
+                      { backgroundColor: theme.surface, color: theme.onSurface },
+                      !quietEnabled && {
+                        borderColor: theme.outline,
+                        color: theme.onSurfaceVariant,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
                     value={quietStart}
                     onChangeText={setQuietStart}
                     placeholder="22:00"
@@ -149,9 +167,9 @@ export default function NudgesScreen(): React.JSX.Element {
                   />
                 </View>
               </View>
-              <Text style={styles.quietSeparator}>—</Text>
+              <Text style={[styles.quietSeparator, { color: theme.onSurfaceVariant }]}>—</Text>
               <View style={styles.quietField}>
-                <Text style={styles.quietFieldLabel}>TO</Text>
+                <Text style={[styles.quietFieldLabel, { color: theme.onSurfaceVariant }]}>TO</Text>
                 <View
                   style={[
                     styles.timeInputWrapper,
@@ -160,7 +178,15 @@ export default function NudgesScreen(): React.JSX.Element {
                 >
                   <View style={styles.timeInputShadow} />
                   <TextInput
-                    style={[styles.timeInput, !quietEnabled && styles.timeInputDisabled]}
+                    style={[
+                      styles.timeInput,
+                      { backgroundColor: theme.surface, color: theme.onSurface },
+                      !quietEnabled && {
+                        borderColor: theme.outline,
+                        color: theme.onSurfaceVariant,
+                        backgroundColor: theme.background,
+                      },
+                    ]}
                     value={quietEnd}
                     onChangeText={setQuietEnd}
                     placeholder="07:00"
@@ -181,7 +207,9 @@ export default function NudgesScreen(): React.JSX.Element {
               </Pressable>
             </View>
             {!quietEnabled && (
-              <Text style={styles.quietDisabledHint}>Enable nudges to configure quiet hours</Text>
+              <Text style={[styles.quietDisabledHint, { color: theme.onSurfaceVariant }]}>
+                Enable nudges to configure quiet hours
+              </Text>
             )}
           </View>
         </View>
@@ -189,11 +217,13 @@ export default function NudgesScreen(): React.JSX.Element {
         <Text style={styles.sectionLabel}>BEHAVIOUR</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
             <View style={styles.toggleRow}>
               <View style={styles.toggleInfo}>
-                <Text style={styles.toggleTitle}>Urgent overrides quiet hours</Text>
-                <Text style={styles.toggleSubtitle}>
+                <Text style={[styles.toggleTitle, { color: theme.onSurface }]}>
+                  Urgent overrides quiet hours
+                </Text>
+                <Text style={[styles.toggleSubtitle, { color: theme.onSurfaceVariant }]}>
                   URGENT tasks always nudge, even during quiet hours
                 </Text>
               </View>
@@ -212,7 +242,7 @@ export default function NudgesScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -229,7 +259,6 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 32 },
   description: {
     fontSize: 13,
-    color: Colors.onSurfaceVariantLight,
     lineHeight: 20,
     marginBottom: 20,
   },
@@ -253,7 +282,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   card: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
@@ -266,17 +294,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.outlineLight },
   optionSelected: { backgroundColor: Colors.primary50 },
   radio: {
     width: 18,
     height: 18,
     borderRadius: 2,
     borderWidth: 2,
-    borderColor: Colors.onSurfaceVariantLight,
   },
   radioSelected: { borderColor: Colors.primary900, backgroundColor: Colors.primary900 },
-  optionLabel: { fontSize: 15, color: Colors.onSurfaceLight },
+  optionLabel: { fontSize: 15 },
   optionLabelSelected: { color: Colors.primary900, fontWeight: '700' },
   quietRow: {
     flexDirection: 'row',
@@ -289,7 +315,6 @@ const styles = StyleSheet.create({
   quietFieldLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: Colors.onSurfaceVariantLight,
     letterSpacing: 0.8,
   },
   timeInputWrapper: { position: 'relative' },
@@ -305,23 +330,15 @@ const styles = StyleSheet.create({
   timeInput: {
     width: 72,
     height: 42,
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.onSurfaceLight,
-  },
-  timeInputDisabled: {
-    borderColor: Colors.outlineLight,
-    color: Colors.onSurfaceVariantLight,
-    backgroundColor: Colors.backgroundLight,
   },
   quietSeparator: {
     fontSize: 18,
-    color: Colors.onSurfaceVariantLight,
     fontWeight: '700',
     marginBottom: 6,
   },
@@ -336,13 +353,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.black,
   },
   saveTimeBtnDisabled: {
-    backgroundColor: Colors.outlineLight,
-    borderColor: Colors.outlineLight,
+    backgroundColor: Colors.neoShadowDefault,
+    borderColor: Colors.neoShadowDefault,
   },
   saveTimeBtnText: { fontSize: 13, fontWeight: '800', color: Colors.white, letterSpacing: 0.5 },
   quietDisabledHint: {
     fontSize: 12,
-    color: Colors.onSurfaceVariantLight,
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
@@ -354,6 +370,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   toggleInfo: { flex: 1 },
-  toggleTitle: { fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '600' },
-  toggleSubtitle: { fontSize: 12, color: Colors.onSurfaceVariantLight, marginTop: 2 },
+  toggleTitle: { fontSize: 15, fontWeight: '600' },
+  toggleSubtitle: { fontSize: 12, marginTop: 2 },
 });

@@ -140,8 +140,8 @@ export default function ExportImportScreen(): React.JSX.Element {
         <Text style={styles.sectionLabel}>EXPORT</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
-          <View style={styles.card}>
-            <Text style={styles.cardHint}>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.cardHint, { color: theme.onSurfaceVariant }]}>
               Export all your tasks (pending + completed) to share or back up.
             </Text>
             <View style={styles.btnRow}>
@@ -166,8 +166,8 @@ export default function ExportImportScreen(): React.JSX.Element {
         <Text style={styles.sectionLabel}>IMPORT</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
-          <View style={styles.card}>
-            <Text style={styles.cardHint}>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.cardHint, { color: theme.onSurfaceVariant }]}>
               Import tasks from a TaskMind JSON export. Merge with existing tasks or replace all
               pending tasks.
             </Text>
@@ -180,8 +180,15 @@ export default function ExportImportScreen(): React.JSX.Element {
               />
             ) : (
               <View style={styles.previewSection}>
-                <View style={styles.previewBox}>
-                  <Text style={styles.previewTitle}>{importPreview.tasks.length} tasks found</Text>
+                <View
+                  style={[
+                    styles.previewBox,
+                    { backgroundColor: theme.background, borderColor: theme.outline },
+                  ]}
+                >
+                  <Text style={[styles.previewTitle, { color: theme.onSurface }]}>
+                    {importPreview.tasks.length} tasks found
+                  </Text>
                   {importPreview.errors.length > 0 && (
                     <Text style={styles.previewErrors}>
                       {importPreview.errors.length} warning
@@ -207,7 +214,7 @@ export default function ExportImportScreen(): React.JSX.Element {
                   />
                 </View>
                 <Pressable onPress={() => setImportPreview(null)} style={styles.cancelLink}>
-                  <Text style={styles.cancelText}>Cancel</Text>
+                  <Text style={[styles.cancelText, { color: theme.onSurfaceVariant }]}>Cancel</Text>
                 </Pressable>
               </View>
             )}
@@ -220,7 +227,7 @@ export default function ExportImportScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -255,27 +262,24 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   card: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
     padding: 16,
     gap: 12,
   },
-  cardHint: { fontSize: 13, color: Colors.onSurfaceVariantLight, lineHeight: 19 },
+  cardHint: { fontSize: 13, lineHeight: 19 },
   btnRow: { flexDirection: 'row', gap: 10 },
   halfBtn: { flex: 1 },
   previewSection: { gap: 12 },
   previewBox: {
-    backgroundColor: Colors.backgroundLight,
     borderWidth: 1,
-    borderColor: Colors.outlineLight,
     borderRadius: 2,
     padding: 12,
   },
-  previewTitle: { fontSize: 14, fontWeight: '700', color: Colors.onSurfaceLight },
+  previewTitle: { fontSize: 14, fontWeight: '700' },
   previewErrors: { fontSize: 12, color: Colors.warning, marginTop: 4 },
   cancelLink: { alignSelf: 'center', paddingVertical: 8 },
-  cancelText: { fontSize: 13, color: Colors.onSurfaceVariantLight, fontWeight: '600' },
+  cancelText: { fontSize: 13, fontWeight: '600' },
   spinner: { marginTop: 8 },
 });

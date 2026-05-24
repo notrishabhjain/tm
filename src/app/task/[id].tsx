@@ -358,7 +358,6 @@ const styles = StyleSheet.create({
   },
   originalText: {
     fontSize: 13,
-    color: Colors.onSurfaceLight,
     lineHeight: 20,
     fontFamily: 'JetBrainsMono-Regular',
   },

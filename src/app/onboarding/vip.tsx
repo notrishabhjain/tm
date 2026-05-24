@@ -38,20 +38,25 @@ export default function OnboardingVipScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.background, paddingTop: insets.top, paddingBottom: insets.bottom },
+      ]}
+    >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.stepLabel}>STEP 3 OF 4</Text>
         <Text style={styles.title}>VIP Contacts</Text>
-        <Text style={styles.description}>
+        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           Messages from VIP contacts always create URGENT tasks and skip the confirmation queue. Add
           names as they appear in your notifications.
         </Text>
 
         <View style={[styles.inputWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.inputShadow} />
-          <View style={styles.inputRow}>
+          <View style={[styles.inputRow, { backgroundColor: theme.surface }]}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: theme.onSurface }]}
               value={name}
               onChangeText={setName}
               placeholder="e.g. Ravi Sharma"
@@ -74,7 +79,7 @@ export default function OnboardingVipScreen(): React.JSX.Element {
         </Pressable>
 
         {vips.length === 0 ? (
-          <Text style={styles.emptyHint}>
+          <Text style={[styles.emptyHint, { color: theme.onSurfaceVariant }]}>
             No VIP contacts yet. You can skip this and add them later in Settings.
           </Text>
         ) : (
@@ -82,11 +87,25 @@ export default function OnboardingVipScreen(): React.JSX.Element {
             <Text style={styles.sectionLabel}>ADDED ({vips.length})</Text>
             <View style={[styles.vipListWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
               <View style={[styles.vipListShadow, { backgroundColor: Colors.neoShadowUrgent }]} />
-              <View style={[styles.vipList, { borderColor: Colors.urgentFg }]}>
+              <View
+                style={[
+                  styles.vipList,
+                  { borderColor: Colors.urgentFg, backgroundColor: theme.surface },
+                ]}
+              >
                 {vips.map((v, i) => (
-                  <View key={v} style={[styles.vipRow, i < vips.length - 1 && styles.vipRowBorder]}>
+                  <View
+                    key={v}
+                    style={[
+                      styles.vipRow,
+                      i < vips.length - 1 && {
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.outline,
+                      },
+                    ]}
+                  >
                     <View style={styles.urgentDot} />
-                    <Text style={styles.vipName}>{v}</Text>
+                    <Text style={[styles.vipName, { color: theme.onSurface }]}>{v}</Text>
                     <Pressable onPress={() => removeVip(v)} hitSlop={8}>
                       <Text style={styles.removeBtn}>Remove</Text>
                     </Pressable>
@@ -136,7 +155,7 @@ export default function OnboardingVipScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   content: { padding: 24, gap: 12 },
   stepLabel: {
     fontSize: 11,
@@ -145,7 +164,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   title: { fontSize: 26, fontWeight: '800', color: Colors.primary900 },
-  description: { fontSize: 14, color: Colors.onSurfaceVariantLight, lineHeight: 22 },
+  description: { fontSize: 14, lineHeight: 22 },
   inputWrapper: { position: 'relative' },
   inputShadow: {
     position: 'absolute',
@@ -158,7 +177,6 @@ const styles = StyleSheet.create({
   },
   inputRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
@@ -169,7 +187,6 @@ const styles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 14,
     fontSize: 15,
-    color: Colors.onSurfaceLight,
   },
   addButton: {
     height: 48,
@@ -189,7 +206,7 @@ const styles = StyleSheet.create({
   },
   pickerBtnPressed: { backgroundColor: Colors.primary50 },
   pickerBtnText: { fontSize: 14, color: Colors.primary900, fontWeight: '700' },
-  emptyHint: { fontSize: 13, color: Colors.onSurfaceVariantLight, lineHeight: 20 },
+  emptyHint: { fontSize: 13, lineHeight: 20 },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
@@ -207,13 +224,11 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   vipList: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderRadius: 2,
     overflow: 'hidden',
   },
   vipRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
-  vipRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.outlineLight },
   urgentDot: {
     width: 10,
     height: 10,
@@ -222,7 +237,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.neoShadowUrgent,
   },
-  vipName: { flex: 1, fontSize: 14, color: Colors.onSurfaceLight, fontWeight: '600' },
+  vipName: { flex: 1, fontSize: 14, fontWeight: '600' },
   removeBtn: { fontSize: 13, color: Colors.urgentFg, fontWeight: '700' },
   footer: { padding: 24, gap: 12 },
 });

@@ -165,7 +165,7 @@ export default function TranscriptImportScreen(): React.JSX.Element {
 
   if (step === 'review') {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.header}>
           <Pressable
             onPress={() => setStep('input')}
@@ -178,8 +178,13 @@ export default function TranscriptImportScreen(): React.JSX.Element {
           <View style={{ width: 56 }} />
         </View>
 
-        <View style={styles.reviewBanner}>
-          <Text style={styles.reviewBannerText}>
+        <View
+          style={[
+            styles.reviewBanner,
+            { backgroundColor: theme.surface, borderBottomColor: theme.outline },
+          ]}
+        >
+          <Text style={[styles.reviewBannerText, { color: theme.onSurfaceVariant }]}>
             {candidates.length} found · {selectedCount} selected
           </Text>
           <Pressable
@@ -204,7 +209,9 @@ export default function TranscriptImportScreen(): React.JSX.Element {
           )}
         />
 
-        <View style={styles.footer}>
+        <View
+          style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.outline }]}
+        >
           <Button
             label={
               saving ? 'Saving...' : `Save ${selectedCount} Task${selectedCount !== 1 ? 's' : ''}`
@@ -220,7 +227,7 @@ export default function TranscriptImportScreen(): React.JSX.Element {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
           <Text style={styles.backText}>Back</Text>
@@ -230,16 +237,16 @@ export default function TranscriptImportScreen(): React.JSX.Element {
       </View>
 
       <ScrollView contentContainerStyle={styles.inputContent} keyboardShouldPersistTaps="handled">
-        <Text style={styles.inputHint}>
+        <Text style={[styles.inputHint, { color: theme.onSurfaceVariant }]}>
           Paste a meeting transcript, email thread, or any long text. TaskMind will extract
           actionable tasks from it using the on-device signal engine.
         </Text>
 
         <View style={[styles.textAreaWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.textAreaShadow} />
-          <View style={styles.textAreaBorder}>
+          <View style={[styles.textAreaBorder, { backgroundColor: theme.surface }]}>
             <TextInput
-              style={styles.textArea}
+              style={[styles.textArea, { color: theme.onSurface }]}
               value={rawText}
               onChangeText={setRawText}
               multiline
@@ -247,7 +254,11 @@ export default function TranscriptImportScreen(): React.JSX.Element {
               placeholderTextColor={theme.onSurfaceVariant}
               textAlignVertical="top"
             />
-            {rawText.length > 0 && <Text style={styles.charCount}>{rawText.length} chars</Text>}
+            {rawText.length > 0 && (
+              <Text style={[styles.charCount, { color: theme.onSurfaceVariant }]}>
+                {rawText.length} chars
+              </Text>
+            )}
           </View>
         </View>
 
@@ -270,7 +281,9 @@ export default function TranscriptImportScreen(): React.JSX.Element {
         {analyzing && (
           <View style={styles.analyzingRow}>
             <ActivityIndicator color={Colors.primary900} />
-            <Text style={styles.analyzingText}>Running signal extraction...</Text>
+            <Text style={[styles.analyzingText, { color: theme.onSurfaceVariant }]}>
+              Running signal extraction...
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -297,19 +310,29 @@ function CandidateRow({
         ]}
       />
       <Pressable
-        style={[styles.candidateRow, candidate.selected && styles.candidateRowSelected]}
+        style={[
+          styles.candidateRow,
+          { backgroundColor: theme.surface, borderColor: theme.outline },
+          candidate.selected && styles.candidateRowSelected,
+        ]}
         onPress={onToggle}
       >
-        <View style={[styles.checkbox, candidate.selected && styles.checkboxSelected]}>
+        <View
+          style={[
+            styles.checkbox,
+            { borderColor: theme.outline },
+            candidate.selected && styles.checkboxSelected,
+          ]}
+        >
           {candidate.selected && <View style={styles.checkmarkFill} />}
         </View>
         <View style={styles.candidateContent}>
-          <Text style={styles.candidateSentence} numberOfLines={3}>
+          <Text style={[styles.candidateSentence, { color: theme.onSurface }]} numberOfLines={3}>
             {candidate.sentence}
           </Text>
           <View style={styles.candidateMeta}>
             <PriorityChip priority={candidate.priority} />
-            <View style={styles.scoreBadge}>
+            <View style={[styles.scoreBadge, { backgroundColor: theme.outline }]}>
               <View
                 style={[
                   styles.scoreBar,
@@ -320,7 +343,9 @@ function CandidateRow({
                 ]}
               />
             </View>
-            <Text style={styles.scoreText}>{Math.round(candidate.score * 100)}%</Text>
+            <Text style={[styles.scoreText, { color: theme.onSurfaceVariant }]}>
+              {Math.round(candidate.score * 100)}%
+            </Text>
           </View>
         </View>
       </Pressable>
@@ -329,7 +354,7 @@ function CandidateRow({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -344,7 +369,7 @@ const styles = StyleSheet.create({
   backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
   title: { fontSize: 17, fontWeight: '800', color: Colors.white },
   inputContent: { padding: 16, gap: 14, paddingBottom: 32 },
-  inputHint: { fontSize: 13, color: Colors.onSurfaceVariantLight, lineHeight: 20 },
+  inputHint: { fontSize: 13, lineHeight: 20 },
   textAreaWrapper: { position: 'relative' },
   textAreaShadow: {
     position: 'absolute',
@@ -356,7 +381,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   textAreaBorder: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
@@ -365,7 +389,6 @@ const styles = StyleSheet.create({
   textArea: {
     padding: 14,
     fontSize: 14,
-    color: Colors.onSurfaceLight,
     minHeight: 200,
     maxHeight: 400,
     textAlignVertical: 'top',
@@ -375,7 +398,6 @@ const styles = StyleSheet.create({
     bottom: 8,
     right: 12,
     fontSize: 11,
-    color: Colors.onSurfaceVariantLight,
   },
   inputActions: { flexDirection: 'row', gap: 10 },
   halfBtn: { flex: 1 },
@@ -386,18 +408,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
   },
-  analyzingText: { fontSize: 13, color: Colors.onSurfaceVariantLight },
+  analyzingText: { fontSize: 13 },
   reviewBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: Colors.surfaceLight,
     borderBottomWidth: 2,
-    borderBottomColor: Colors.outlineLight,
   },
-  reviewBannerText: { fontSize: 12, color: Colors.onSurfaceVariantLight, flex: 1 },
+  reviewBannerText: { fontSize: 12, flex: 1 },
   selectAllText: { fontSize: 13, color: Colors.primary900, fontWeight: '700' },
   reviewList: { padding: 12, gap: 8, paddingBottom: 16 },
   candidateWrapper: { position: 'relative' },
@@ -411,12 +431,10 @@ const styles = StyleSheet.create({
   },
   candidateRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceLight,
     borderRadius: 2,
     padding: 12,
     gap: 12,
     borderWidth: 2,
-    borderColor: Colors.outlineLight,
   },
   candidateRowSelected: { borderColor: Colors.primary900 },
   checkbox: {
@@ -424,7 +442,6 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 2,
     borderWidth: 2,
-    borderColor: Colors.outlineLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 2,
@@ -435,21 +452,18 @@ const styles = StyleSheet.create({
   },
   checkmarkFill: { width: 8, height: 8, borderRadius: 1, backgroundColor: Colors.white },
   candidateContent: { flex: 1, gap: 6 },
-  candidateSentence: { fontSize: 13, color: Colors.onSurfaceLight, lineHeight: 19 },
+  candidateSentence: { fontSize: 13, lineHeight: 19 },
   candidateMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   scoreBadge: {
     flex: 1,
     height: 4,
-    backgroundColor: Colors.outlineLight,
     borderRadius: 2,
     overflow: 'hidden',
   },
   scoreBar: { height: '100%', borderRadius: 2 },
-  scoreText: { fontSize: 11, color: Colors.onSurfaceVariantLight, width: 32, textAlign: 'right' },
+  scoreText: { fontSize: 11, width: 32, textAlign: 'right' },
   footer: {
     padding: 16,
-    backgroundColor: Colors.surfaceLight,
     borderTopWidth: 2,
-    borderTopColor: Colors.outlineLight,
   },
 });

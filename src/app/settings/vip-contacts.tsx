@@ -58,7 +58,7 @@ export default function VipContactsScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
           <Text style={styles.backText}>Back</Text>
@@ -68,7 +68,7 @@ export default function VipContactsScreen(): React.JSX.Element {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.description}>
+        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           Messages from VIP contacts always create URGENT tasks and skip the confirmation queue. Add
           names as they appear in notification senders.
         </Text>
@@ -76,9 +76,9 @@ export default function VipContactsScreen(): React.JSX.Element {
         {/* Input row */}
         <View style={[styles.inputWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.inputShadow} />
-          <View style={styles.inputRow}>
+          <View style={[styles.inputRow, { backgroundColor: theme.surface }]}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: theme.onSurface }]}
               value={name}
               onChangeText={setName}
               placeholder="e.g. Ravi Sharma"
@@ -108,7 +108,7 @@ export default function VipContactsScreen(): React.JSX.Element {
         </Pressable>
 
         {contacts.length === 0 ? (
-          <Text style={styles.emptyHint}>
+          <Text style={[styles.emptyHint, { color: theme.onSurfaceVariant }]}>
             No VIP contacts yet. Messages from VIP senders skip confirmation and become URGENT.
           </Text>
         ) : (
@@ -116,14 +116,27 @@ export default function VipContactsScreen(): React.JSX.Element {
             <Text style={styles.sectionLabel}>VIP CONTACTS ({contacts.length})</Text>
             <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
               <View style={[styles.cardShadow, { backgroundColor: Colors.neoShadowUrgent }]} />
-              <View style={[styles.card, { borderColor: Colors.urgentFg }]}>
+              <View
+                style={[
+                  styles.card,
+                  { borderColor: Colors.urgentFg, backgroundColor: theme.surface },
+                ]}
+              >
                 {contacts.map((contact, i) => (
                   <View
                     key={contact.id}
-                    style={[styles.row, i < contacts.length - 1 && styles.rowBorder]}
+                    style={[
+                      styles.row,
+                      i < contacts.length - 1 && {
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.outline,
+                      },
+                    ]}
                   >
                     <View style={styles.urgentDot} />
-                    <Text style={styles.contactName}>{contact.displayName}</Text>
+                    <Text style={[styles.contactName, { color: theme.onSurface }]}>
+                      {contact.displayName}
+                    </Text>
                     <Pressable
                       onPress={() => handleRemove(contact.id, contact.displayName)}
                       hitSlop={8}
@@ -140,9 +153,14 @@ export default function VipContactsScreen(): React.JSX.Element {
         {/* Info card */}
         <View style={[styles.infoWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={[styles.cardShadow, { backgroundColor: Colors.neoShadowMedium }]} />
-          <View style={[styles.infoCard, { borderColor: Colors.mediumFg }]}>
+          <View
+            style={[
+              styles.infoCard,
+              { borderColor: Colors.mediumFg, backgroundColor: theme.mediumBg },
+            ]}
+          >
             <Text style={styles.infoTitle}>How VIP matching works</Text>
-            <Text style={styles.infoText}>
+            <Text style={[styles.infoText, { color: theme.onSurface }]}>
               If a notification sender contains the VIP name (case-insensitive), the task is
               automatically URGENT priority. Use the name as it appears in the notification — for
               WhatsApp, this is typically the contact's saved name.
@@ -162,7 +180,7 @@ export default function VipContactsScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -177,7 +195,7 @@ const styles = StyleSheet.create({
   backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
   title: { fontSize: 17, fontWeight: '800', color: Colors.white },
   content: { padding: 16, paddingBottom: 32, gap: 12 },
-  description: { fontSize: 13, color: Colors.onSurfaceVariantLight, lineHeight: 20 },
+  description: { fontSize: 13, lineHeight: 20 },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
@@ -199,7 +217,6 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     gap: 0,
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
@@ -210,7 +227,6 @@ const styles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 14,
     fontSize: 15,
-    color: Colors.onSurfaceLight,
   },
   addBtn: {
     height: 48,
@@ -230,7 +246,7 @@ const styles = StyleSheet.create({
   },
   pickerBtnPressed: { backgroundColor: Colors.primary50 },
   pickerBtnText: { fontSize: 14, color: Colors.primary900, fontWeight: '700' },
-  emptyHint: { fontSize: 13, color: Colors.onSurfaceVariantLight, lineHeight: 20 },
+  emptyHint: { fontSize: 13, lineHeight: 20 },
   cardWrapper: { position: 'relative' },
   cardShadow: {
     position: 'absolute',
@@ -241,13 +257,11 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   card: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderRadius: 2,
     overflow: 'hidden',
   },
   row: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.outlineLight },
   urgentDot: {
     width: 10,
     height: 10,
@@ -256,15 +270,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.neoShadowUrgent,
   },
-  contactName: { flex: 1, fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '600' },
+  contactName: { flex: 1, fontSize: 15, fontWeight: '600' },
   removeBtn: { fontSize: 13, color: Colors.urgentFg, fontWeight: '700' },
   infoWrapper: { position: 'relative' },
   infoCard: {
-    backgroundColor: Colors.mediumBgLight,
     borderWidth: 2,
     borderRadius: 2,
     padding: 14,
   },
   infoTitle: { fontSize: 13, fontWeight: '700', color: Colors.primary900, marginBottom: 6 },
-  infoText: { fontSize: 13, color: Colors.onSurfaceLight, lineHeight: 19 },
+  infoText: { fontSize: 13, lineHeight: 19 },
 });

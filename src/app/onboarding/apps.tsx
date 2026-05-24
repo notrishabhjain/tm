@@ -109,23 +109,28 @@ export default function OnboardingAppsScreen(): React.JSX.Element {
   const selectedCount = apps.filter((a) => a.selected).length;
 
   if (loading) {
-    return <View style={styles.container} />;
+    return <View style={[styles.container, { backgroundColor: theme.background }]} />;
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.topSection}>
         <Text style={styles.stepLabel}>STEP 2 OF 4</Text>
         <Text style={styles.title}>Choose Apps to Monitor</Text>
-        <Text style={styles.description}>
+        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           TaskMind will process notifications only from selected apps. You can change this anytime
           in Settings → Monitored Apps.
         </Text>
       </View>
 
       {/* Select-all toggle */}
-      <View style={styles.selectAllRow}>
-        <Text style={styles.selectAllLabel}>Monitor all apps</Text>
+      <View
+        style={[
+          styles.selectAllRow,
+          { borderColor: theme.outline, backgroundColor: theme.surfaceVariant },
+        ]}
+      >
+        <Text style={[styles.selectAllLabel, { color: theme.onSurface }]}>Monitor all apps</Text>
         <Switch
           value={allSelected}
           onValueChange={toggleAll}
@@ -146,15 +151,31 @@ export default function OnboardingAppsScreen(): React.JSX.Element {
               ]}
             />
             <Pressable
-              style={[styles.appRow, item.selected && styles.appRowSelected]}
+              style={[
+                styles.appRow,
+                { backgroundColor: theme.surface, borderColor: theme.outline },
+                item.selected && styles.appRowSelected,
+              ]}
               onPress={() => toggleApp(item.packageName)}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: item.selected }}
             >
-              <View style={[styles.checkbox, item.selected && styles.checkboxSelected]}>
+              <View
+                style={[
+                  styles.checkbox,
+                  { borderColor: theme.outline },
+                  item.selected && styles.checkboxSelected,
+                ]}
+              >
                 {item.selected && <View style={styles.checkmarkFill} />}
               </View>
-              <Text style={[styles.appName, item.selected && styles.appNameSelected]}>
+              <Text
+                style={[
+                  styles.appName,
+                  { color: theme.onSurface },
+                  item.selected && styles.appNameSelected,
+                ]}
+              >
                 {item.displayName}
               </Text>
             </Pressable>
@@ -179,7 +200,7 @@ export default function OnboardingAppsScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   topSection: { padding: 24, paddingBottom: 12 },
   stepLabel: {
     fontSize: 11,
@@ -189,7 +210,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: { fontSize: 26, fontWeight: '800', color: Colors.primary900, marginBottom: 12 },
-  description: { fontSize: 14, color: Colors.onSurfaceVariantLight, lineHeight: 22 },
+  description: { fontSize: 14, lineHeight: 22 },
   selectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -198,11 +219,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: Colors.outlineLight,
-    backgroundColor: Colors.surfaceVariantLight,
     marginBottom: 4,
   },
-  selectAllLabel: { fontSize: 14, fontWeight: '600', color: Colors.onSurfaceLight },
+  selectAllLabel: { fontSize: 14, fontWeight: '600' },
   list: { paddingHorizontal: 16, paddingBottom: 16, gap: 4 },
   rowWrapper: { position: 'relative' },
   rowShadow: {
@@ -211,17 +230,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: Colors.outlineLight,
+    backgroundColor: Colors.neoShadowDefault,
     borderRadius: 2,
   },
   appRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: Colors.surfaceLight,
     borderRadius: 2,
     borderWidth: 2,
-    borderColor: Colors.outlineLight,
     gap: 12,
   },
   appRowSelected: { borderColor: Colors.primary900 },
@@ -230,13 +247,12 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 2,
     borderWidth: 2,
-    borderColor: Colors.outlineLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxSelected: { backgroundColor: Colors.primary900, borderColor: Colors.primary900 },
   checkmarkFill: { width: 8, height: 8, borderRadius: 1, backgroundColor: Colors.white },
-  appName: { fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '500' },
+  appName: { fontSize: 15, fontWeight: '500' },
   appNameSelected: { color: Colors.primary900, fontWeight: '700' },
   footer: { padding: 24, paddingTop: 12 },
 });

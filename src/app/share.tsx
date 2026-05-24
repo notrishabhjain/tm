@@ -168,16 +168,18 @@ export default function ShareScreen(): React.JSX.Element {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: theme.background }]}>
         <ActivityIndicator color={Colors.primary500} size="large" />
-        <Text style={styles.loadingText}>Analysing shared message…</Text>
+        <Text style={[styles.loadingText, { color: theme.onSurfaceVariant }]}>
+          Analysing shared message…
+        </Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: theme.background }]}>
         <Text style={styles.errorText}>{error}</Text>
         <Button label="Go to Home" onPress={() => void handleDiscard()} variant="secondary" />
       </View>
@@ -187,28 +189,35 @@ export default function ShareScreen(): React.JSX.Element {
   const priorityColor = getPriorityColor(priority);
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { borderBottomColor: priorityColor }]}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: priorityColor, backgroundColor: theme.surface },
+        ]}
+      >
         <Text style={styles.headerTitle}>Create Task</Text>
         <PriorityChip priority={priority} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {parsed?.sender ? (
-          <View style={styles.metaCard}>
+          <View style={[styles.metaCard, { backgroundColor: theme.surface }]}>
             <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>From</Text>
-              <Text style={styles.metaValue}>{parsed.sender}</Text>
+              <Text style={[styles.metaLabel, { color: theme.onSurfaceVariant }]}>From</Text>
+              <Text style={[styles.metaValue, { color: theme.onSurface }]}>{parsed.sender}</Text>
             </View>
             {parsed.timestamp ? (
               <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Time</Text>
-                <Text style={styles.metaValue}>{parsed.timestamp}</Text>
+                <Text style={[styles.metaLabel, { color: theme.onSurfaceVariant }]}>Time</Text>
+                <Text style={[styles.metaValue, { color: theme.onSurface }]}>
+                  {parsed.timestamp}
+                </Text>
               </View>
             ) : null}
             {dueDate ? (
               <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Due</Text>
+                <Text style={[styles.metaLabel, { color: theme.onSurfaceVariant }]}>Due</Text>
                 <Text style={[styles.metaValue, { color: getPriorityColor('URGENT') }]}>
                   {formatDueDate(dueDate)}
                 </Text>
@@ -217,9 +226,12 @@ export default function ShareScreen(): React.JSX.Element {
           </View>
         ) : null}
 
-        <Text style={styles.fieldLabel}>Task</Text>
+        <Text style={[styles.fieldLabel, { color: theme.onSurfaceVariant }]}>Task</Text>
         <TextInput
-          style={styles.titleInput}
+          style={[
+            styles.titleInput,
+            { backgroundColor: theme.surface, color: theme.onSurface, borderColor: theme.outline },
+          ]}
           value={title}
           onChangeText={setTitle}
           multiline
@@ -228,13 +240,15 @@ export default function ShareScreen(): React.JSX.Element {
           autoFocus
         />
 
-        <Text style={styles.fieldLabel}>Original Message</Text>
+        <Text style={[styles.fieldLabel, { color: theme.onSurfaceVariant }]}>Original Message</Text>
         <View style={styles.messageBox}>
           <Text style={styles.messageText}>{parsed?.message}</Text>
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View
+        style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.outline }]}
+      >
         <Pressable
           style={[styles.createBtn, { backgroundColor: priorityColor }, saving && styles.disabled]}
           onPress={() => void handleCreate()}
@@ -259,16 +273,15 @@ export default function ShareScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-    backgroundColor: Colors.backgroundLight,
     padding: 24,
   },
-  loadingText: { fontSize: 14, color: Colors.onSurfaceVariantLight },
+  loadingText: { fontSize: 14 },
   errorText: { fontSize: 14, color: Colors.error, textAlign: 'center', marginBottom: 8 },
   header: {
     flexDirection: 'row',
@@ -277,13 +290,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 56,
     paddingBottom: 14,
-    backgroundColor: Colors.surfaceLight,
     borderBottomWidth: 3,
   },
   headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.primary900 },
   content: { padding: 16, gap: 12 },
   metaCard: {
-    backgroundColor: Colors.surfaceLight,
     borderRadius: 10,
     padding: 12,
     elevation: 1,
@@ -293,29 +304,24 @@ const styles = StyleSheet.create({
   metaLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.onSurfaceVariantLight,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  metaValue: { fontSize: 14, color: Colors.onSurfaceLight, fontWeight: '500' },
+  metaValue: { fontSize: 14, fontWeight: '500' },
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.onSurfaceVariantLight,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginLeft: 2,
     marginBottom: 4,
   },
   titleInput: {
-    backgroundColor: Colors.surfaceLight,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: Colors.onSurfaceLight,
     borderWidth: 1,
-    borderColor: Colors.outlineLight,
     minHeight: 60,
     textAlignVertical: 'top',
   },
@@ -330,9 +336,7 @@ const styles = StyleSheet.create({
   footer: {
     padding: 16,
     gap: 10,
-    backgroundColor: Colors.surfaceLight,
     borderTopWidth: 1,
-    borderTopColor: Colors.outlineLight,
   },
   createBtn: {
     borderRadius: 10,
