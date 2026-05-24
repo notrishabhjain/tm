@@ -194,7 +194,7 @@ export default function TranscriptImportScreen(): React.JSX.Element {
               )
             }
           >
-            <Text style={styles.selectAllText}>
+            <Text style={[styles.selectAllText, { color: theme.primary }]}>
               {selectedCount < candidates.length ? 'Select all' : 'Deselect all'}
             </Text>
           </Pressable>
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
   },
   reviewBannerText: { fontSize: 12, flex: 1 },
-  selectAllText: { fontSize: 13, color: Colors.primary900, fontWeight: '700' },
+  selectAllText: { fontSize: 13, fontWeight: '700' },
   reviewList: { padding: 12, gap: 8, paddingBottom: 16 },
   candidateWrapper: { position: 'relative' },
   candidateShadow: {

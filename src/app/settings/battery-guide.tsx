@@ -63,7 +63,9 @@ export default function BatteryGuideScreen(): React.JSX.Element {
           >
             <View style={styles.cardShadow} />
             <View style={[styles.card, { backgroundColor: theme.surface }]}>
-              <Text style={styles.manufacturer}>{guide.manufacturer}</Text>
+              <Text style={[styles.manufacturer, { color: theme.primary }]}>
+                {guide.manufacturer}
+              </Text>
               {guide.steps.map((step, i) => (
                 <View key={i} style={styles.stepRow}>
                   <Text style={[styles.stepNum, { color: theme.onSurfaceVariant }]}>{i + 1}.</Text>
@@ -82,7 +84,7 @@ export default function BatteryGuideScreen(): React.JSX.Element {
               { borderColor: Colors.mediumFg, backgroundColor: theme.mediumBg },
             ]}
           >
-            <Text style={styles.tipTitle}>After making changes</Text>
+            <Text style={[styles.tipTitle, { color: theme.primary }]}>After making changes</Text>
             <Text style={[styles.tipText, { color: theme.onSurface }]}>
               Reboot your device, then check Settings → Diagnostics → System to verify the
               foreground service is running.
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 8,
   },
-  manufacturer: { fontSize: 14, fontWeight: '800', color: Colors.primary900, marginBottom: 4 },
+  manufacturer: { fontSize: 14, fontWeight: '800', marginBottom: 4 },
   stepRow: { flexDirection: 'row', gap: 8 },
   stepNum: { fontSize: 12, fontWeight: '700', minWidth: 16 },
   stepText: { fontSize: 12, flex: 1, lineHeight: 18 },
@@ -138,6 +140,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     padding: 14,
   },
-  tipTitle: { fontSize: 13, fontWeight: '700', color: Colors.primary900, marginBottom: 6 },
+  tipTitle: { fontSize: 13, fontWeight: '700', marginBottom: 6 },
   tipText: { fontSize: 13, lineHeight: 19 },
 });

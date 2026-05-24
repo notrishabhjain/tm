@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import { SwipeNavigator } from '@/ui/components/SwipeNavigator';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
 import { getPriorityColor } from '@/ui/theme/colors';
@@ -96,39 +97,41 @@ export default function ConfirmationsScreen(): React.JSX.Element {
   });
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {tasks.length > 0 && (
-        <View style={styles.header}>
-          <Text style={styles.headerText}>
-            {tasks.length} notification{tasks.length !== 1 ? 's' : ''} need your input
-          </Text>
-        </View>
-      )}
-
-      <FlatList
-        data={tasks}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ConfirmationCard
-            task={item}
-            onConfirm={(t) => confirmMutation.mutate(t)}
-            onReject={(t) => rejectMutation.mutate(t)}
-            surfaceColor={theme.surface}
-            onSurfaceColor={theme.onSurface}
-            onSurfaceVariantColor={theme.onSurfaceVariant}
-          />
+    <SwipeNavigator tabIndex={1}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {tasks.length > 0 && (
+          <View style={styles.header}>
+            <Text style={styles.headerText}>
+              {tasks.length} notification{tasks.length !== 1 ? 's' : ''} need your input
+            </Text>
+          </View>
         )}
-        contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
-        ListEmptyComponent={
-          isLoading ? null : (
-            <EmptyState
-              title="Nothing to confirm"
-              description="Notifications that need your input will appear here. High-confidence tasks are added automatically."
+
+        <FlatList
+          data={tasks}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ConfirmationCard
+              task={item}
+              onConfirm={(t) => confirmMutation.mutate(t)}
+              onReject={(t) => rejectMutation.mutate(t)}
+              surfaceColor={theme.surface}
+              onSurfaceColor={theme.onSurface}
+              onSurfaceVariantColor={theme.onSurfaceVariant}
             />
-          )
-        }
-      />
-    </View>
+          )}
+          contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
+          ListEmptyComponent={
+            isLoading ? null : (
+              <EmptyState
+                title="Nothing to confirm"
+                description="Notifications that need your input will appear here. High-confidence tasks are added automatically."
+              />
+            )
+          }
+        />
+      </View>
+    </SwipeNavigator>
   );
 }
 

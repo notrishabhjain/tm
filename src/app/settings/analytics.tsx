@@ -145,7 +145,7 @@ export default function AnalyticsScreen(): React.JSX.Element {
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* ── 7-day summary ── */}
-        <Text style={styles.sectionLabel}>LAST 7 DAYS</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>LAST 7 DAYS</Text>
         <View style={styles.statsGrid}>
           <NeoStatCard label="PROCESSED" value={String(total)} />
           <NeoStatCard label="AUTO-CREATED" value={total > 0 ? `${autoCreatePct}%` : '—'} />
@@ -160,7 +160,9 @@ export default function AnalyticsScreen(): React.JSX.Element {
         {/* ── Decision breakdown ── */}
         {total > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { marginTop: 20 }]}>DECISION BREAKDOWN</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
+              DECISION BREAKDOWN
+            </Text>
             <NeoCard>
               <BreakdownBar label="AUTO-CREATE" pct={autoCreatePct} color={Colors.success} />
               <BreakdownBar label="CONFIRM" pct={confirmPct} color={Colors.highFg} />
@@ -172,7 +174,9 @@ export default function AnalyticsScreen(): React.JSX.Element {
         {/* ── User feedback ── */}
         {(feedback?.confirmed ?? 0) + (feedback?.rejected ?? 0) > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { marginTop: 20 }]}>USER FEEDBACK</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
+              USER FEEDBACK
+            </Text>
             <NeoCard>
               <FeedbackRow
                 label="Confirmed"
@@ -196,7 +200,9 @@ export default function AnalyticsScreen(): React.JSX.Element {
         {/* ── Discard reasons ── */}
         {discardReasons.length > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { marginTop: 20 }]}>DISCARD REASONS</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
+              DISCARD REASONS
+            </Text>
             <NeoCard>
               {discardReasons.map((r: { reason: string; count: number }, i: number) => (
                 <FeedbackRow
@@ -214,7 +220,9 @@ export default function AnalyticsScreen(): React.JSX.Element {
         {/* ── Sender trust tiers ── */}
         {tiers.length > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { marginTop: 20 }]}>SENDER TRUST TIERS</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
+              SENDER TRUST TIERS
+            </Text>
             <NeoCard>
               {tiers.map((t: { tier: string; count: number }, i: number) => (
                 <FeedbackRow
@@ -230,7 +238,9 @@ export default function AnalyticsScreen(): React.JSX.Element {
         )}
 
         {/* ── Vocabulary ── */}
-        <Text style={[styles.sectionLabel, { marginTop: 20 }]}>LEARNED VOCABULARY</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
+          LEARNED VOCABULARY
+        </Text>
         <NeoCard>
           <FeedbackRow label="Active n-grams" value={vocabSize} color={Colors.success} />
         </NeoCard>
@@ -354,7 +364,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
     marginBottom: 8,
     textTransform: 'uppercase',

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import { SwipeNavigator } from '@/ui/components/SwipeNavigator';
 import { useQuery } from '@tanstack/react-query';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
@@ -61,71 +62,81 @@ export default function HistoryScreen(): React.JSX.Element {
   }, [tasks]);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Filter strip */}
-      <View style={styles.filterRow}>
-        {(Object.keys(FILTER_LABELS) as FilterPeriod[]).map((f) => (
-          <Pressable
-            key={f}
-            style={[styles.chip, filter === f && styles.chipActive]}
-            onPress={() => setFilter(f)}
-          >
-            <Text style={[styles.chipText, filter === f && styles.chipTextActive]}>
-              {FILTER_LABELS[f]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+    <SwipeNavigator tabIndex={2}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Filter strip */}
+        <View style={styles.filterRow}>
+          {(Object.keys(FILTER_LABELS) as FilterPeriod[]).map((f) => (
+            <Pressable
+              key={f}
+              style={[styles.chip, filter === f && styles.chipActive]}
+              onPress={() => setFilter(f)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  filter === f && styles.chipTextActive,
+                  filter === f && { color: theme.primary },
+                ]}
+              >
+                {FILTER_LABELS[f]}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
-      {/* Stats card */}
-      {tasks.length > 0 && (
-        <View style={[styles.statsWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.statsShadow} />
-          <View style={[styles.statsCard, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.statsTotal, { color: theme.onSurface }]}>
-              {tasks.length} task{tasks.length !== 1 ? 's' : ''} completed
-            </Text>
-            <View style={styles.breakdownRow}>
-              {(Object.keys(priorityBreakdown) as Priority[])
-                .filter((p) => priorityBreakdown[p] > 0)
-                .map((p) => (
-                  <View key={p} style={styles.breakdownItem}>
-                    <View style={[styles.breakdownDot, { backgroundColor: getPriorityColor(p) }]} />
-                    <Text style={[styles.breakdownLabel, { color: theme.onSurfaceVariant }]}>
-                      {p.charAt(0) + p.slice(1).toLowerCase()} {priorityBreakdown[p]}
-                    </Text>
-                  </View>
-                ))}
+        {/* Stats card */}
+        {tasks.length > 0 && (
+          <View style={[styles.statsWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
+            <View style={styles.statsShadow} />
+            <View style={[styles.statsCard, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.statsTotal, { color: theme.onSurface }]}>
+                {tasks.length} task{tasks.length !== 1 ? 's' : ''} completed
+              </Text>
+              <View style={styles.breakdownRow}>
+                {(Object.keys(priorityBreakdown) as Priority[])
+                  .filter((p) => priorityBreakdown[p] > 0)
+                  .map((p) => (
+                    <View key={p} style={styles.breakdownItem}>
+                      <View
+                        style={[styles.breakdownDot, { backgroundColor: getPriorityColor(p) }]}
+                      />
+                      <Text style={[styles.breakdownLabel, { color: theme.onSurfaceVariant }]}>
+                        {p.charAt(0) + p.slice(1).toLowerCase()} {priorityBreakdown[p]}
+                      </Text>
+                    </View>
+                  ))}
+              </View>
             </View>
           </View>
-        </View>
-      )}
-
-      <FlatList
-        data={tasks}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <HistoryTaskRow
-            task={item}
-            surfaceColor={theme.surface}
-            onSurfaceVariantColor={theme.onSurfaceVariant}
-          />
         )}
-        contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
-        ListEmptyComponent={
-          isLoading ? null : (
-            <EmptyState
-              title={filter === 'ALL' ? 'No history yet' : 'Nothing in this period'}
-              description={
-                filter === 'ALL'
-                  ? 'Completed tasks will appear here.'
-                  : 'Try selecting a wider time range.'
-              }
+
+        <FlatList
+          data={tasks}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <HistoryTaskRow
+              task={item}
+              surfaceColor={theme.surface}
+              onSurfaceVariantColor={theme.onSurfaceVariant}
             />
-          )
-        }
-      />
-    </View>
+          )}
+          contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
+          ListEmptyComponent={
+            isLoading ? null : (
+              <EmptyState
+                title={filter === 'ALL' ? 'No history yet' : 'Nothing in this period'}
+                description={
+                  filter === 'ALL'
+                    ? 'Completed tasks will appear here.'
+                    : 'Try selecting a wider time range.'
+                }
+              />
+            )
+          }
+        />
+      </View>
+    </SwipeNavigator>
   );
 }
 
@@ -185,7 +196,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.white,
   },
   chipText: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
-  chipTextActive: { color: Colors.primary900 },
+  chipTextActive: {},
   statsWrapper: {
     marginHorizontal: 16,
     marginTop: 12,

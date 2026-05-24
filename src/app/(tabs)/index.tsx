@@ -21,6 +21,7 @@ import { db } from '@/data/db/client';
 import NotificationListener from '../../../modules/notification-listener/src';
 import type { Task, Priority } from '@/domain/types';
 import { useTaskStore } from '@/state/taskStore';
+import { SwipeNavigator } from '@/ui/components/SwipeNavigator';
 
 const taskRepo = new TaskRepository(db);
 const DEPTH = 4;
@@ -174,148 +175,150 @@ export default function HomeScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Stats strip — CRED bold numeric display */}
-      <View style={styles.statsStrip}>
-        <StatItem label="PENDING" value={tasks.length} />
-        <View style={styles.statDivider} />
-        <StatItem label="URGENT" value={urgentCount} valueColor={Colors.urgentFg} />
-        <View style={styles.statDivider} />
-        <StatItem label="DONE TODAY" value={todayCount} valueColor={Colors.success} />
+    <SwipeNavigator tabIndex={0}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {/* Stats strip — CRED bold numeric display */}
+        <View style={styles.statsStrip}>
+          <StatItem label="PENDING" value={tasks.length} />
+          <View style={styles.statDivider} />
+          <StatItem label="URGENT" value={urgentCount} valueColor={Colors.urgentFg} />
+          <View style={styles.statDivider} />
+          <StatItem label="DONE TODAY" value={todayCount} valueColor={Colors.success} />
 
-        {/* Scan icon */}
-        <Pressable
-          onPress={() => void handleScan()}
-          style={styles.searchToggle}
-          accessibilityRole="button"
-          accessibilityLabel="Scan notifications"
-          disabled={scanning}
-        >
-          {scanning ? (
-            <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
-          ) : (
-            <Text style={styles.searchIcon}>↺</Text>
-          )}
-        </Pressable>
+          {/* Scan icon */}
+          <Pressable
+            onPress={() => void handleScan()}
+            style={styles.searchToggle}
+            accessibilityRole="button"
+            accessibilityLabel="Scan notifications"
+            disabled={scanning}
+          >
+            {scanning ? (
+              <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
+            ) : (
+              <Text style={styles.searchIcon}>↺</Text>
+            )}
+          </Pressable>
 
-        {/* Search icon */}
-        <Pressable onPress={toggleSearch} style={styles.searchToggle} accessibilityRole="button">
-          <Text style={styles.searchIcon}>{searchVisible ? '✕' : '⌕'}</Text>
-        </Pressable>
-      </View>
-
-      {/* Search bar */}
-      {searchVisible && (
-        <View style={styles.searchBar}>
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search tasks, senders, apps…"
-            placeholderTextColor={theme.onSurfaceVariant}
-            autoFocus
-            returnKeyType="search"
-          />
+          {/* Search icon */}
+          <Pressable onPress={toggleSearch} style={styles.searchToggle} accessibilityRole="button">
+            <Text style={styles.searchIcon}>{searchVisible ? '✕' : '⌕'}</Text>
+          </Pressable>
         </View>
-      )}
 
-      {/* Filter chips */}
-      <View
-        style={[
-          styles.filterRow,
-          { backgroundColor: theme.surface, borderBottomColor: theme.outline },
-        ]}
-      >
-        {FILTERS.map((f) => (
-          <FilterChip
-            key={f.value}
-            label={f.label}
-            active={activeFilter === f.value}
-            onPress={() => setActiveFilter(f.value)}
-            outlineColor={theme.outline}
-            textColor={theme.onSurfaceVariant}
-          />
-        ))}
-      </View>
-
-      {/* Task list with sections */}
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TaskCard
-            task={item}
-            onPress={handlePress}
-            onComplete={handleComplete}
-            onDelete={handleDelete}
-          />
-        )}
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <Text
-              style={[
-                styles.sectionTitle,
-                { color: theme.isDark ? Colors.primary300 : Colors.primary900 },
-              ]}
-            >
-              {section.title}
-            </Text>
-            <View
-              style={[
-                styles.sectionBadge,
-                { backgroundColor: theme.isDark ? Colors.primary700 : Colors.primary900 },
-              ]}
-            >
-              <Text style={styles.sectionCount}>{section.count}</Text>
-            </View>
+        {/* Search bar */}
+        {searchVisible && (
+          <View style={styles.searchBar}>
+            <TextInput
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search tasks, senders, apps…"
+              placeholderTextColor={theme.onSurfaceVariant}
+              autoFocus
+              returnKeyType="search"
+            />
           </View>
         )}
-        contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.list}
-        ListEmptyComponent={
-          isLoading ? null : (
-            <EmptyState
-              title={searchQuery ? 'No results' : 'All clear'}
-              description={
-                searchQuery
-                  ? 'No tasks match your search.'
-                  : 'No pending tasks. Notifications from your monitored apps will appear here automatically.'
-              }
-            />
-          )
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={() => void refetch()}
-            tintColor={Colors.primary500}
-          />
-        }
-        stickySectionHeadersEnabled={false}
-      />
 
-      {/* FAB — create task manually */}
-      <View style={[styles.fabWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-        <View style={styles.fabShadow} />
-        <Pressable
-          style={({ pressed }) => [
-            styles.fab,
-            pressed && { transform: [{ translateX: DEPTH }, { translateY: DEPTH }] },
+        {/* Filter chips */}
+        <View
+          style={[
+            styles.filterRow,
+            { backgroundColor: theme.surface, borderBottomColor: theme.outline },
           ]}
-          onPress={() => router.push('/task/create')}
-          accessibilityRole="button"
-          accessibilityLabel="Create new task"
         >
-          <Text style={styles.fabIcon}>+</Text>
-        </Pressable>
-      </View>
-
-      {/* DEBUG watermark */}
-      {__DEV__ && (
-        <View style={styles.debugBadge} pointerEvents="none">
-          <Text style={styles.debugText}>DEBUG</Text>
+          {FILTERS.map((f) => (
+            <FilterChip
+              key={f.value}
+              label={f.label}
+              active={activeFilter === f.value}
+              onPress={() => setActiveFilter(f.value)}
+              outlineColor={theme.outline}
+              textColor={theme.onSurfaceVariant}
+            />
+          ))}
         </View>
-      )}
-    </View>
+
+        {/* Task list with sections */}
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TaskCard
+              task={item}
+              onPress={handlePress}
+              onComplete={handleComplete}
+              onDelete={handleDelete}
+            />
+          )}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: theme.isDark ? Colors.primary300 : Colors.primary900 },
+                ]}
+              >
+                {section.title}
+              </Text>
+              <View
+                style={[
+                  styles.sectionBadge,
+                  { backgroundColor: theme.isDark ? Colors.primary700 : Colors.primary900 },
+                ]}
+              >
+                <Text style={styles.sectionCount}>{section.count}</Text>
+              </View>
+            </View>
+          )}
+          contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.list}
+          ListEmptyComponent={
+            isLoading ? null : (
+              <EmptyState
+                title={searchQuery ? 'No results' : 'All clear'}
+                description={
+                  searchQuery
+                    ? 'No tasks match your search.'
+                    : 'No pending tasks. Notifications from your monitored apps will appear here automatically.'
+                }
+              />
+            )
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={() => void refetch()}
+              tintColor={Colors.primary500}
+            />
+          }
+          stickySectionHeadersEnabled={false}
+        />
+
+        {/* FAB — create task manually */}
+        <View style={[styles.fabWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
+          <View style={styles.fabShadow} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.fab,
+              pressed && { transform: [{ translateX: DEPTH }, { translateY: DEPTH }] },
+            ]}
+            onPress={() => router.push('/task/create')}
+            accessibilityRole="button"
+            accessibilityLabel="Create new task"
+          >
+            <Text style={styles.fabIcon}>+</Text>
+          </Pressable>
+        </View>
+
+        {/* DEBUG watermark */}
+        {__DEV__ && (
+          <View style={styles.debugBadge} pointerEvents="none">
+            <Text style={styles.debugText}>DEBUG</Text>
+          </View>
+        )}
+      </View>
+    </SwipeNavigator>
   );
 }
 

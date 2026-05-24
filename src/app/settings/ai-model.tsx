@@ -251,7 +251,7 @@ export default function AiModelScreen(): React.JSX.Element {
         </View>
 
         {/* Positive signals table */}
-        <Text style={styles.sectionLabel}>POSITIVE SIGNALS</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>POSITIVE SIGNALS</Text>
         <View style={[styles.tableWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.tableShadow} />
           <View
@@ -276,7 +276,9 @@ export default function AiModelScreen(): React.JSX.Element {
         </View>
 
         {/* Negative signals table */}
-        <Text style={[styles.sectionLabel, { marginTop: 16 }]}>NEGATIVE SIGNALS</Text>
+        <Text style={[styles.sectionLabel, { marginTop: 16, color: theme.primary }]}>
+          NEGATIVE SIGNALS
+        </Text>
         <View style={[styles.tableWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={[styles.tableShadow, { backgroundColor: Colors.neoShadowUrgent }]} />
           <View
@@ -475,7 +477,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
     marginBottom: 6,
     textTransform: 'uppercase',

@@ -41,8 +41,8 @@ export default function OnboardingPriorityScreen(): React.JSX.Element {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
-        <Text style={styles.stepLabel}>STEP 4 OF 5</Text>
-        <Text style={styles.title}>How Priorities Work</Text>
+        <Text style={[styles.stepLabel, { color: theme.primary }]}>STEP 4 OF 5</Text>
+        <Text style={[styles.title, { color: theme.primary }]}>How Priorities Work</Text>
         <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           TaskMind automatically assigns priorities based on keywords and urgency signals in your
           notifications.
@@ -92,11 +92,10 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
     marginBottom: 12,
   },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.primary900, marginBottom: 12 },
+  title: { fontSize: 26, fontWeight: '800', marginBottom: 12 },
   description: {
     fontSize: 14,
     lineHeight: 22,

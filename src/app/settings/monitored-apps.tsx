@@ -93,7 +93,7 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
             : 'No apps selected — all notifications are monitored.'}
         </Text>
 
-        <Text style={styles.sectionLabel}>COMMON APPS</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>COMMON APPS</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -133,7 +133,7 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
 
         {apps.some((a) => !COMMON_APPS.find((c) => c.packageName === a.packageName)) && (
           <>
-            <Text style={styles.sectionLabel}>CUSTOM APPS</Text>
+            <Text style={[styles.sectionLabel, { color: theme.primary }]}>CUSTOM APPS</Text>
             <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
               <View style={styles.cardShadow} />
               <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -174,7 +174,11 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
         )}
 
         <Pressable
-          style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
+          style={({ pressed }) => [
+            styles.addBtn,
+            pressed && styles.addBtnPressed,
+            pressed && { backgroundColor: theme.pressHighlight },
+          ]}
           onPress={() =>
             Alert.prompt(
               'Add App',
@@ -195,7 +199,7 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
           }
           accessibilityRole="button"
         >
-          <Text style={styles.addBtnText}>+ Add custom app</Text>
+          <Text style={[styles.addBtnText, { color: theme.primary }]}>+ Add custom app</Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -226,7 +230,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 8,
@@ -260,6 +263,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addBtnPressed: { backgroundColor: Colors.primary50 },
-  addBtnText: { fontSize: 14, color: Colors.primary900, fontWeight: '700' },
+  addBtnPressed: {},
+  addBtnText: { fontSize: 14, fontWeight: '700' },
 });

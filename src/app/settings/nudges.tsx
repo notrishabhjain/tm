@@ -89,7 +89,7 @@ export default function NudgesScreen(): React.JSX.Element {
           often it nudges you.
         </Text>
 
-        <Text style={styles.sectionLabel}>NUDGE FREQUENCY</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>NUDGE FREQUENCY</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -103,6 +103,7 @@ export default function NudgesScreen(): React.JSX.Element {
                     borderBottomColor: theme.outline,
                   },
                   frequencyMinutes === opt.value && styles.optionSelected,
+                  frequencyMinutes === opt.value && { backgroundColor: theme.pressHighlight },
                 ]}
                 onPress={() => handleFrequency(opt.value)}
                 accessibilityRole="radio"
@@ -120,6 +121,7 @@ export default function NudgesScreen(): React.JSX.Element {
                     styles.optionLabel,
                     { color: theme.onSurface },
                     frequencyMinutes === opt.value && styles.optionLabelSelected,
+                    frequencyMinutes === opt.value && { color: theme.primary },
                   ]}
                 >
                   {opt.label}
@@ -130,7 +132,7 @@ export default function NudgesScreen(): React.JSX.Element {
         </View>
 
         {/* Quiet Hours */}
-        <Text style={styles.sectionLabel}>QUIET HOURS</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>QUIET HOURS</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -214,7 +216,7 @@ export default function NudgesScreen(): React.JSX.Element {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>BEHAVIOUR</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>BEHAVIOUR</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -265,7 +267,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 8,
@@ -294,7 +295,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  optionSelected: { backgroundColor: Colors.primary50 },
+  optionSelected: {},
   radio: {
     width: 18,
     height: 18,
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
   },
   radioSelected: { borderColor: Colors.primary900, backgroundColor: Colors.primary900 },
   optionLabel: { fontSize: 15 },
-  optionLabelSelected: { color: Colors.primary900, fontWeight: '700' },
+  optionLabelSelected: { fontWeight: '700' },
   quietRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

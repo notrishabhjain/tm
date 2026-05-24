@@ -9,6 +9,7 @@ import { db } from '@/data/db/client';
 import { MonitoredAppRepository } from '@/data/repositories/MonitoredAppRepository';
 import { VipContactRepository } from '@/data/repositories/VipContactRepository';
 import NotificationListener from '../../../modules/notification-listener/src';
+import { SwipeNavigator } from '@/ui/components/SwipeNavigator';
 
 const monitoredRepo = new MonitoredAppRepository(db);
 const vipRepo = new VipContactRepository(db);
@@ -45,7 +46,6 @@ export default function SettingsScreen(): React.JSX.Element {
     void checkPermission();
   }, [checkPermission]);
 
-  // Re-check permission when screen comes back into focus (user may have granted it)
   useFocusEffect(
     useCallback(() => {
       void checkPermission();
@@ -72,225 +72,147 @@ export default function SettingsScreen(): React.JSX.Element {
           : `Every ${nudgeFreq / 60} hours`;
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
-    >
-      {/* Notification Permission banner */}
-      {permissionStatus === 'denied' && (
-        <Pressable
-          style={[styles.permissionBanner, { backgroundColor: theme.urgentBg }]}
-          onPress={handleGrantPermission}
-        >
-          <View style={styles.permissionBannerText}>
-            <Text style={styles.permissionTitle}>Notification Access Required</Text>
-            <Text style={styles.permissionSubtitle}>
-              Tap to open settings and grant Notification Listener access so TaskMind can capture
-              tasks from your apps.
-            </Text>
-          </View>
-          <Text style={styles.permissionArrow}>›</Text>
-        </Pressable>
-      )}
-
-      <Section
-        title="Monitoring"
-        surfaceColor={theme.surface}
-        outlineColor={theme.outline}
-        onSurfaceColor={theme.onSurface}
-        onSurfaceVariantColor={theme.onSurfaceVariant}
+    <SwipeNavigator tabIndex={3}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentContainerStyle={styles.content}
       >
-        <NavRow
-          label="Notification Access"
-          subtitle={
-            permissionStatus === 'granted'
-              ? 'Granted'
-              : permissionStatus === 'denied'
-                ? 'Not granted — tap to fix'
-                : 'Checking…'
-          }
-          subtitleColor={permissionStatus === 'granted' ? Colors.success : undefined}
-          onPress={handleGrantPermission}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-        <NavRow
-          label="Monitored Apps"
-          subtitle={
-            activeAppCount === 0
-              ? 'All apps (none selected)'
-              : `${activeAppCount} app${activeAppCount !== 1 ? 's' : ''} active`
-          }
-          onPress={() => void router.push('/settings/monitored-apps')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-        <NavRow
-          label="VIP Contacts"
-          subtitle={
-            vipContacts.length === 0
-              ? 'None set'
-              : `${vipContacts.length} contact${vipContacts.length !== 1 ? 's' : ''}`
-          }
-          onPress={() => void router.push('/settings/vip-contacts')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-      </Section>
+        {permissionStatus === 'denied' && (
+          <Pressable
+            style={[styles.permissionBanner, { backgroundColor: theme.urgentBg }]}
+            onPress={handleGrantPermission}
+          >
+            <View style={styles.permissionBannerText}>
+              <Text style={styles.permissionTitle}>Notification Access Required</Text>
+              <Text style={styles.permissionSubtitle}>
+                Tap to open settings and grant Notification Listener access so TaskMind can capture
+                tasks from your apps.
+              </Text>
+            </View>
+            <Text style={styles.permissionArrow}>›</Text>
+          </Pressable>
+        )}
 
-      <Section
-        title="Intelligence"
-        surfaceColor={theme.surface}
-        outlineColor={theme.outline}
-        onSurfaceColor={theme.onSurface}
-        onSurfaceVariantColor={theme.onSurfaceVariant}
-      >
-        <NavRow
-          label="Signal Engine"
-          subtitle="17-signal deterministic scorer, no AI models"
-          onPress={() => void router.push('/settings/ai-model')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-        <NavRow
-          label="Learned Vocabulary"
-          onPress={() => void router.push('/settings/vocabulary')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-        <NavRow
-          label="Analytics"
-          subtitle="Decision log, accuracy"
-          onPress={() => void router.push('/settings/analytics')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-        <NavRow
-          label="Analyze Text"
-          subtitle="Extract tasks from long text"
-          onPress={() => void router.push('/settings/transcript-import')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-      </Section>
+        <Section title="Monitoring">
+          <NavRow
+            label="Notification Access"
+            subtitle={
+              permissionStatus === 'granted'
+                ? 'Granted'
+                : permissionStatus === 'denied'
+                  ? 'Not granted — tap to fix'
+                  : 'Checking…'
+            }
+            subtitleColor={permissionStatus === 'granted' ? Colors.success : undefined}
+            onPress={handleGrantPermission}
+          />
+          <NavRow
+            label="Monitored Apps"
+            subtitle={
+              activeAppCount === 0
+                ? 'All apps (none selected)'
+                : `${activeAppCount} app${activeAppCount !== 1 ? 's' : ''} active`
+            }
+            onPress={() => void router.push('/settings/monitored-apps')}
+          />
+          <NavRow
+            label="VIP Contacts"
+            subtitle={
+              vipContacts.length === 0
+                ? 'None set'
+                : `${vipContacts.length} contact${vipContacts.length !== 1 ? 's' : ''}`
+            }
+            onPress={() => void router.push('/settings/vip-contacts')}
+          />
+        </Section>
 
-      <Section
-        title="Nudges"
-        surfaceColor={theme.surface}
-        outlineColor={theme.outline}
-        onSurfaceColor={theme.onSurface}
-        onSurfaceVariantColor={theme.onSurfaceVariant}
-      >
-        <NavRow
-          label="Nudge Schedule"
-          subtitle={nudgeLabel}
-          onPress={() => void router.push('/settings/nudges')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-        <ToggleRow
-          label="Urgent overrides quiet hours"
-          value={urgentOverride}
-          onChange={handleUrgentOverride}
-          onSurfaceColor={theme.onSurface}
-          outlineColor={theme.outline}
-        />
-      </Section>
+        <Section title="Intelligence">
+          <NavRow
+            label="Signal Engine"
+            subtitle="17-signal deterministic scorer, no AI models"
+            onPress={() => void router.push('/settings/ai-model')}
+          />
+          <NavRow
+            label="Learned Vocabulary"
+            onPress={() => void router.push('/settings/vocabulary')}
+          />
+          <NavRow
+            label="Analytics"
+            subtitle="Decision log, accuracy"
+            onPress={() => void router.push('/settings/analytics')}
+          />
+          <NavRow
+            label="Analyze Text"
+            subtitle="Extract tasks from long text"
+            onPress={() => void router.push('/settings/transcript-import')}
+          />
+        </Section>
 
-      <Section
-        title="Reports"
-        surfaceColor={theme.surface}
-        outlineColor={theme.outline}
-        onSurfaceColor={theme.onSurface}
-        onSurfaceVariantColor={theme.onSurfaceVariant}
-      >
-        <NavRow
-          label="Daily Email Report"
-          subtitle={getSetting('email_enabled') ? 'Enabled' : 'Not configured'}
-          onPress={() => void router.push('/settings/email-report')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-        <NavRow
-          label="Export / Import"
-          subtitle="JSON or CSV"
-          onPress={() => void router.push('/settings/export-import')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-      </Section>
+        <Section title="Nudges">
+          <NavRow
+            label="Nudge Schedule"
+            subtitle={nudgeLabel}
+            onPress={() => void router.push('/settings/nudges')}
+          />
+          <ToggleRow
+            label="Urgent overrides quiet hours"
+            value={urgentOverride}
+            onChange={handleUrgentOverride}
+          />
+        </Section>
 
-      <Section
-        title="Device"
-        surfaceColor={theme.surface}
-        outlineColor={theme.outline}
-        onSurfaceColor={theme.onSurface}
-        onSurfaceVariantColor={theme.onSurfaceVariant}
-      >
-        <NavRow
-          label="Battery Optimization Guide"
-          onPress={() => void router.push('/settings/battery-guide')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-      </Section>
+        <Section title="Reports">
+          <NavRow
+            label="Daily Email Report"
+            subtitle={getSetting('email_enabled') ? 'Enabled' : 'Not configured'}
+            onPress={() => void router.push('/settings/email-report')}
+          />
+          <NavRow
+            label="Export / Import"
+            subtitle="JSON or CSV"
+            onPress={() => void router.push('/settings/export-import')}
+          />
+        </Section>
 
-      <Section
-        title="Debug"
-        surfaceColor={theme.surface}
-        outlineColor={theme.outline}
-        onSurfaceColor={theme.onSurface}
-        onSurfaceVariantColor={theme.onSurfaceVariant}
-      >
-        <NavRow
-          label="Diagnostics"
-          subtitle="Notification capture, extraction log"
-          onPress={() => void router.push('/settings/diagnostics')}
-          onSurfaceColor={theme.onSurface}
-          onSurfaceVariantColor={theme.onSurfaceVariant}
-          outlineColor={theme.outline}
-        />
-      </Section>
+        <Section title="Device">
+          <NavRow
+            label="Battery Optimization Guide"
+            onPress={() => void router.push('/settings/battery-guide')}
+          />
+        </Section>
 
-      <View style={styles.versionRow}>
-        <Text style={[styles.versionText, { color: theme.onSurfaceVariant }]}>
-          TaskMind v0.1.0 · {process.env['EXPO_PUBLIC_COMMIT_SHA'] ?? 'dev'}
-        </Text>
-      </View>
-    </ScrollView>
+        <Section title="Debug">
+          <NavRow
+            label="Diagnostics"
+            subtitle="Notification capture, extraction log"
+            onPress={() => void router.push('/settings/diagnostics')}
+          />
+        </Section>
+
+        <View style={styles.versionRow}>
+          <Text style={[styles.versionText, { color: theme.onSurfaceVariant }]}>
+            TaskMind v0.1.0 · {process.env['EXPO_PUBLIC_COMMIT_SHA'] ?? 'dev'}
+          </Text>
+        </View>
+      </ScrollView>
+    </SwipeNavigator>
   );
 }
 
 function Section({
   title,
   children,
-  surfaceColor,
-  outlineColor: _outlineColor,
-  onSurfaceColor: _onSurfaceColor,
-  onSurfaceVariantColor: _onSurfaceVariantColor,
 }: {
   title: string;
   children: React.ReactNode;
-  surfaceColor: string;
-  outlineColor: string;
-  onSurfaceColor: string;
-  onSurfaceVariantColor: string;
 }): React.JSX.Element {
+  const t = useTheme();
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={[styles.sectionCard, { backgroundColor: surfaceColor }]}>{children}</View>
+      <Text style={[styles.sectionTitle, { color: t.primary }]}>{title}</Text>
+      <View style={[styles.sectionCard, { backgroundColor: t.surface, borderColor: t.outline }]}>
+        {children}
+      </View>
     </View>
   );
 }
@@ -300,37 +222,32 @@ function NavRow({
   subtitle,
   subtitleColor,
   onPress,
-  onSurfaceColor,
-  onSurfaceVariantColor,
-  outlineColor,
 }: {
   label: string;
   subtitle?: string;
   subtitleColor?: string;
   onPress: () => void;
-  onSurfaceColor: string;
-  onSurfaceVariantColor: string;
-  outlineColor: string;
 }): React.JSX.Element {
+  const t = useTheme();
   return (
     <Pressable
       style={({ pressed }) => [
         styles.row,
-        { borderBottomColor: outlineColor },
-        pressed && styles.rowPressed,
+        { borderBottomColor: t.outline },
+        pressed && { backgroundColor: t.pressHighlight },
       ]}
       onPress={onPress}
       accessibilityRole="button"
     >
       <View style={styles.rowLeft}>
-        <Text style={[styles.rowLabel, { color: onSurfaceColor }]}>{label}</Text>
+        <Text style={[styles.rowLabel, { color: t.onSurface }]}>{label}</Text>
         {subtitle && (
-          <Text style={[styles.rowSubtitle, { color: subtitleColor ?? onSurfaceVariantColor }]}>
+          <Text style={[styles.rowSubtitle, { color: subtitleColor ?? t.onSurfaceVariant }]}>
             {subtitle}
           </Text>
         )}
       </View>
-      <Text style={[styles.chevron, { color: onSurfaceVariantColor }]}>›</Text>
+      <Text style={[styles.chevron, { color: t.onSurfaceVariant }]}>›</Text>
     </Pressable>
   );
 }
@@ -339,22 +256,19 @@ function ToggleRow({
   label,
   value,
   onChange,
-  onSurfaceColor,
-  outlineColor,
 }: {
   label: string;
   value: boolean;
   onChange: (v: boolean) => void;
-  onSurfaceColor: string;
-  outlineColor: string;
 }): React.JSX.Element {
+  const t = useTheme();
   return (
-    <View style={[styles.row, { borderBottomColor: outlineColor }]}>
-      <Text style={[styles.rowLabel, styles.flex1, { color: onSurfaceColor }]}>{label}</Text>
+    <View style={[styles.row, { borderBottomColor: t.outline }]}>
+      <Text style={[styles.rowLabel, styles.flex1, { color: t.onSurface }]}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ true: Colors.primary900, false: outlineColor }}
+        trackColor={{ true: Colors.primary500, false: t.outline }}
         thumbColor={Colors.white}
       />
     </View>
@@ -381,7 +295,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 8,
@@ -389,7 +302,6 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     borderWidth: 2,
-    borderColor: Colors.primary900,
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -400,7 +312,6 @@ const styles = StyleSheet.create({
     minHeight: 56,
     borderBottomWidth: 1,
   },
-  rowPressed: { backgroundColor: Colors.primary50 },
   rowLeft: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600' },
   rowSubtitle: { fontSize: 12, marginTop: 2 },

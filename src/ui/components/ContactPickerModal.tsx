@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Contacts from 'expo-contacts';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 
 interface Props {
   visible: boolean;
@@ -28,6 +29,7 @@ export function ContactPickerModal({
   existingNames,
 }: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   const [allContacts, setAllContacts] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -130,11 +132,17 @@ export function ContactPickerModal({
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <Pressable
-                style={({ pressed }) => [styles.contactRow, pressed && styles.contactRowPressed]}
+                style={({ pressed }) => [
+                  styles.contactRow,
+                  pressed && styles.contactRowPressed,
+                  pressed && { backgroundColor: theme.pressHighlight },
+                ]}
                 onPress={() => handleSelect(item)}
               >
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarLetter}>{item[0]?.toUpperCase() ?? '?'}</Text>
+                  <Text style={[styles.avatarLetter, { color: theme.primary }]}>
+                    {item[0]?.toUpperCase() ?? '?'}
+                  </Text>
                 </View>
                 <Text style={styles.contactName}>{item}</Text>
                 <Text style={styles.addIcon}>+</Text>
@@ -196,7 +204,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceLight,
     gap: 12,
   },
-  contactRowPressed: { backgroundColor: Colors.primary50 },
+  contactRowPressed: {},
   avatar: {
     width: 38,
     height: 38,
@@ -205,7 +213,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarLetter: { fontSize: 15, fontWeight: '700', color: Colors.primary900 },
+  avatarLetter: { fontSize: 15, fontWeight: '700' },
   contactName: { flex: 1, fontSize: 15, color: Colors.onSurfaceLight },
   addIcon: { fontSize: 22, color: Colors.primary500, fontWeight: '700' },
   separator: { height: 1, backgroundColor: Colors.outlineLight, marginLeft: 66 },

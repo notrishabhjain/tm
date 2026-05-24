@@ -115,8 +115,8 @@ export default function OnboardingAppsScreen(): React.JSX.Element {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.topSection}>
-        <Text style={styles.stepLabel}>STEP 2 OF 4</Text>
-        <Text style={styles.title}>Choose Apps to Monitor</Text>
+        <Text style={[styles.stepLabel, { color: theme.primary }]}>STEP 2 OF 4</Text>
+        <Text style={[styles.title, { color: theme.primary }]}>Choose Apps to Monitor</Text>
         <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           TaskMind will process notifications only from selected apps. You can change this anytime
           in Settings → Monitored Apps.
@@ -174,6 +174,7 @@ export default function OnboardingAppsScreen(): React.JSX.Element {
                   styles.appName,
                   { color: theme.onSurface },
                   item.selected && styles.appNameSelected,
+                  item.selected && { color: theme.primary },
                 ]}
               >
                 {item.displayName}
@@ -205,11 +206,10 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
     marginBottom: 12,
   },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.primary900, marginBottom: 12 },
+  title: { fontSize: 26, fontWeight: '800', marginBottom: 12 },
   description: { fontSize: 14, lineHeight: 22 },
   selectAllRow: {
     flexDirection: 'row',
@@ -253,6 +253,6 @@ const styles = StyleSheet.create({
   checkboxSelected: { backgroundColor: Colors.primary900, borderColor: Colors.primary900 },
   checkmarkFill: { width: 8, height: 8, borderRadius: 1, backgroundColor: Colors.white },
   appName: { fontSize: 15, fontWeight: '500' },
-  appNameSelected: { color: Colors.primary900, fontWeight: '700' },
+  appNameSelected: { fontWeight: '700' },
   footer: { padding: 24, paddingTop: 12 },
 });

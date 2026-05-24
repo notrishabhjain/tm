@@ -95,6 +95,7 @@ export default function VocabularyScreen(): React.JSX.Element {
                 styles.tabText,
                 { color: theme.onSurfaceVariant },
                 tab === t && styles.tabTextActive,
+                tab === t && { color: theme.primary },
               ]}
             >
               {t.charAt(0) + t.slice(1).toLowerCase()} ({tabCounts[t]})
@@ -190,7 +191,7 @@ const styles = StyleSheet.create({
   },
   tabActive: { borderBottomColor: Colors.primary900 },
   tabText: { fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: Colors.primary900, fontWeight: '800' },
+  tabTextActive: { fontWeight: '800' },
   list: { paddingTop: 8, paddingBottom: 16 },
   emptyContainer: { flex: 1 },
   rowWrapper: { marginHorizontal: 16, marginVertical: 4, position: 'relative' },

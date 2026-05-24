@@ -100,11 +100,15 @@ export default function VipContactsScreen(): React.JSX.Element {
         </View>
 
         <Pressable
-          style={({ pressed }) => [styles.pickerBtn, pressed && styles.pickerBtnPressed]}
+          style={({ pressed }) => [
+            styles.pickerBtn,
+            pressed && styles.pickerBtnPressed,
+            pressed && { backgroundColor: theme.pressHighlight },
+          ]}
           onPress={() => setPickerVisible(true)}
           accessibilityRole="button"
         >
-          <Text style={styles.pickerBtnText}>Pick from Contacts</Text>
+          <Text style={[styles.pickerBtnText, { color: theme.primary }]}>Pick from Contacts</Text>
         </Pressable>
 
         {contacts.length === 0 ? (
@@ -113,7 +117,9 @@ export default function VipContactsScreen(): React.JSX.Element {
           </Text>
         ) : (
           <>
-            <Text style={styles.sectionLabel}>VIP CONTACTS ({contacts.length})</Text>
+            <Text style={[styles.sectionLabel, { color: theme.primary }]}>
+              VIP CONTACTS ({contacts.length})
+            </Text>
             <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
               <View style={[styles.cardShadow, { backgroundColor: Colors.neoShadowUrgent }]} />
               <View
@@ -159,7 +165,7 @@ export default function VipContactsScreen(): React.JSX.Element {
               { borderColor: Colors.mediumFg, backgroundColor: theme.mediumBg },
             ]}
           >
-            <Text style={styles.infoTitle}>How VIP matching works</Text>
+            <Text style={[styles.infoTitle, { color: theme.primary }]}>How VIP matching works</Text>
             <Text style={[styles.infoText, { color: theme.onSurface }]}>
               If a notification sender contains the VIP name (case-insensitive), the task is
               automatically URGENT priority. Use the name as it appears in the notification — for
@@ -199,7 +205,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 4,
@@ -244,8 +249,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pickerBtnPressed: { backgroundColor: Colors.primary50 },
-  pickerBtnText: { fontSize: 14, color: Colors.primary900, fontWeight: '700' },
+  pickerBtnPressed: {},
+  pickerBtnText: { fontSize: 14, fontWeight: '700' },
   emptyHint: { fontSize: 13, lineHeight: 20 },
   cardWrapper: { position: 'relative' },
   cardShadow: {
@@ -278,6 +283,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     padding: 14,
   },
-  infoTitle: { fontSize: 13, fontWeight: '700', color: Colors.primary900, marginBottom: 6 },
+  infoTitle: { fontSize: 13, fontWeight: '700', marginBottom: 6 },
   infoText: { fontSize: 13, lineHeight: 19 },
 });

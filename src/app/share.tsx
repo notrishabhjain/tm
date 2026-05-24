@@ -196,7 +196,7 @@ export default function ShareScreen(): React.JSX.Element {
           { borderBottomColor: priorityColor, backgroundColor: theme.surface },
         ]}
       >
-        <Text style={styles.headerTitle}>Create Task</Text>
+        <Text style={[styles.headerTitle, { color: theme.primary }]}>Create Task</Text>
         <PriorityChip priority={priority} />
       </View>
 
@@ -241,8 +241,8 @@ export default function ShareScreen(): React.JSX.Element {
         />
 
         <Text style={[styles.fieldLabel, { color: theme.onSurfaceVariant }]}>Original Message</Text>
-        <View style={styles.messageBox}>
-          <Text style={styles.messageText}>{parsed?.message}</Text>
+        <View style={[styles.messageBox, { backgroundColor: theme.pressHighlight }]}>
+          <Text style={[styles.messageText, { color: theme.onSurface }]}>{parsed?.message}</Text>
         </View>
       </ScrollView>
 
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 3,
   },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.primary900 },
+  headerTitle: { fontSize: 20, fontWeight: '700' },
   content: { padding: 16, gap: 12 },
   metaCard: {
     borderRadius: 10,
@@ -326,13 +326,12 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   messageBox: {
-    backgroundColor: Colors.primary50,
     borderRadius: 8,
     padding: 12,
     borderLeftWidth: 3,
     borderLeftColor: Colors.primary300,
   },
-  messageText: { fontSize: 14, color: Colors.primary900, lineHeight: 20 },
+  messageText: { fontSize: 14, lineHeight: 20 },
   footer: {
     padding: 16,
     gap: 10,

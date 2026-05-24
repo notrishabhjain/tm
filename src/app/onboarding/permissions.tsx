@@ -52,8 +52,8 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
       ]}
     >
       <View style={styles.content}>
-        <Text style={styles.stepLabel}>STEP 1 OF 4</Text>
-        <Text style={styles.title}>Grant Notification Access</Text>
+        <Text style={[styles.stepLabel, { color: theme.primary }]}>STEP 1 OF 4</Text>
+        <Text style={[styles.title, { color: theme.primary }]}>Grant Notification Access</Text>
         <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           TaskMind needs Notification Access to read your notifications and identify actionable
           tasks. This permission is required for the app to work.
@@ -100,7 +100,7 @@ export default function OnboardingPermissionsScreen(): React.JSX.Element {
           'Come back here',
         ].map((step, i) => (
           <View key={i} style={styles.stepRow}>
-            <Text style={styles.stepNum}>{i + 1}.</Text>
+            <Text style={[styles.stepNum, { color: theme.primary }]}>{i + 1}.</Text>
             <Text style={[styles.step, { color: theme.onSurfaceVariant }]}>{step}</Text>
           </View>
         ))}
@@ -136,11 +136,10 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
     marginBottom: 12,
   },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.primary900, marginBottom: 12 },
+  title: { fontSize: 26, fontWeight: '800', marginBottom: 12 },
   description: {
     fontSize: 14,
     lineHeight: 22,
@@ -172,7 +171,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   stepRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
-  stepNum: { fontSize: 13, fontWeight: '700', color: Colors.primary900, minWidth: 16 },
+  stepNum: { fontSize: 13, fontWeight: '700', minWidth: 16 },
   step: { fontSize: 13 },
   footer: { gap: 12 },
 });

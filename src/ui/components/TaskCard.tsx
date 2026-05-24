@@ -184,10 +184,12 @@ export function TaskCard({
     <View style={[styles.wrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
       {/* Swipe hint backgrounds */}
       <Animated.View style={[styles.swipeHintComplete, { opacity: completeOpacity }]}>
-        <Text style={styles.swipeHintText}>✓ Done</Text>
+        <Text style={styles.swipeHintIcon}>✓</Text>
+        <Text style={styles.swipeHintText}>COMPLETE</Text>
       </Animated.View>
       <Animated.View style={[styles.swipeHintDelete, { opacity: deleteOpacity }]}>
-        <Text style={styles.swipeHintText}>✕ Del</Text>
+        <Text style={styles.swipeHintText}>DELETE</Text>
+        <Text style={styles.swipeHintIcon}>✕</Text>
       </Animated.View>
 
       {/* NeoPop depth shadow */}
@@ -275,22 +277,31 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.success,
     borderRadius: 2,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingLeft: 20,
+    gap: 8,
   },
   swipeHintDelete: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.urgentFg,
     borderRadius: 2,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     paddingRight: 20,
+    gap: 8,
+  },
+  swipeHintIcon: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 20,
   },
   swipeHintText: {
     color: '#fff',
     fontWeight: '800',
-    fontSize: 13,
-    letterSpacing: 0.5,
+    fontSize: 12,
+    letterSpacing: 1.0,
   },
   shadow: {
     position: 'absolute',

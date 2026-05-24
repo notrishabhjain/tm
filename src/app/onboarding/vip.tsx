@@ -45,8 +45,8 @@ export default function OnboardingVipScreen(): React.JSX.Element {
       ]}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.stepLabel}>STEP 3 OF 4</Text>
-        <Text style={styles.title}>VIP Contacts</Text>
+        <Text style={[styles.stepLabel, { color: theme.primary }]}>STEP 3 OF 4</Text>
+        <Text style={[styles.title, { color: theme.primary }]}>VIP Contacts</Text>
         <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           Messages from VIP contacts always create URGENT tasks and skip the confirmation queue. Add
           names as they appear in your notifications.
@@ -71,11 +71,14 @@ export default function OnboardingVipScreen(): React.JSX.Element {
         </View>
 
         <Pressable
-          style={({ pressed }) => [styles.pickerBtn, pressed && styles.pickerBtnPressed]}
+          style={({ pressed }) => [
+            styles.pickerBtn,
+            pressed && { backgroundColor: theme.pressHighlight },
+          ]}
           onPress={() => setPickerVisible(true)}
           accessibilityRole="button"
         >
-          <Text style={styles.pickerBtnText}>Pick from Contacts</Text>
+          <Text style={[styles.pickerBtnText, { color: theme.primary }]}>Pick from Contacts</Text>
         </Pressable>
 
         {vips.length === 0 ? (
@@ -84,7 +87,9 @@ export default function OnboardingVipScreen(): React.JSX.Element {
           </Text>
         ) : (
           <>
-            <Text style={styles.sectionLabel}>ADDED ({vips.length})</Text>
+            <Text style={[styles.sectionLabel, { color: theme.primary }]}>
+              ADDED ({vips.length})
+            </Text>
             <View style={[styles.vipListWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
               <View style={[styles.vipListShadow, { backgroundColor: Colors.neoShadowUrgent }]} />
               <View
@@ -160,10 +165,9 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
   },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.primary900 },
+  title: { fontSize: 26, fontWeight: '800' },
   description: { fontSize: 14, lineHeight: 22 },
   inputWrapper: { position: 'relative' },
   inputShadow: {
@@ -204,13 +208,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pickerBtnPressed: { backgroundColor: Colors.primary50 },
-  pickerBtnText: { fontSize: 14, color: Colors.primary900, fontWeight: '700' },
+  pickerBtnPressed: {},
+  pickerBtnText: { fontSize: 14, fontWeight: '700' },
   emptyHint: { fontSize: 13, lineHeight: 20 },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },

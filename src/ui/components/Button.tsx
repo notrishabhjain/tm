@@ -36,9 +36,9 @@ export function Button({
     },
     secondary: {
       bg: theme.surface,
-      shadow: Colors.primary900,
-      border: Colors.primary900,
-      text: Colors.primary900,
+      shadow: theme.primary,
+      border: theme.primary,
+      text: theme.primary,
     },
     destructive: {
       bg: Colors.urgentFg,

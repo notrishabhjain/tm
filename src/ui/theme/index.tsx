@@ -16,6 +16,8 @@ export interface Theme {
   outline: string;
   onSurface: string;
   onSurfaceVariant: string;
+  primary: string;
+  pressHighlight: string;
   urgentBg: string;
   highBg: string;
   mediumBg: string;
@@ -32,6 +34,8 @@ function buildTheme(isDark: boolean): Theme {
     outline: isDark ? Colors.outlineDark : Colors.outlineLight,
     onSurface: isDark ? Colors.onSurfaceDark : Colors.onSurfaceLight,
     onSurfaceVariant: isDark ? Colors.onSurfaceVariantDark : Colors.onSurfaceVariantLight,
+    primary: isDark ? Colors.primary300 : Colors.primary900,
+    pressHighlight: isDark ? 'rgba(255,255,255,0.08)' : Colors.primary50,
     urgentBg: isDark ? Colors.urgentBgDark : Colors.urgentBgLight,
     highBg: isDark ? Colors.highBgDark : Colors.highBgLight,
     mediumBg: isDark ? Colors.mediumBgDark : Colors.mediumBgLight,

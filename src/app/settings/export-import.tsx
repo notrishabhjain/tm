@@ -137,7 +137,7 @@ export default function ExportImportScreen(): React.JSX.Element {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionLabel}>EXPORT</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>EXPORT</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -163,7 +163,7 @@ export default function ExportImportScreen(): React.JSX.Element {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>IMPORT</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>IMPORT</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -245,7 +245,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 8,

@@ -91,6 +91,7 @@ export default function DiagnosticsScreen(): React.JSX.Element {
                 styles.tabText,
                 { color: theme.onSurfaceVariant },
                 activeTab === tab && styles.tabTextActive,
+                activeTab === tab && { color: theme.primary },
               ]}
             >
               {tab}
@@ -219,6 +220,7 @@ function ExtractionRow({
   onSurfaceColor: string;
   onSurfaceVariantColor: string;
 }): React.JSX.Element {
+  const theme = useTheme();
   const decisionColor =
     item.decision === 'CREATE'
       ? Colors.success
@@ -237,7 +239,7 @@ function ExtractionRow({
           {item.decision} · score: {item.finalScore.toFixed(2)} · {item.language}
         </Text>
         {item.matchedKeywords.length > 0 && (
-          <Text style={styles.logKeywords}>
+          <Text style={[styles.logKeywords, { color: theme.primary }]}>
             Keywords: {item.matchedKeywords.slice(0, 5).join(', ')}
           </Text>
         )}
@@ -473,8 +475,11 @@ function DBTab(): React.JSX.Element {
           onSurfaceVariantColor={theme.onSurfaceVariant}
         />
       )}
-      <Pressable style={styles.refreshBtn} onPress={() => void refetch()}>
-        <Text style={styles.refreshBtnText}>Refresh</Text>
+      <Pressable
+        style={[styles.refreshBtn, { borderColor: theme.primary }]}
+        onPress={() => void refetch()}
+      >
+        <Text style={[styles.refreshBtnText, { color: theme.primary }]}>Refresh</Text>
       </Pressable>
     </View>
   );
@@ -531,6 +536,7 @@ function SystemRow({
   onSurfaceColor: string;
   onSurfaceVariantColor: string;
 }): React.JSX.Element {
+  const theme = useTheme();
   return (
     <View style={[styles.systemRow, { borderBottomColor: outlineColor }]}>
       <Text
@@ -538,6 +544,7 @@ function SystemRow({
           styles.systemLabel,
           { color: onSurfaceVariantColor },
           highlight && styles.systemLabelHighlight,
+          highlight && { color: theme.primary },
         ]}
       >
         {label}
@@ -547,6 +554,7 @@ function SystemRow({
           styles.systemValue,
           { color: onSurfaceColor },
           highlight && styles.systemValueHighlight,
+          highlight && { color: theme.primary },
         ]}
       >
         {value}
@@ -585,7 +593,7 @@ const styles = StyleSheet.create({
   },
   tabActive: { borderBottomColor: Colors.primary900 },
   tabText: { fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: Colors.primary900, fontWeight: '800' },
+  tabTextActive: { fontWeight: '800' },
   content: { flex: 1 },
   emptyTab: { padding: 32, alignItems: 'center' },
   emptyText: {
@@ -612,7 +620,7 @@ const styles = StyleSheet.create({
   logTitle: { fontSize: 12, fontWeight: '700', marginBottom: 2 },
   logBody: { fontSize: 11, marginBottom: 2 },
   logMeta: { fontSize: 11 },
-  logKeywords: { fontSize: 11, color: Colors.primary900, marginTop: 2, fontWeight: '600' },
+  logKeywords: { fontSize: 11, marginTop: 2, fontWeight: '600' },
   discardedRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -638,9 +646,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   systemLabel: { fontSize: 13 },
-  systemLabelHighlight: { color: Colors.primary900, fontWeight: '700' },
+  systemLabelHighlight: { fontWeight: '700' },
   systemValue: { fontSize: 13, fontWeight: '500' },
-  systemValueHighlight: { color: Colors.primary900, fontWeight: '800' },
+  systemValueHighlight: { fontWeight: '800' },
   refreshBtn: {
     marginTop: 16,
     alignSelf: 'flex-start',
@@ -648,7 +656,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 2,
     borderWidth: 2,
-    borderColor: Colors.primary900,
   },
-  refreshBtnText: { color: Colors.primary900, fontSize: 13, fontWeight: '700' },
+  refreshBtnText: { fontSize: 13, fontWeight: '700' },
 });

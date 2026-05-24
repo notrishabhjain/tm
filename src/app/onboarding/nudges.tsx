@@ -31,14 +31,14 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
-        <Text style={styles.stepLabel}>STEP 5 OF 5</Text>
-        <Text style={styles.title}>Configure Nudges</Text>
+        <Text style={[styles.stepLabel, { color: theme.primary }]}>STEP 5 OF 5</Text>
+        <Text style={[styles.title, { color: theme.primary }]}>Configure Nudges</Text>
         <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           TaskMind can send a persistent notification reminding you of pending tasks. Configure when
           and how often.
         </Text>
 
-        <Text style={styles.sectionLabel}>NUDGE FREQUENCY</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>NUDGE FREQUENCY</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -52,6 +52,7 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
                     borderBottomColor: theme.outline,
                   },
                   frequencyMinutes === opt.value && styles.optionSelected,
+                  frequencyMinutes === opt.value && { backgroundColor: theme.pressHighlight },
                 ]}
                 onPress={() => setFrequencyMinutes(opt.value)}
                 accessibilityRole="radio"
@@ -62,6 +63,10 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
                     styles.radio,
                     { borderColor: theme.onSurfaceVariant },
                     frequencyMinutes === opt.value && styles.radioSelected,
+                    frequencyMinutes === opt.value && {
+                      borderColor: theme.primary,
+                      backgroundColor: theme.primary,
+                    },
                   ]}
                 />
                 <Text
@@ -69,6 +74,7 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
                     styles.optionLabel,
                     { color: theme.onSurface },
                     frequencyMinutes === opt.value && styles.optionLabelSelected,
+                    frequencyMinutes === opt.value && { color: theme.primary },
                   ]}
                 >
                   {opt.label}
@@ -78,7 +84,7 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>BEHAVIOUR</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>BEHAVIOUR</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -94,7 +100,7 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
               <Switch
                 value={urgentOverride}
                 onValueChange={setUrgentOverride}
-                trackColor={{ true: Colors.primary900, false: theme.outline }}
+                trackColor={{ true: theme.primary, false: theme.outline }}
                 thumbColor={Colors.white}
               />
             </View>
@@ -125,11 +131,10 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
     marginBottom: 12,
   },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.primary900, marginBottom: 12 },
+  title: { fontSize: 26, fontWeight: '800', marginBottom: 12 },
   description: {
     fontSize: 14,
     lineHeight: 22,
@@ -138,7 +143,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 8,
@@ -156,7 +160,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 2,
-    borderColor: Colors.primary900,
+    borderColor: Colors.neoShadowDefault,
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -167,16 +171,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  optionSelected: { backgroundColor: Colors.primary50 },
+  optionSelected: {},
   radio: {
     width: 18,
     height: 18,
     borderRadius: 2,
     borderWidth: 2,
   },
-  radioSelected: { borderColor: Colors.primary900, backgroundColor: Colors.primary900 },
+  radioSelected: {},
   optionLabel: { fontSize: 15 },
-  optionLabelSelected: { color: Colors.primary900, fontWeight: '700' },
+  optionLabelSelected: { fontWeight: '700' },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -85,7 +85,7 @@ export default function CreateTaskScreen(): React.JSX.Element {
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Title input */}
-        <Text style={styles.sectionLabel}>WHAT NEEDS TO BE DONE</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>WHAT NEEDS TO BE DONE</Text>
         <View style={[styles.inputWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.inputShadow} />
           <TextInput
@@ -104,7 +104,7 @@ export default function CreateTaskScreen(): React.JSX.Element {
         </View>
 
         {/* Priority selector */}
-        <Text style={styles.sectionLabel}>PRIORITY</Text>
+        <Text style={[styles.sectionLabel, { color: theme.primary }]}>PRIORITY</Text>
         <View style={styles.priorityGrid}>
           {PRIORITIES.map((p) => {
             const color = getPriorityColor(p.value);
@@ -190,7 +190,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
     marginBottom: 8,
     marginTop: 12,
