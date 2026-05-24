@@ -86,6 +86,7 @@ export async function handleNotification(taskData: {
       needsConfirmation: false,
       matchedKeywords: ['vip_contact'],
       language: 'EN',
+      createdAt: notification.postTime || Date.now(),
     });
     logExtractionDecision({
       input: messageText,
@@ -184,6 +185,7 @@ export async function handleNotification(taskData: {
     matchedKeywords,
     language: 'EN',
     dueDate: result.extractedDeadline ?? null,
+    createdAt: notification.postTime || Date.now(),
   });
 
   if (!needsConfirmation) {

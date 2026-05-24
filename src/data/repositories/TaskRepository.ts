@@ -21,6 +21,7 @@ export interface CreateTaskInput {
   needsConfirmation: boolean;
   dueDate?: number | null;
   screenshotPath?: string | null;
+  createdAt?: number;
 }
 
 function mapRow(row: typeof tasks.$inferSelect): Task {
@@ -47,7 +48,7 @@ export class TaskRepository {
 
   async createTask(input: CreateTaskInput): Promise<Task> {
     const id = generateId();
-    const now = Date.now();
+    const now = input.createdAt ?? Date.now();
     await this.db.insert(tasks).values({
       id,
       title: input.title,

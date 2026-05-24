@@ -7,6 +7,8 @@ import {
   RefreshControl,
   TextInput,
   Pressable,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -16,6 +18,7 @@ import { TaskCard } from '@/ui/components/TaskCard';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
+import NotificationListener from '../../../modules/notification-listener/src';
 import type { Task, Priority } from '@/domain/types';
 import { useTaskStore } from '@/state/taskStore';
 
@@ -72,6 +75,7 @@ export default function HomeScreen(): React.JSX.Element {
   const { activeFilter, setActiveFilter } = useTaskStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const theme = useTheme();
 
   const {
@@ -156,6 +160,19 @@ export default function HomeScreen(): React.JSX.Element {
     if (searchVisible) setSearchQuery('');
   };
 
+  const handleScan = async (): Promise<void> => {
+    setScanning(true);
+    try {
+      await NotificationListener.scanActiveNotifications();
+      await new Promise((r) => setTimeout(r, 1200));
+      await refetch();
+    } catch {
+      Alert.alert('Scan failed', 'Could not scan notifications. Make sure the service is running.');
+    } finally {
+      setScanning(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Stats strip — CRED bold numeric display */}
@@ -165,6 +182,21 @@ export default function HomeScreen(): React.JSX.Element {
         <StatItem label="URGENT" value={urgentCount} valueColor={Colors.urgentFg} />
         <View style={styles.statDivider} />
         <StatItem label="DONE TODAY" value={todayCount} valueColor={Colors.success} />
+
+        {/* Scan icon */}
+        <Pressable
+          onPress={() => void handleScan()}
+          style={styles.searchToggle}
+          accessibilityRole="button"
+          accessibilityLabel="Scan notifications"
+          disabled={scanning}
+        >
+          {scanning ? (
+            <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
+          ) : (
+            <Text style={styles.searchIcon}>↺</Text>
+          )}
+        </Pressable>
 
         {/* Search icon */}
         <Pressable onPress={toggleSearch} style={styles.searchToggle} accessibilityRole="button">
@@ -220,8 +252,20 @@ export default function HomeScreen(): React.JSX.Element {
         )}
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <View style={styles.sectionBadge}>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.isDark ? Colors.primary300 : Colors.primary900 },
+              ]}
+            >
+              {section.title}
+            </Text>
+            <View
+              style={[
+                styles.sectionBadge,
+                { backgroundColor: theme.isDark ? Colors.primary700 : Colors.primary900 },
+              ]}
+            >
               <Text style={styles.sectionCount}>{section.count}</Text>
             </View>
           </View>
@@ -403,11 +447,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
   },
   sectionBadge: {
-    backgroundColor: Colors.primary900,
     borderRadius: 2,
     paddingHorizontal: 6,
     paddingVertical: 2,

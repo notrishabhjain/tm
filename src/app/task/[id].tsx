@@ -198,7 +198,11 @@ export default function TaskDetailScreen(): React.JSX.Element {
             style={({ pressed }) => [
               styles.calendarBtn,
               {
-                borderColor: calendarAdded ? Colors.success : Colors.primary900,
+                borderColor: calendarAdded
+                  ? Colors.success
+                  : theme.isDark
+                    ? Colors.primary300
+                    : Colors.primary900,
                 backgroundColor: calendarAdded ? Colors.successBg : theme.surface,
               },
               pressed &&
@@ -213,7 +217,13 @@ export default function TaskDetailScreen(): React.JSX.Element {
             <Text
               style={[
                 styles.calendarBtnText,
-                { color: calendarAdded ? Colors.success : Colors.primary900 },
+                {
+                  color: calendarAdded
+                    ? Colors.success
+                    : theme.isDark
+                      ? Colors.primary300
+                      : Colors.primary900,
+                },
               ]}
             >
               {calendarAdded ? 'Added to Calendar' : 'Add to Calendar'}
@@ -224,7 +234,14 @@ export default function TaskDetailScreen(): React.JSX.Element {
         {/* Original message */}
         {task.body && (
           <>
-            <Text style={styles.originalLabel}>ORIGINAL MESSAGE</Text>
+            <Text
+              style={[
+                styles.originalLabel,
+                { color: theme.isDark ? Colors.primary300 : Colors.primary900 },
+              ]}
+            >
+              ORIGINAL MESSAGE
+            </Text>
             <View style={[styles.neoCardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
               <View style={[styles.neoCardShadow, { backgroundColor: Colors.neoShadowLow }]} />
               <View
@@ -257,6 +274,7 @@ export default function TaskDetailScreen(): React.JSX.Element {
           onPress={handleDelete}
           loading={deleteMutation.isPending}
           style={styles.deleteButton}
+          fullWidth={false}
         />
       </View>
     </View>
@@ -351,7 +369,6 @@ const styles = StyleSheet.create({
   originalLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary900,
     letterSpacing: 1.2,
     marginBottom: 4,
     textTransform: 'uppercase',
@@ -370,5 +387,5 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.black,
   },
   completeButton: { flex: 1 },
-  deleteButton: { width: 100 },
+  deleteButton: { minWidth: 110 },
 });

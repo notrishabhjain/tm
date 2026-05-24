@@ -92,6 +92,11 @@ const NotificationListenerModule = {
     return NativeModule.clearLatestScreenshot() as Promise<void>;
   },
 
+  scanActiveNotifications(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.scanActiveNotifications() as Promise<void>;
+  },
+
   addNotificationListener(listener: (data: NotificationData) => void) {
     if (!emitter) return { remove: () => undefined };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

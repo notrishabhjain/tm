@@ -129,6 +129,10 @@ class NotificationListenerModule : Module() {
         AsyncFunction("clearLatestScreenshot") {
             java.io.File(context.filesDir, "taskmind_share_screenshot.jpg").delete()
         }
+
+        AsyncFunction("scanActiveNotifications") {
+            TaskMindNotificationListenerService.triggerActiveScan()
+        }
     }
 
     companion object {

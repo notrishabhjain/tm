@@ -16,6 +16,13 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
 
     companion object {
         const val ACTION_REFRESH_FILTER = "com.taskmind.REFRESH_FILTER"
+
+        @Volatile
+        private var serviceInstance: TaskMindNotificationListenerService? = null
+
+        fun triggerActiveScan() {
+            serviceInstance?.scanActiveNotificationsInternal()
+        }
         private const val DEDUP_WINDOW_MS = 5000L
         private const val DEDUP_CACHE_MAX = 100
         private const val MAX_THREAD_MESSAGES = 10
@@ -56,8 +63,18 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         }
     }
 
+    private fun scanActiveNotificationsInternal() {
+        try {
+            val sbns = getActiveNotifications() ?: return
+            for (sbn in sbns) {
+                onNotificationPosted(sbn)
+            }
+        } catch (_: Exception) {}
+    }
+
     override fun onCreate() {
         super.onCreate()
+        serviceInstance = this
         loadMonitoredApps()
         val filter = IntentFilter(ACTION_REFRESH_FILTER)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -70,6 +87,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (serviceInstance === this) serviceInstance = null
         try {
             unregisterReceiver(refreshReceiver)
         } catch (_: Exception) { }
