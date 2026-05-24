@@ -77,7 +77,7 @@ export default function AiModelScreen(): React.JSX.Element {
     setModelWeightState(next);
   }, [modelWeight]);
 
-  const modelActive = modelWeight > 0 && modelInfo?.source === 'downloaded';
+  const modelActive = modelWeight > 0 && modelInfo != null && modelInfo.source !== 'none';
 
   return (
     <View style={styles.container}>
@@ -126,12 +126,14 @@ export default function AiModelScreen(): React.JSX.Element {
                 <Text style={styles.modelSub}>
                   {modelInfo
                     ? modelInfo.source === 'downloaded'
-                      ? `v${modelInfo.version} · ${modelInfo.weightCount.toLocaleString()} weights`
-                      : 'Not downloaded'
+                      ? `v${modelInfo.version} · ${modelInfo.weightCount.toLocaleString()} weights · updated`
+                      : modelInfo.source === 'seed'
+                        ? `v${modelInfo.version} · ${modelInfo.weightCount} active weights · bundled`
+                        : 'Not loaded'
                     : 'Loading…'}
                 </Text>
               </View>
-              {modelInfo?.source === 'downloaded' && (
+              {modelInfo && modelInfo.source !== 'none' && (
                 <View
                   style={[
                     styles.statusDot,
@@ -166,52 +168,51 @@ export default function AiModelScreen(): React.JSX.Element {
             )}
 
             <View style={styles.modelActions}>
-              {modelInfo?.source !== 'downloaded' ? (
+              {/* Seed always provides a base; download replaces it with an improved version */}
+              <Pressable
+                onPress={() => void handleDownload()}
+                style={[styles.actionBtn, styles.actionBtnSecondary]}
+                disabled={downloading}
+                accessibilityRole="button"
+              >
+                {downloading ? (
+                  <ActivityIndicator size="small" color={Colors.onSurfaceLight} />
+                ) : (
+                  <Text style={styles.actionBtnSecondaryText}>
+                    {modelInfo?.source === 'downloaded' ? 'Re-download' : 'Update model'}
+                  </Text>
+                )}
+              </Pressable>
+              {modelInfo?.source === 'downloaded' ? (
                 <Pressable
-                  onPress={() => void handleDownload()}
-                  style={[styles.actionBtn, styles.actionBtnPrimary]}
-                  disabled={downloading}
+                  onPress={() => void handleDelete()}
+                  style={[styles.actionBtn, styles.actionBtnDestructive]}
                   accessibilityRole="button"
                 >
-                  {downloading ? (
-                    <ActivityIndicator size="small" color={Colors.white} />
-                  ) : (
-                    <Text style={styles.actionBtnPrimaryText}>Download model</Text>
-                  )}
+                  <Text style={styles.actionBtnDestructiveText}>Delete downloaded</Text>
                 </Pressable>
-              ) : (
-                <>
-                  <Pressable
-                    onPress={toggleModel}
-                    style={[
-                      styles.actionBtn,
-                      modelActive ? styles.actionBtnSecondary : styles.actionBtnPrimary,
-                    ]}
-                    accessibilityRole="button"
-                  >
-                    <Text
-                      style={[
-                        modelActive ? styles.actionBtnSecondaryText : styles.actionBtnPrimaryText,
-                      ]}
-                    >
-                      {modelActive ? 'Disable model' : 'Enable model'}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => void handleDelete()}
-                    style={[styles.actionBtn, styles.actionBtnDestructive]}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.actionBtnDestructiveText}>Delete</Text>
-                  </Pressable>
-                </>
-              )}
+              ) : null}
+              <Pressable
+                onPress={toggleModel}
+                style={[
+                  styles.actionBtn,
+                  modelActive ? styles.actionBtnSecondary : styles.actionBtnPrimary,
+                ]}
+                accessibilityRole="button"
+              >
+                <Text
+                  style={modelActive ? styles.actionBtnSecondaryText : styles.actionBtnPrimaryText}
+                >
+                  {modelActive ? 'Disable model' : 'Enable model'}
+                </Text>
+              </Pressable>
             </View>
 
-            {modelInfo?.source === 'downloaded' && (
+            {modelInfo && modelInfo.source !== 'none' && (
               <Text style={styles.weightNote}>
-                Model blend: {Math.round(modelWeight * 100)}% model ·{' '}
-                {Math.round((1 - modelWeight) * 100)}% rules
+                {modelActive
+                  ? `Active · ${Math.round(modelWeight * 100)}% model / ${Math.round((1 - modelWeight) * 100)}% rules`
+                  : 'Disabled — tap Enable to activate'}
               </Text>
             )}
           </View>

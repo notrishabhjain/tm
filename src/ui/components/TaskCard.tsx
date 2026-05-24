@@ -15,12 +15,24 @@ interface TaskCardProps {
 function formatRelativeTime(ts: number): string {
   const diffMs = Date.now() - ts;
   const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'just now';
+  if (diffMins < 2) return 'just now';
   if (diffMins < 60) return `${diffMins}m ago`;
   const diffHrs = Math.floor(diffMins / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
+  if (diffHrs < 24) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
   const diffDays = Math.floor(diffHrs / 24);
-  return `${diffDays}d ago`;
+  if (diffDays < 7) {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-IN', {
+      weekday: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  }
+  return new Date(ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
 function getSourceLabel(sourceApp: string): string {

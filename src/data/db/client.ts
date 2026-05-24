@@ -100,7 +100,9 @@ export function initializeDatabase(): void {
       confirm_count INTEGER NOT NULL DEFAULT 0,
       reject_count INTEGER NOT NULL DEFAULT 0,
       auto_accept_count INTEGER NOT NULL DEFAULT 0,
-      last_seen_at INTEGER NOT NULL
+      last_seen_at INTEGER NOT NULL,
+      tier TEXT NOT NULL DEFAULT 'UNKNOWN',
+      seed_trust REAL
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_sender_stats_key ON sender_stats (sender_key);
 
@@ -142,6 +144,8 @@ export function initializeDatabase(): void {
   const columnMigrations: string[] = [
     'ALTER TABLE tasks ADD COLUMN due_date INTEGER;',
     'ALTER TABLE tasks ADD COLUMN screenshot_path TEXT;',
+    "ALTER TABLE sender_stats ADD COLUMN tier TEXT NOT NULL DEFAULT 'UNKNOWN';",
+    'ALTER TABLE sender_stats ADD COLUMN seed_trust REAL;',
   ];
   for (const sql of columnMigrations) {
     try {

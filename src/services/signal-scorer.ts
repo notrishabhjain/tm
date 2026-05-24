@@ -960,23 +960,21 @@ export async function scoreNotification(notification: NotificationData): Promise
   const rawScore = Math.max(0, Math.min(1, acc.score));
 
   // ── On-device intent model (optional second pass) ─────────────────────────
-  const modelWeight = getSetting('model_weight');
+  // Seed model (bundled) is always available; model_weight defaults to 0.3.
+  const modelWeight = getSetting('model_weight') || 0.3;
   let modelScore: number | null = null;
   let finalScore = rawScore;
 
-  if (modelWeight > 0) {
-    try {
-      const model = await loadModel();
-      if (model.version !== '0.0.0' && model.weights.length > 0) {
-        modelScore = runInference(latestMessage, model);
-        // Linear blend: finalScore = ruleScore*(1-w) + modelScore*w
-        finalScore = rawScore * (1 - modelWeight) + modelScore * modelWeight;
-        finalScore = Math.max(0, Math.min(1, finalScore));
-        acc.signals.push(modelScore >= 0.5 ? 'model_positive' : 'model_negative');
-      }
-    } catch {
-      /* model inference failed — rule-only fallback */
+  try {
+    const model = await loadModel();
+    if (model.weights.length > 0) {
+      modelScore = runInference(latestMessage, model);
+      finalScore = rawScore * (1 - modelWeight) + modelScore * modelWeight;
+      finalScore = Math.max(0, Math.min(1, finalScore));
+      acc.signals.push(modelScore >= 0.5 ? 'model_positive' : 'model_negative');
     }
+  } catch {
+    /* model inference failed — rule-only fallback */
   }
 
   const forceInbox = checkForceInbox(latestMessage, acc.signals, senderInfo.effectiveTrust);

@@ -11,7 +11,7 @@ export interface ModelData {
 
 export interface ModelInfo {
   version: string;
-  source: 'downloaded' | 'none';
+  source: 'seed' | 'downloaded' | 'none';
   weightCount: number;
 }
 
@@ -22,7 +22,6 @@ export interface DownloadOptions {
 
 const MODEL_FILENAME = 'intent-classifier.json';
 
-// Release URL for the bundled model — update when a new version ships.
 export const DEFAULT_MODEL_URL =
   'https://github.com/notrishabhjain/tm/releases/download/models/intent-classifier-v1.json';
 
@@ -30,34 +29,36 @@ export function getModelPath(): string {
   return `${FileSystem.documentDirectory ?? ''}${MODEL_FILENAME}`;
 }
 
-// Zero-weight model — identical to rule-only scoring (no effect).
-const NEUTRAL_MODEL: ModelData = {
-  version: '0.0.0',
-  type: 'logistic_regression',
-  featureDim: 8192,
-  weights: [],
-  bias: 0,
-};
+// Bundled seed model loaded from app assets — always available, no download needed.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const SEED_MODEL: ModelData = require('../../assets/models/intent-seed-model.json') as ModelData;
 
 let _cached: ModelData | null = null;
 
 export async function loadModel(): Promise<ModelData> {
   if (_cached) return _cached;
+
+  // Try downloaded model first (may be a newer version than seed)
   const path = getModelPath();
   try {
     const info = await FileSystem.getInfoAsync(path);
     if (info.exists) {
       const json = await FileSystem.readAsStringAsync(path);
       const parsed = JSON.parse(json) as ModelData;
-      if (Array.isArray(parsed.weights) && typeof parsed.bias === 'number') {
+      if (
+        Array.isArray(parsed.weights) &&
+        parsed.weights.length > 0 &&
+        typeof parsed.bias === 'number'
+      ) {
         _cached = parsed;
         return _cached;
       }
     }
   } catch {
-    /* fall through to neutral */
+    /* fall through to seed */
   }
-  _cached = NEUTRAL_MODEL;
+
+  _cached = SEED_MODEL;
   return _cached;
 }
 
@@ -68,21 +69,30 @@ export function invalidateModelCache(): void {
 export async function getModelInfo(): Promise<ModelInfo> {
   const path = getModelPath();
   const downloaded = getSetting('model_downloaded');
-  if (!downloaded) return { version: '—', source: 'none', weightCount: 0 };
-  try {
-    const info = await FileSystem.getInfoAsync(path);
-    if (info.exists) {
-      const model = await loadModel();
-      return {
-        version: model.version,
-        source: 'downloaded',
-        weightCount: model.weights.length,
-      };
+
+  if (downloaded) {
+    try {
+      const info = await FileSystem.getInfoAsync(path);
+      if (info.exists) {
+        const model = await loadModel();
+        if (model !== SEED_MODEL) {
+          return {
+            version: model.version,
+            source: 'downloaded',
+            weightCount: model.weights.length,
+          };
+        }
+      }
+    } catch {
+      /* fall through */
     }
-  } catch {
-    /* non-fatal */
   }
-  return { version: '—', source: 'none', weightCount: 0 };
+
+  return {
+    version: SEED_MODEL.version,
+    source: 'seed',
+    weightCount: SEED_MODEL.weights.filter((w) => w !== 0).length,
+  };
 }
 
 export async function downloadModel(opts: DownloadOptions = {}): Promise<void> {
@@ -102,15 +112,26 @@ export async function downloadModel(opts: DownloadOptions = {}): Promise<void> {
   if (!result?.uri) throw new Error('Download returned no URI');
 
   const text = await FileSystem.readAsStringAsync(result.uri);
-  const parsed = JSON.parse(text) as ModelData;
-  if (!parsed.version || !Array.isArray(parsed.weights) || typeof parsed.bias !== 'number') {
+  let parsed: ModelData;
+  try {
+    parsed = JSON.parse(text) as ModelData;
+  } catch {
     await FileSystem.deleteAsync(dest, { idempotent: true });
-    throw new Error('Invalid model file format');
+    throw new Error('Server returned an invalid response — check the model URL');
+  }
+
+  if (
+    !parsed.version ||
+    !Array.isArray(parsed.weights) ||
+    parsed.weights.length === 0 ||
+    typeof parsed.bias !== 'number'
+  ) {
+    await FileSystem.deleteAsync(dest, { idempotent: true });
+    throw new Error('Downloaded file is not a valid model (missing version, weights, or bias)');
   }
 
   setSetting('model_downloaded', true);
   setSetting('model_version', parsed.version);
-  // Auto-enable at 30% blend if weight was previously 0
   if (getSetting('model_weight') === 0) setSetting('model_weight', 0.3);
   invalidateModelCache();
 }
