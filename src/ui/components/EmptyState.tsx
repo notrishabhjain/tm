@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../theme/colors';
+import { useTheme } from '../theme';
 import { Button } from './Button';
 
 interface EmptyStateProps {
@@ -16,12 +17,13 @@ export function EmptyState({
   actionLabel,
   onAction,
 }: EmptyStateProps): React.JSX.Element {
+  const theme = useTheme();
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
         <View style={styles.dot} />
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
+        <Text style={[styles.title, { color: theme.onSurface }]}>{title}</Text>
+        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>{description}</Text>
         {actionLabel && onAction && (
           <Button
             label={actionLabel}
@@ -45,9 +47,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     padding: 28,
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
-    borderColor: Colors.outlineLight,
     borderRadius: 2,
     alignItems: 'center',
   },
@@ -63,14 +63,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.onSurfaceLight,
     textAlign: 'center',
     marginBottom: 8,
     letterSpacing: 0.2,
   },
   description: {
     fontSize: 13,
-    color: Colors.onSurfaceVariantLight,
     textAlign: 'center',
     maxWidth: 280,
     lineHeight: 20,

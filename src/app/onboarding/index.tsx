@@ -3,16 +3,25 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Link } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
 
 const DEPTH = 4;
 
 export default function OnboardingWelcomeScreen(): React.JSX.Element {
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
     <View
-      style={[styles.container, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 32 }]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.background,
+          paddingTop: insets.top + 32,
+          paddingBottom: insets.bottom + 32,
+        },
+      ]}
     >
       <View style={styles.hero}>
         <View style={styles.logoWrapper}>

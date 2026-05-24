@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { getPriorityColor, getPriorityBgLight } from '../theme/colors';
+import { getPriorityColor } from '../theme/colors';
+import { useTheme } from '../theme';
 import type { Priority } from '@/domain/types';
 
 interface PriorityChipProps {
@@ -19,8 +20,15 @@ export function PriorityChip({
   priority,
   variant = 'filled',
 }: PriorityChipProps): React.JSX.Element {
+  const theme = useTheme();
   const color = getPriorityColor(priority);
-  const bgColor = getPriorityBgLight(priority);
+  const bgMap: Record<Priority, string> = {
+    URGENT: theme.urgentBg,
+    HIGH: theme.highBg,
+    MEDIUM: theme.mediumBg,
+    LOW: theme.lowBg,
+  };
+  const bgColor = bgMap[priority];
 
   return (
     <View

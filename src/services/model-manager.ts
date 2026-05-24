@@ -53,6 +53,9 @@ export async function loadModel(): Promise<ModelData> {
         _cached = parsed;
         return _cached;
       }
+      // Downloaded file is corrupt or invalid — clean it up silently
+      await FileSystem.deleteAsync(path, { idempotent: true });
+      setSetting('model_downloaded', false);
     }
   } catch {
     /* fall through to seed */

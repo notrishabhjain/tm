@@ -11,6 +11,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { TaskCard } from '@/ui/components/TaskCard';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
@@ -71,6 +72,7 @@ export default function HomeScreen(): React.JSX.Element {
   const { activeFilter, setActiveFilter } = useTaskStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
+  const theme = useTheme();
 
   const {
     data: tasks = [],
@@ -155,7 +157,7 @@ export default function HomeScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Stats strip — CRED bold numeric display */}
       <View style={styles.statsStrip}>
         <StatItem label="PENDING" value={tasks.length} />
@@ -178,7 +180,7 @@ export default function HomeScreen(): React.JSX.Element {
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search tasks, senders, apps…"
-            placeholderTextColor={Colors.onSurfaceVariantLight}
+            placeholderTextColor={theme.onSurfaceVariant}
             autoFocus
             returnKeyType="search"
           />
@@ -186,13 +188,20 @@ export default function HomeScreen(): React.JSX.Element {
       )}
 
       {/* Filter chips */}
-      <View style={styles.filterRow}>
+      <View
+        style={[
+          styles.filterRow,
+          { backgroundColor: theme.surface, borderBottomColor: theme.outline },
+        ]}
+      >
         {FILTERS.map((f) => (
           <FilterChip
             key={f.value}
             label={f.label}
             active={activeFilter === f.value}
             onPress={() => setActiveFilter(f.value)}
+            outlineColor={theme.outline}
+            textColor={theme.onSurfaceVariant}
           />
         ))}
       </View>
@@ -287,25 +296,33 @@ function FilterChip({
   label,
   active,
   onPress,
+  outlineColor,
+  textColor,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  outlineColor: string;
+  textColor: string;
 }): React.JSX.Element {
   return (
     <Pressable
-      style={[styles.filterChip, active && styles.filterChipActive]}
+      style={[styles.filterChip, { borderColor: outlineColor }, active && styles.filterChipActive]}
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected: active }}
     >
-      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
+      <Text
+        style={[styles.filterChipText, { color: textColor }, active && styles.filterChipTextActive]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   statsStrip: {
     flexDirection: 'row',
     backgroundColor: Colors.primary900,
@@ -356,23 +373,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 8,
-    backgroundColor: Colors.surfaceLight,
     borderBottomWidth: 2,
-    borderBottomColor: Colors.outlineLight,
   },
   filterChip: {
     height: 30,
     paddingHorizontal: 12,
     borderRadius: 2,
     borderWidth: 2,
-    borderColor: Colors.onSurfaceVariantLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   filterChipActive: { backgroundColor: Colors.primary900, borderColor: Colors.primary900 },
   filterChipText: {
     fontSize: 12,
-    color: Colors.onSurfaceVariantLight,
     fontWeight: '700',
     letterSpacing: 0.3,
   },

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from 'react-nat
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { getSetting, setSetting } from '@/data/storage/settings';
 import { db } from '@/data/db/client';
 import { MonitoredAppRepository } from '@/data/repositories/MonitoredAppRepository';
@@ -14,6 +15,7 @@ const vipRepo = new VipContactRepository(db);
 
 export default function SettingsScreen(): React.JSX.Element {
   const router = useRouter();
+  const theme = useTheme();
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'unknown'>(
     'unknown'
   );
@@ -70,10 +72,16 @@ export default function SettingsScreen(): React.JSX.Element {
           : `Every ${nudgeFreq / 60} hours`;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      contentContainerStyle={styles.content}
+    >
       {/* Notification Permission banner */}
       {permissionStatus === 'denied' && (
-        <Pressable style={styles.permissionBanner} onPress={handleGrantPermission}>
+        <Pressable
+          style={[styles.permissionBanner, { backgroundColor: theme.urgentBg }]}
+          onPress={handleGrantPermission}
+        >
           <View style={styles.permissionBannerText}>
             <Text style={styles.permissionTitle}>Notification Access Required</Text>
             <Text style={styles.permissionSubtitle}>
@@ -85,7 +93,13 @@ export default function SettingsScreen(): React.JSX.Element {
         </Pressable>
       )}
 
-      <Section title="Monitoring">
+      <Section
+        title="Monitoring"
+        surfaceColor={theme.surface}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      >
         <NavRow
           label="Notification Access"
           subtitle={
@@ -97,6 +111,9 @@ export default function SettingsScreen(): React.JSX.Element {
           }
           subtitleColor={permissionStatus === 'granted' ? Colors.success : undefined}
           onPress={handleGrantPermission}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
         <NavRow
           label="Monitored Apps"
@@ -106,6 +123,9 @@ export default function SettingsScreen(): React.JSX.Element {
               : `${activeAppCount} app${activeAppCount !== 1 ? 's' : ''} active`
           }
           onPress={() => void router.push('/settings/monitored-apps')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
         <NavRow
           label="VIP Contacts"
@@ -115,74 +135,136 @@ export default function SettingsScreen(): React.JSX.Element {
               : `${vipContacts.length} contact${vipContacts.length !== 1 ? 's' : ''}`
           }
           onPress={() => void router.push('/settings/vip-contacts')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
       </Section>
 
-      <Section title="Intelligence">
+      <Section
+        title="Intelligence"
+        surfaceColor={theme.surface}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      >
         <NavRow
           label="Signal Engine"
           subtitle="17-signal deterministic scorer, no AI models"
           onPress={() => void router.push('/settings/ai-model')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
         <NavRow
           label="Learned Vocabulary"
           onPress={() => void router.push('/settings/vocabulary')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
         <NavRow
           label="Analytics"
           subtitle="Decision log, accuracy"
           onPress={() => void router.push('/settings/analytics')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
         <NavRow
           label="Analyze Text"
           subtitle="Extract tasks from long text"
           onPress={() => void router.push('/settings/transcript-import')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
       </Section>
 
-      <Section title="Nudges">
+      <Section
+        title="Nudges"
+        surfaceColor={theme.surface}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      >
         <NavRow
           label="Nudge Schedule"
           subtitle={nudgeLabel}
           onPress={() => void router.push('/settings/nudges')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
         <ToggleRow
           label="Urgent overrides quiet hours"
           value={urgentOverride}
           onChange={handleUrgentOverride}
+          onSurfaceColor={theme.onSurface}
+          outlineColor={theme.outline}
         />
       </Section>
 
-      <Section title="Reports">
+      <Section
+        title="Reports"
+        surfaceColor={theme.surface}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      >
         <NavRow
           label="Daily Email Report"
           subtitle={getSetting('email_enabled') ? 'Enabled' : 'Not configured'}
           onPress={() => void router.push('/settings/email-report')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
         <NavRow
           label="Export / Import"
           subtitle="JSON or CSV"
           onPress={() => void router.push('/settings/export-import')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
       </Section>
 
-      <Section title="Device">
+      <Section
+        title="Device"
+        surfaceColor={theme.surface}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      >
         <NavRow
           label="Battery Optimization Guide"
           onPress={() => void router.push('/settings/battery-guide')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
       </Section>
 
-      <Section title="Debug">
+      <Section
+        title="Debug"
+        surfaceColor={theme.surface}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      >
         <NavRow
           label="Diagnostics"
           subtitle="Notification capture, extraction log"
           onPress={() => void router.push('/settings/diagnostics')}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+          outlineColor={theme.outline}
         />
       </Section>
 
       <View style={styles.versionRow}>
-        <Text style={styles.versionText}>
+        <Text style={[styles.versionText, { color: theme.onSurfaceVariant }]}>
           TaskMind v0.1.0 · {process.env['EXPO_PUBLIC_COMMIT_SHA'] ?? 'dev'}
         </Text>
       </View>
@@ -193,14 +275,22 @@ export default function SettingsScreen(): React.JSX.Element {
 function Section({
   title,
   children,
+  surfaceColor,
+  outlineColor: _outlineColor,
+  onSurfaceColor: _onSurfaceColor,
+  onSurfaceVariantColor: _onSurfaceVariantColor,
 }: {
   title: string;
   children: React.ReactNode;
+  surfaceColor: string;
+  outlineColor: string;
+  onSurfaceColor: string;
+  onSurfaceVariantColor: string;
 }): React.JSX.Element {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionCard}>{children}</View>
+      <View style={[styles.sectionCard, { backgroundColor: surfaceColor }]}>{children}</View>
     </View>
   );
 }
@@ -210,27 +300,37 @@ function NavRow({
   subtitle,
   subtitleColor,
   onPress,
+  onSurfaceColor,
+  onSurfaceVariantColor,
+  outlineColor,
 }: {
   label: string;
   subtitle?: string;
   subtitleColor?: string;
   onPress: () => void;
+  onSurfaceColor: string;
+  onSurfaceVariantColor: string;
+  outlineColor: string;
 }): React.JSX.Element {
   return (
     <Pressable
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      style={({ pressed }) => [
+        styles.row,
+        { borderBottomColor: outlineColor },
+        pressed && styles.rowPressed,
+      ]}
       onPress={onPress}
       accessibilityRole="button"
     >
       <View style={styles.rowLeft}>
-        <Text style={styles.rowLabel}>{label}</Text>
+        <Text style={[styles.rowLabel, { color: onSurfaceColor }]}>{label}</Text>
         {subtitle && (
-          <Text style={[styles.rowSubtitle, subtitleColor ? { color: subtitleColor } : undefined]}>
+          <Text style={[styles.rowSubtitle, { color: subtitleColor ?? onSurfaceVariantColor }]}>
             {subtitle}
           </Text>
         )}
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <Text style={[styles.chevron, { color: onSurfaceVariantColor }]}>›</Text>
     </Pressable>
   );
 }
@@ -239,18 +339,22 @@ function ToggleRow({
   label,
   value,
   onChange,
+  onSurfaceColor,
+  outlineColor,
 }: {
   label: string;
   value: boolean;
   onChange: (v: boolean) => void;
+  onSurfaceColor: string;
+  outlineColor: string;
 }): React.JSX.Element {
   return (
-    <View style={styles.row}>
-      <Text style={[styles.rowLabel, styles.flex1]}>{label}</Text>
+    <View style={[styles.row, { borderBottomColor: outlineColor }]}>
+      <Text style={[styles.rowLabel, styles.flex1, { color: onSurfaceColor }]}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ true: Colors.primary500, false: Colors.outlineLight }}
+        trackColor={{ true: Colors.primary900, false: outlineColor }}
         thumbColor={Colors.white}
       />
     </View>
@@ -258,11 +362,10 @@ function ToggleRow({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   content: { paddingBottom: 32 },
   permissionBanner: {
     margin: 16,
-    backgroundColor: Colors.urgentBgLight,
     borderWidth: 2,
     borderColor: Colors.urgentFg,
     borderRadius: 2,
@@ -285,7 +388,6 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   sectionCard: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
@@ -297,14 +399,13 @@ const styles = StyleSheet.create({
     padding: 16,
     minHeight: 56,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.outlineLight,
   },
   rowPressed: { backgroundColor: Colors.primary50 },
   rowLeft: { flex: 1 },
-  rowLabel: { fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '600' },
-  rowSubtitle: { fontSize: 12, color: Colors.onSurfaceVariantLight, marginTop: 2 },
-  chevron: { fontSize: 20, color: Colors.onSurfaceVariantLight, fontWeight: '700' },
+  rowLabel: { fontSize: 15, fontWeight: '600' },
+  rowSubtitle: { fontSize: 12, marginTop: 2 },
+  chevron: { fontSize: 20, fontWeight: '700' },
   flex1: { flex: 1 },
   versionRow: { alignItems: 'center', marginTop: 32, marginBottom: 8 },
-  versionText: { fontSize: 12, color: Colors.onSurfaceVariantLight },
+  versionText: { fontSize: 12 },
 });

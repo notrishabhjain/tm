@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Switch, Pressable, StyleSheet, Alert } from 're
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { db } from '@/data/db/client';
 import { MonitoredAppRepository } from '@/data/repositories/MonitoredAppRepository';
 import NotificationListener from '../../../modules/notification-listener/src';
@@ -24,6 +25,7 @@ const COMMON_APPS = [
 ];
 
 export default function MonitoredAppsScreen(): React.JSX.Element {
+  const theme = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -75,7 +77,7 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
   const activeCount = apps.filter((a) => a.isActive).length;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
           <Text style={styles.backText}>Back</Text>
@@ -85,7 +87,7 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.description}>
+        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           {activeCount > 0
             ? `${activeCount} app${activeCount !== 1 ? 's' : ''} active — only these are monitored.`
             : 'No apps selected — all notifications are monitored.'}
@@ -94,23 +96,33 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
         <Text style={styles.sectionLabel}>COMMON APPS</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
             {COMMON_APPS.map((app, i) => {
               const existing = appMap.get(app.packageName);
               const isActive = existing?.isActive ?? false;
               return (
                 <View
                   key={app.packageName}
-                  style={[styles.row, i < COMMON_APPS.length - 1 && styles.rowBorder]}
+                  style={[
+                    styles.row,
+                    i < COMMON_APPS.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.outline,
+                    },
+                  ]}
                 >
                   <View style={styles.rowInfo}>
-                    <Text style={styles.appName}>{app.displayName}</Text>
-                    <Text style={styles.packageName}>{app.packageName}</Text>
+                    <Text style={[styles.appName, { color: theme.onSurface }]}>
+                      {app.displayName}
+                    </Text>
+                    <Text style={[styles.packageName, { color: theme.onSurfaceVariant }]}>
+                      {app.packageName}
+                    </Text>
                   </View>
                   <Switch
                     value={isActive}
                     onValueChange={(v) => handleToggle(app.packageName, app.displayName, v)}
-                    trackColor={{ true: Colors.primary900, false: Colors.outlineLight }}
+                    trackColor={{ true: Colors.primary900, false: theme.outline }}
                     thumbColor={Colors.white}
                   />
                 </View>
@@ -124,24 +136,34 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
             <Text style={styles.sectionLabel}>CUSTOM APPS</Text>
             <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
               <View style={styles.cardShadow} />
-              <View style={styles.card}>
+              <View style={[styles.card, { backgroundColor: theme.surface }]}>
                 {apps
                   .filter((a) => !COMMON_APPS.find((c) => c.packageName === a.packageName))
                   .map((app, i, arr) => (
                     <View
                       key={app.packageName}
-                      style={[styles.row, i < arr.length - 1 && styles.rowBorder]}
+                      style={[
+                        styles.row,
+                        i < arr.length - 1 && {
+                          borderBottomWidth: 1,
+                          borderBottomColor: theme.outline,
+                        },
+                      ]}
                     >
                       <View style={styles.rowInfo}>
-                        <Text style={styles.appName}>{app.displayName}</Text>
-                        <Text style={styles.packageName}>{app.packageName}</Text>
+                        <Text style={[styles.appName, { color: theme.onSurface }]}>
+                          {app.displayName}
+                        </Text>
+                        <Text style={[styles.packageName, { color: theme.onSurfaceVariant }]}>
+                          {app.packageName}
+                        </Text>
                       </View>
                       <Switch
                         value={app.isActive}
                         onValueChange={(v) =>
                           toggleMutation.mutate({ packageName: app.packageName, isActive: v })
                         }
-                        trackColor={{ true: Colors.primary900, false: Colors.outlineLight }}
+                        trackColor={{ true: Colors.primary900, false: theme.outline }}
                         thumbColor={Colors.white}
                       />
                     </View>
@@ -181,7 +203,7 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -198,7 +220,6 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 32 },
   description: {
     fontSize: 13,
-    color: Colors.onSurfaceVariantLight,
     lineHeight: 20,
     marginBottom: 16,
   },
@@ -222,17 +243,15 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   card: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
     overflow: 'hidden',
   },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.outlineLight },
   rowInfo: { flex: 1 },
-  appName: { fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '600' },
-  packageName: { fontSize: 11, color: Colors.onSurfaceVariantLight, marginTop: 2 },
+  appName: { fontSize: 15, fontWeight: '600' },
+  packageName: { fontSize: 11, marginTop: 2 },
   addBtn: {
     height: 48,
     borderWidth: 2,

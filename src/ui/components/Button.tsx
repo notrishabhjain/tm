@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View, StyleSheet, ActivityIndicator, type ViewStyle } from 'react-native';
 import { Colors } from '../theme/colors';
+import { useTheme } from '../theme';
 
 interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'destructive';
@@ -14,27 +15,6 @@ interface ButtonProps {
 
 const DEPTH = 4;
 
-const VARIANT_STYLES = {
-  primary: {
-    bg: Colors.primary900,
-    shadow: Colors.neoShadowDefault,
-    border: Colors.neoShadowDefault,
-    text: Colors.white,
-  },
-  secondary: {
-    bg: Colors.white,
-    shadow: Colors.primary900,
-    border: Colors.primary900,
-    text: Colors.primary900,
-  },
-  destructive: {
-    bg: Colors.urgentFg,
-    shadow: Colors.neoShadowUrgent,
-    border: Colors.neoShadowUrgent,
-    text: Colors.white,
-  },
-};
-
 export function Button({
   variant = 'primary',
   label,
@@ -44,7 +24,30 @@ export function Button({
   disabled,
   onPress,
 }: ButtonProps): React.JSX.Element {
+  const theme = useTheme();
   const isDisabled = disabled ?? loading;
+
+  const VARIANT_STYLES = {
+    primary: {
+      bg: Colors.primary900,
+      shadow: Colors.neoShadowDefault,
+      border: Colors.neoShadowDefault,
+      text: Colors.white,
+    },
+    secondary: {
+      bg: theme.surface,
+      shadow: Colors.primary900,
+      border: Colors.primary900,
+      text: Colors.primary900,
+    },
+    destructive: {
+      bg: Colors.urgentFg,
+      shadow: Colors.neoShadowUrgent,
+      border: Colors.neoShadowUrgent,
+      text: Colors.white,
+    },
+  };
+
   const v = VARIANT_STYLES[variant];
 
   return (
@@ -56,7 +59,6 @@ export function Button({
         style,
       ]}
     >
-      {/* Shadow layer */}
       <View style={[styles.shadow, { backgroundColor: v.shadow }]} />
 
       <Pressable

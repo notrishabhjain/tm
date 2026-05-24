@@ -16,6 +16,10 @@ export interface Theme {
   outline: string;
   onSurface: string;
   onSurfaceVariant: string;
+  urgentBg: string;
+  highBg: string;
+  mediumBg: string;
+  lowBg: string;
 }
 
 function buildTheme(isDark: boolean): Theme {
@@ -28,6 +32,10 @@ function buildTheme(isDark: boolean): Theme {
     outline: isDark ? Colors.outlineDark : Colors.outlineLight,
     onSurface: isDark ? Colors.onSurfaceDark : Colors.onSurfaceLight,
     onSurfaceVariant: isDark ? Colors.onSurfaceVariantDark : Colors.onSurfaceVariantLight,
+    urgentBg: isDark ? Colors.urgentBgDark : Colors.urgentBgLight,
+    highBg: isDark ? Colors.highBgDark : Colors.highBgLight,
+    mediumBg: isDark ? Colors.mediumBgDark : Colors.mediumBgLight,
+    lowBg: isDark ? Colors.lowBgDark : Colors.lowBgLight,
   };
 }
 

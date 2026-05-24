@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
@@ -35,6 +36,7 @@ export default function CreateTaskScreen(): React.JSX.Element {
   const [priority, setPriority] = useState<Priority>('MEDIUM');
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const theme = useTheme();
 
   const handleCreate = async (): Promise<void> => {
     const trimmed = title.trim();
@@ -65,7 +67,7 @@ export default function CreateTaskScreen(): React.JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header */}
@@ -88,11 +90,11 @@ export default function CreateTaskScreen(): React.JSX.Element {
           <View style={styles.inputShadow} />
           <TextInput
             ref={inputRef}
-            style={styles.titleInput}
+            style={[styles.titleInput, { backgroundColor: theme.surface, color: theme.onSurface }]}
             value={title}
             onChangeText={setTitle}
             placeholder="Describe the task clearly..."
-            placeholderTextColor={Colors.onSurfaceVariantLight}
+            placeholderTextColor={theme.onSurfaceVariant}
             multiline
             numberOfLines={3}
             autoFocus
@@ -116,7 +118,7 @@ export default function CreateTaskScreen(): React.JSX.Element {
                 <Pressable
                   style={[
                     styles.priorityCard,
-                    { borderColor: active ? color : Colors.outlineLight },
+                    { borderColor: active ? color : theme.outline, backgroundColor: theme.surface },
                     active && { backgroundColor: color + '15' },
                   ]}
                   onPress={() => setPriority(p.value)}
@@ -126,12 +128,23 @@ export default function CreateTaskScreen(): React.JSX.Element {
                   <View
                     style={[
                       styles.priorityDot,
-                      { backgroundColor: active ? color : Colors.outlineLight },
+                      { backgroundColor: active ? color : theme.outline },
                     ]}
                   />
                   <View style={styles.priorityText}>
-                    <Text style={[styles.priorityLabel, active && { color }]}>{p.label}</Text>
-                    <Text style={styles.priorityDesc} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.priorityLabel,
+                        { color: theme.onSurfaceVariant },
+                        active && { color },
+                      ]}
+                    >
+                      {p.label}
+                    </Text>
+                    <Text
+                      style={[styles.priorityDesc, { color: theme.onSurfaceVariant }]}
+                      numberOfLines={1}
+                    >
                       {p.desc}
                     </Text>
                   </View>
@@ -143,7 +156,9 @@ export default function CreateTaskScreen(): React.JSX.Element {
       </ScrollView>
 
       {/* Footer */}
-      <View style={styles.footer}>
+      <View
+        style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.outline }]}
+      >
         <Button
           label="Create Task"
           variant="primary"
@@ -157,7 +172,7 @@ export default function CreateTaskScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.backgroundLight },
+  root: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -191,14 +206,12 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   titleInput: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: Colors.onSurfaceLight,
     minHeight: 96,
     textAlignVertical: 'top',
     fontWeight: '500',
@@ -217,7 +230,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderRadius: 2,
     gap: 12,
@@ -227,15 +239,12 @@ const styles = StyleSheet.create({
   priorityLabel: {
     fontSize: 13,
     fontWeight: '800',
-    color: Colors.onSurfaceVariantLight,
     letterSpacing: 0.5,
   },
-  priorityDesc: { fontSize: 11, color: Colors.onSurfaceVariantLight, marginTop: 2 },
+  priorityDesc: { fontSize: 11, marginTop: 2 },
   footer: {
     padding: 20,
     paddingTop: 12,
     borderTopWidth: 2,
-    borderTopColor: Colors.outlineLight,
-    backgroundColor: Colors.surfaceLight,
   },
 });

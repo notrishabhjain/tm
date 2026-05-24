@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Calendar from 'expo-calendar';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { PriorityChip } from '@/ui/components/PriorityChip';
 import { Button } from '@/ui/components/Button';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
@@ -60,6 +61,7 @@ export default function TaskDetailScreen(): React.JSX.Element {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [calendarAdded, setCalendarAdded] = useState(false);
+  const theme = useTheme();
 
   const { data: task, isLoading } = useQuery({
     queryKey: ['task', id],
@@ -107,8 +109,8 @@ export default function TaskDetailScreen(): React.JSX.Element {
 
   if (isLoading || !task) {
     return (
-      <View style={styles.loading}>
-        <Text style={styles.loadingText}>Loading…</Text>
+      <View style={[styles.loading, { backgroundColor: theme.background }]}>
+        <Text style={[styles.loadingText, { color: theme.onSurfaceVariant }]}>Loading…</Text>
       </View>
     );
   }
@@ -116,7 +118,7 @@ export default function TaskDetailScreen(): React.JSX.Element {
   const priorityColor = getPriorityColor(task.priority);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: priorityColor }]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
@@ -127,17 +129,39 @@ export default function TaskDetailScreen(): React.JSX.Element {
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         {/* Task title */}
-        <Text style={styles.taskTitle} selectable>
+        <Text style={[styles.taskTitle, { color: theme.onSurface }]} selectable>
           {task.title}
         </Text>
 
         {/* Source info card */}
         <View style={[styles.neoCardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={[styles.neoCardShadow, { backgroundColor: priorityColor }]} />
-          <View style={[styles.neoCard, { borderColor: priorityColor }]}>
-            <InfoRow label="Source" value={task.sourceApp.split('.').pop() ?? task.sourceApp} />
-            {task.sender && <InfoRow label="From" value={task.sender} />}
-            <InfoRow label="Captured" value={new Date(task.createdAt).toLocaleString('en-IN')} />
+          <View
+            style={[styles.neoCard, { borderColor: priorityColor, backgroundColor: theme.surface }]}
+          >
+            <InfoRow
+              label="Source"
+              value={task.sourceApp.split('.').pop() ?? task.sourceApp}
+              onSurfaceColor={theme.onSurface}
+              onSurfaceVariantColor={theme.onSurfaceVariant}
+              outlineColor={theme.outline}
+            />
+            {task.sender && (
+              <InfoRow
+                label="From"
+                value={task.sender}
+                onSurfaceColor={theme.onSurface}
+                onSurfaceVariantColor={theme.onSurfaceVariant}
+                outlineColor={theme.outline}
+              />
+            )}
+            <InfoRow
+              label="Captured"
+              value={new Date(task.createdAt).toLocaleString('en-IN')}
+              onSurfaceColor={theme.onSurface}
+              onSurfaceVariantColor={theme.onSurfaceVariant}
+              outlineColor={theme.outline}
+            />
             {task.dueDate && (
               <InfoRow
                 label="Due"
@@ -146,9 +170,19 @@ export default function TaskDetailScreen(): React.JSX.Element {
                   month: 'short',
                   day: 'numeric',
                 })}
+                onSurfaceColor={theme.onSurface}
+                onSurfaceVariantColor={theme.onSurfaceVariant}
+                outlineColor={theme.outline}
               />
             )}
-            <InfoRow label="Confidence" value={`${Math.round(task.confidence * 100)}%`} last />
+            <InfoRow
+              label="Confidence"
+              value={`${Math.round(task.confidence * 100)}%`}
+              last
+              onSurfaceColor={theme.onSurface}
+              onSurfaceVariantColor={theme.onSurfaceVariant}
+              outlineColor={theme.outline}
+            />
           </View>
         </View>
 
@@ -165,7 +199,7 @@ export default function TaskDetailScreen(): React.JSX.Element {
               styles.calendarBtn,
               {
                 borderColor: calendarAdded ? Colors.success : Colors.primary900,
-                backgroundColor: calendarAdded ? Colors.successBg : Colors.surfaceLight,
+                backgroundColor: calendarAdded ? Colors.successBg : theme.surface,
               },
               pressed &&
                 !calendarAdded && {
@@ -193,8 +227,13 @@ export default function TaskDetailScreen(): React.JSX.Element {
             <Text style={styles.originalLabel}>ORIGINAL MESSAGE</Text>
             <View style={[styles.neoCardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
               <View style={[styles.neoCardShadow, { backgroundColor: Colors.neoShadowLow }]} />
-              <View style={[styles.neoCard, { borderColor: Colors.lowFg }]}>
-                <Text style={styles.originalText} selectable>
+              <View
+                style={[
+                  styles.neoCard,
+                  { borderColor: Colors.lowFg, backgroundColor: theme.surface },
+                ]}
+              >
+                <Text style={[styles.originalText, { color: theme.onSurface }]} selectable>
                   {task.body}
                 </Text>
               </View>
@@ -228,23 +267,31 @@ function InfoRow({
   label,
   value,
   last = false,
+  onSurfaceColor,
+  onSurfaceVariantColor,
+  outlineColor,
 }: {
   label: string;
   value: string;
   last?: boolean;
+  onSurfaceColor: string;
+  onSurfaceVariantColor: string;
+  outlineColor: string;
 }): React.JSX.Element {
   return (
-    <View style={[styles.infoRow, !last && styles.infoRowBorder]}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+    <View
+      style={[styles.infoRow, !last && { borderBottomWidth: 1, borderBottomColor: outlineColor }]}
+    >
+      <Text style={[styles.infoLabel, { color: onSurfaceVariantColor }]}>{label}</Text>
+      <Text style={[styles.infoValue, { color: onSurfaceColor }]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: Colors.onSurfaceVariantLight, fontSize: 15 },
+  loadingText: { fontSize: 15 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -260,7 +307,6 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: Colors.onSurfaceLight,
     lineHeight: 28,
     marginBottom: 4,
   },
@@ -274,7 +320,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   neoCard: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderRadius: 2,
     padding: 12,
@@ -284,14 +329,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 7,
   },
-  infoRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.outlineLight,
-  },
-  infoLabel: { fontSize: 13, color: Colors.onSurfaceVariantLight, fontWeight: '600' },
+  infoLabel: { fontSize: 13, fontWeight: '600' },
   infoValue: {
     fontSize: 13,
-    color: Colors.onSurfaceLight,
     flex: 1,
     textAlign: 'right',
     fontWeight: '500',
@@ -318,7 +358,6 @@ const styles = StyleSheet.create({
   },
   originalText: {
     fontSize: 13,
-    color: Colors.onSurfaceLight,
     lineHeight: 20,
     fontFamily: 'JetBrainsMono-Regular',
   },

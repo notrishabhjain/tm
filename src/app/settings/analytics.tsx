@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { gt, sql, eq } from 'drizzle-orm';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { db } from '@/data/db/client';
 import { trainingLog, discardedLog, tasks, senderStats, learnedKeywords } from '@/data/db/schema';
 
@@ -86,6 +87,7 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 export default function AnalyticsScreen(): React.JSX.Element {
+  const theme = useTheme();
   const router = useRouter();
 
   const { data: decisions } = useQuery({
@@ -132,7 +134,7 @@ export default function AnalyticsScreen(): React.JSX.Element {
   }, [feedback]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>Back</Text>
@@ -162,7 +164,7 @@ export default function AnalyticsScreen(): React.JSX.Element {
             <NeoCard>
               <BreakdownBar label="AUTO-CREATE" pct={autoCreatePct} color={Colors.success} />
               <BreakdownBar label="CONFIRM" pct={confirmPct} color={Colors.highFg} />
-              <BreakdownBar label="DISCARD" pct={discardPct} color={Colors.onSurfaceVariantLight} />
+              <BreakdownBar label="DISCARD" pct={discardPct} color={theme.onSurfaceVariant} />
             </NeoCard>
           </>
         )}
@@ -201,7 +203,7 @@ export default function AnalyticsScreen(): React.JSX.Element {
                   key={r.reason}
                   label={r.reason.replace(/_/g, ' ')}
                   value={r.count}
-                  color={Colors.onSurfaceVariantLight}
+                  color={theme.onSurfaceVariant}
                   border={i > 0}
                 />
               ))}
@@ -235,9 +237,14 @@ export default function AnalyticsScreen(): React.JSX.Element {
 
         {/* Empty state */}
         {total === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No data yet</Text>
-            <Text style={styles.emptyDesc}>
+          <View
+            style={[
+              styles.emptyState,
+              { backgroundColor: theme.surface, borderColor: theme.outline },
+            ]}
+          >
+            <Text style={[styles.emptyTitle, { color: theme.onSurface }]}>No data yet</Text>
+            <Text style={[styles.emptyDesc, { color: theme.onSurfaceVariant }]}>
               Decision metrics will appear here once the notification listener captures and
               processes notifications.
             </Text>
@@ -249,10 +256,11 @@ export default function AnalyticsScreen(): React.JSX.Element {
 }
 
 function NeoCard({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const theme = useTheme();
   return (
     <View style={[styles.neoCardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
       <View style={styles.neoCardShadow} />
-      <View style={styles.neoCard}>{children}</View>
+      <View style={[styles.neoCard, { backgroundColor: theme.surface }]}>{children}</View>
     </View>
   );
 }
@@ -266,13 +274,14 @@ function NeoStatCard({
   value: string;
   hint?: string;
 }): React.JSX.Element {
+  const theme = useTheme();
   return (
     <View style={[styles.statWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
       <View style={styles.statShadow} />
-      <View style={styles.statCard}>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statLabel}>{label}</Text>
-        {hint && <Text style={styles.statHint}>{hint}</Text>}
+      <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
+        <Text style={[styles.statValue, { color: theme.onSurface }]}>{value}</Text>
+        <Text style={[styles.statLabel, { color: theme.onSurfaceVariant }]}>{label}</Text>
+        {hint && <Text style={[styles.statHint, { color: theme.onSurfaceVariant }]}>{hint}</Text>}
       </View>
     </View>
   );
@@ -287,10 +296,11 @@ function BreakdownBar({
   pct: number;
   color: string;
 }): React.JSX.Element {
+  const theme = useTheme();
   return (
     <View style={styles.breakdownRow}>
-      <Text style={styles.breakdownLabel}>{label}</Text>
-      <View style={styles.breakdownTrack}>
+      <Text style={[styles.breakdownLabel, { color: theme.onSurfaceVariant }]}>{label}</Text>
+      <View style={[styles.breakdownTrack, { backgroundColor: theme.outline }]}>
         <View
           style={[styles.breakdownFill, { width: `${Math.max(pct, 0)}%`, backgroundColor: color }]}
         />
@@ -311,16 +321,22 @@ function FeedbackRow({
   color: string;
   border?: boolean;
 }): React.JSX.Element {
+  const theme = useTheme();
   return (
-    <View style={[styles.feedbackRow, border && styles.feedbackRowBorder]}>
-      <Text style={styles.feedbackLabel}>{label}</Text>
+    <View
+      style={[
+        styles.feedbackRow,
+        border && { borderTopWidth: 1, borderTopColor: theme.outline, paddingTop: 8, marginTop: 4 },
+      ]}
+    >
+      <Text style={[styles.feedbackLabel, { color: theme.onSurface }]}>{label}</Text>
       <Text style={[styles.feedbackValue, { color }]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -355,23 +371,21 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   statCard: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
     padding: 12,
     alignItems: 'center',
   },
-  statValue: { fontSize: 22, fontWeight: '800', color: Colors.onSurfaceLight },
+  statValue: { fontSize: 22, fontWeight: '800' },
   statLabel: {
     fontSize: 9,
-    color: Colors.onSurfaceVariantLight,
     fontWeight: '700',
     marginTop: 2,
     textAlign: 'center',
     letterSpacing: 0.6,
   },
-  statHint: { fontSize: 9, color: Colors.onSurfaceVariantLight, marginTop: 1, textAlign: 'center' },
+  statHint: { fontSize: 9, marginTop: 1, textAlign: 'center' },
   neoCardWrapper: { position: 'relative', marginBottom: 4 },
   neoCardShadow: {
     position: 'absolute',
@@ -383,7 +397,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   neoCard: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
@@ -394,14 +407,12 @@ const styles = StyleSheet.create({
   breakdownLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.onSurfaceVariantLight,
     width: 88,
     letterSpacing: 0.4,
   },
   breakdownTrack: {
     flex: 1,
     height: 6,
-    backgroundColor: Colors.outlineLight,
     borderRadius: 1,
     overflow: 'hidden',
   },
@@ -413,27 +424,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 4,
   },
-  feedbackRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.outlineLight,
-    paddingTop: 8,
-    marginTop: 4,
-  },
-  feedbackLabel: { fontSize: 13, color: Colors.onSurfaceLight, fontWeight: '500' },
+  feedbackLabel: { fontSize: 13, fontWeight: '500' },
   feedbackValue: { fontSize: 16, fontWeight: '800' },
   emptyState: {
     marginTop: 32,
     padding: 24,
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
-    borderColor: Colors.outlineLight,
     borderRadius: 2,
     alignItems: 'center',
   },
-  emptyTitle: { fontSize: 15, fontWeight: '700', color: Colors.onSurfaceLight, marginBottom: 8 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', marginBottom: 8 },
   emptyDesc: {
     fontSize: 13,
-    color: Colors.onSurfaceVariantLight,
     textAlign: 'center',
     lineHeight: 20,
   },

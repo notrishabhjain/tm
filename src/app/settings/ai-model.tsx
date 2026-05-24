@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { downloadModel, deleteModel, getModelInfo, type ModelInfo } from '@/services/model-manager';
 import { getSetting, setSetting } from '@/data/storage/settings';
 
@@ -34,6 +35,7 @@ const NEGATIVE_SIGNALS = [
 
 export default function AiModelScreen(): React.JSX.Element {
   const router = useRouter();
+  const theme = useTheme();
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -80,7 +82,7 @@ export default function AiModelScreen(): React.JSX.Element {
   const modelActive = modelWeight > 0 && modelInfo != null && modelInfo.source !== 'none';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
           <Text style={styles.backText}>Back</Text>
@@ -119,11 +121,18 @@ export default function AiModelScreen(): React.JSX.Element {
         {/* Local model card */}
         <View style={[styles.modelWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.modelShadow} />
-          <View style={styles.modelCard}>
+          <View
+            style={[
+              styles.modelCard,
+              { backgroundColor: theme.surface, borderColor: Colors.primary900 },
+            ]}
+          >
             <View style={styles.modelHeader}>
               <View>
-                <Text style={styles.modelTitle}>Local intent model</Text>
-                <Text style={styles.modelSub}>
+                <Text style={[styles.modelTitle, { color: theme.onSurface }]}>
+                  Local intent model
+                </Text>
+                <Text style={[styles.modelSub, { color: theme.onSurfaceVariant }]}>
                   {modelInfo
                     ? modelInfo.source === 'downloaded'
                       ? `v${modelInfo.version} · ${modelInfo.weightCount.toLocaleString()} weights · updated`
@@ -145,15 +154,25 @@ export default function AiModelScreen(): React.JSX.Element {
               )}
             </View>
 
-            <Text style={styles.modelDesc}>
+            <Text style={[styles.modelDesc, { color: theme.onSurfaceVariant }]}>
               A logistic regression classifier trained on labeled notification data. Acts as a
               semantic second opinion on top of the rule engine — fully offline, ~50 KB.
             </Text>
 
             {error && (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
+              <Pressable
+                style={styles.errorBanner}
+                onPress={() => setError(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss error"
+              >
+                <Text style={styles.errorText}>
+                  {error.includes('not a valid model') || error.includes('invalid response')
+                    ? 'No update available — built-in model is active'
+                    : error}
+                </Text>
+                <Text style={styles.errorDismiss}>✕ tap to dismiss</Text>
+              </Pressable>
             )}
 
             {downloading && (
@@ -171,14 +190,18 @@ export default function AiModelScreen(): React.JSX.Element {
               {/* Seed always provides a base; download replaces it with an improved version */}
               <Pressable
                 onPress={() => void handleDownload()}
-                style={[styles.actionBtn, styles.actionBtnSecondary]}
+                style={[
+                  styles.actionBtn,
+                  styles.actionBtnSecondary,
+                  { backgroundColor: theme.surfaceVariant, borderColor: theme.outline },
+                ]}
                 disabled={downloading}
                 accessibilityRole="button"
               >
                 {downloading ? (
-                  <ActivityIndicator size="small" color={Colors.onSurfaceLight} />
+                  <ActivityIndicator size="small" color={theme.onSurface} />
                 ) : (
-                  <Text style={styles.actionBtnSecondaryText}>
+                  <Text style={[styles.actionBtnSecondaryText, { color: theme.onSurface }]}>
                     {modelInfo?.source === 'downloaded' ? 'Re-download' : 'Update model'}
                   </Text>
                 )}
@@ -196,12 +219,21 @@ export default function AiModelScreen(): React.JSX.Element {
                 onPress={toggleModel}
                 style={[
                   styles.actionBtn,
-                  modelActive ? styles.actionBtnSecondary : styles.actionBtnPrimary,
+                  modelActive
+                    ? [
+                        styles.actionBtnSecondary,
+                        { backgroundColor: theme.surfaceVariant, borderColor: theme.outline },
+                      ]
+                    : styles.actionBtnPrimary,
                 ]}
                 accessibilityRole="button"
               >
                 <Text
-                  style={modelActive ? styles.actionBtnSecondaryText : styles.actionBtnPrimaryText}
+                  style={
+                    modelActive
+                      ? [styles.actionBtnSecondaryText, { color: theme.onSurface }]
+                      : styles.actionBtnPrimaryText
+                  }
                 >
                   {modelActive ? 'Disable model' : 'Enable model'}
                 </Text>
@@ -209,7 +241,7 @@ export default function AiModelScreen(): React.JSX.Element {
             </View>
 
             {modelInfo && modelInfo.source !== 'none' && (
-              <Text style={styles.weightNote}>
+              <Text style={[styles.weightNote, { color: theme.onSurfaceVariant }]}>
                 {modelActive
                   ? `Active · ${Math.round(modelWeight * 100)}% model / ${Math.round((1 - modelWeight) * 100)}% rules`
                   : 'Disabled — tap Enable to activate'}
@@ -222,10 +254,21 @@ export default function AiModelScreen(): React.JSX.Element {
         <Text style={styles.sectionLabel}>POSITIVE SIGNALS</Text>
         <View style={[styles.tableWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.tableShadow} />
-          <View style={styles.table}>
+          <View
+            style={[
+              styles.table,
+              { backgroundColor: theme.surface, borderColor: Colors.primary900 },
+            ]}
+          >
             {POSITIVE_SIGNALS.map((s, i) => (
-              <View key={s.label} style={[styles.tableRow, i > 0 && styles.tableRowBorder]}>
-                <Text style={styles.tableLabel}>{s.label}</Text>
+              <View
+                key={s.label}
+                style={[
+                  styles.tableRow,
+                  i > 0 && [styles.tableRowBorder, { borderTopColor: theme.outline }],
+                ]}
+              >
+                <Text style={[styles.tableLabel, { color: theme.onSurface }]}>{s.label}</Text>
                 <Text style={[styles.tableWeight, { color: Colors.success }]}>{s.weight}</Text>
               </View>
             ))}
@@ -236,10 +279,18 @@ export default function AiModelScreen(): React.JSX.Element {
         <Text style={[styles.sectionLabel, { marginTop: 16 }]}>NEGATIVE SIGNALS</Text>
         <View style={[styles.tableWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={[styles.tableShadow, { backgroundColor: Colors.neoShadowUrgent }]} />
-          <View style={[styles.table, { borderColor: Colors.urgentFg }]}>
+          <View
+            style={[styles.table, { backgroundColor: theme.surface, borderColor: Colors.urgentFg }]}
+          >
             {NEGATIVE_SIGNALS.map((s, i) => (
-              <View key={s.label} style={[styles.tableRow, i > 0 && styles.tableRowBorder]}>
-                <Text style={styles.tableLabel}>{s.label}</Text>
+              <View
+                key={s.label}
+                style={[
+                  styles.tableRow,
+                  i > 0 && [styles.tableRowBorder, { borderTopColor: theme.outline }],
+                ]}
+              >
+                <Text style={[styles.tableLabel, { color: theme.onSurface }]}>{s.label}</Text>
                 <Text
                   style={[
                     styles.tableWeight,
@@ -253,7 +304,7 @@ export default function AiModelScreen(): React.JSX.Element {
           </View>
         </View>
 
-        <Text style={styles.footnote}>
+        <Text style={[styles.footnote, { color: theme.onSurfaceVariant }]}>
           Self-learning via sender stats and n-gram feedback. Each confirmation/rejection refines
           future scoring.
         </Text>
@@ -372,14 +423,15 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   errorBanner: {
-    backgroundColor: Colors.urgentBgLight,
+    backgroundColor: '#FFF8E1',
     borderRadius: 2,
     borderWidth: 1,
-    borderColor: Colors.urgentFg,
-    padding: 8,
+    borderColor: Colors.highFg,
+    padding: 10,
     marginBottom: 10,
   },
-  errorText: { fontSize: 12, color: Colors.urgentFg, fontWeight: '600' },
+  errorText: { fontSize: 12, color: Colors.highFg, fontWeight: '600' },
+  errorDismiss: { fontSize: 10, color: Colors.highFg, marginTop: 4, fontWeight: '500' },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   progressTrack: {
     flex: 1,
@@ -408,10 +460,9 @@ const styles = StyleSheet.create({
   actionBtnPrimary: { backgroundColor: Colors.primary900, borderColor: Colors.primary900 },
   actionBtnPrimaryText: { fontSize: 13, fontWeight: '700', color: Colors.white },
   actionBtnSecondary: {
-    backgroundColor: Colors.surfaceVariantLight,
     borderColor: Colors.outlineLight,
   },
-  actionBtnSecondaryText: { fontSize: 13, fontWeight: '700', color: Colors.onSurfaceLight },
+  actionBtnSecondaryText: { fontSize: 13, fontWeight: '700' },
   actionBtnDestructive: { backgroundColor: Colors.urgentBgLight, borderColor: Colors.urgentFg },
   actionBtnDestructiveText: { fontSize: 13, fontWeight: '700', color: Colors.urgentFg },
   weightNote: {

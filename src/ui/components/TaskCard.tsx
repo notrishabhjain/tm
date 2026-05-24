@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { getPriorityColor, Colors } from '../theme/colors';
+import { useTheme } from '../theme';
 import { PriorityChip } from './PriorityChip';
 import type { Task } from '@/domain/types';
 
@@ -98,6 +99,7 @@ export function TaskCard({
   onComplete,
   onDelete,
 }: TaskCardProps): React.JSX.Element {
+  const theme = useTheme();
   const priorityColor = getPriorityColor(task.priority);
   const shadowColor = getPriorityShadow(priorityColor);
 
@@ -124,7 +126,7 @@ export function TaskCard({
         onPress={handlePress}
         style={({ pressed }) => [
           styles.card,
-          { borderColor: priorityColor },
+          { borderColor: priorityColor, backgroundColor: theme.surface },
           pressed && { transform: [{ translateX: 2 }, { translateY: 2 }] },
         ]}
         accessibilityRole="button"
@@ -134,16 +136,18 @@ export function TaskCard({
         <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
 
         <View style={styles.content}>
-          <Text style={styles.title} numberOfLines={2}>
+          <Text style={[styles.title, { color: theme.onSurface }]} numberOfLines={2}>
             {task.title}
           </Text>
 
           <View style={styles.metaRow}>
-            <Text style={styles.source} numberOfLines={1}>
+            <Text style={[styles.source, { color: theme.onSurfaceVariant }]} numberOfLines={1}>
               {task.sender ? `${task.sender} · ` : ''}
               {getSourceLabel(task.sourceApp)}
             </Text>
-            <Text style={styles.time}>{formatRelativeTime(task.createdAt)}</Text>
+            <Text style={[styles.time, { color: theme.onSurfaceVariant }]}>
+              {formatRelativeTime(task.createdAt)}
+            </Text>
           </View>
 
           <View style={styles.chipsRow}>
@@ -161,7 +165,10 @@ export function TaskCard({
         <View style={styles.actions}>
           <Pressable
             onPress={handleComplete}
-            style={styles.actionButton}
+            style={[
+              styles.actionButton,
+              { backgroundColor: theme.surfaceVariant, borderColor: theme.outline },
+            ]}
             accessibilityLabel="Mark complete"
             hitSlop={8}
           >
@@ -169,7 +176,10 @@ export function TaskCard({
           </Pressable>
           <Pressable
             onPress={handleDelete}
-            style={styles.actionButton}
+            style={[
+              styles.actionButton,
+              { backgroundColor: theme.surfaceVariant, borderColor: theme.outline },
+            ]}
             accessibilityLabel="Delete task"
             hitSlop={8}
           >
@@ -197,7 +207,6 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderRadius: 2,
     overflow: 'hidden',
@@ -213,7 +222,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.onSurfaceLight,
     lineHeight: 21,
     marginBottom: 5,
   },
@@ -225,13 +233,11 @@ const styles = StyleSheet.create({
   },
   source: {
     fontSize: 12,
-    color: Colors.onSurfaceVariantLight,
     flex: 1,
     fontWeight: '500',
   },
   time: {
     fontSize: 11,
-    color: Colors.onSurfaceVariantLight,
     marginLeft: 8,
   },
   chipsRow: {
@@ -275,10 +281,8 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 2,
     borderWidth: 1.5,
-    borderColor: Colors.outlineLight,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceVariantLight,
   },
   actionText: {
     fontSize: 11,

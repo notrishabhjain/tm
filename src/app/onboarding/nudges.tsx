@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, Switch, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
 import { setSetting } from '@/data/storage/settings';
 
@@ -16,6 +17,7 @@ const FREQUENCY_OPTIONS = [
 const DEPTH = 4;
 
 export default function OnboardingNudgesScreen(): React.JSX.Element {
+  const theme = useTheme();
   const router = useRouter();
   const [frequencyMinutes, setFrequencyMinutes] = useState<number>(60);
   const [urgentOverride, setUrgentOverride] = useState<boolean>(true);
@@ -27,11 +29,11 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.content}>
         <Text style={styles.stepLabel}>STEP 5 OF 5</Text>
         <Text style={styles.title}>Configure Nudges</Text>
-        <Text style={styles.description}>
+        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           TaskMind can send a persistent notification reminding you of pending tasks. Configure when
           and how often.
         </Text>
@@ -39,13 +41,16 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
         <Text style={styles.sectionLabel}>NUDGE FREQUENCY</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
             {FREQUENCY_OPTIONS.map((opt, i) => (
               <Pressable
                 key={opt.value}
                 style={[
                   styles.optionRow,
-                  i < FREQUENCY_OPTIONS.length - 1 && styles.rowBorder,
+                  i < FREQUENCY_OPTIONS.length - 1 && {
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.outline,
+                  },
                   frequencyMinutes === opt.value && styles.optionSelected,
                 ]}
                 onPress={() => setFrequencyMinutes(opt.value)}
@@ -53,11 +58,16 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
                 accessibilityState={{ selected: frequencyMinutes === opt.value }}
               >
                 <View
-                  style={[styles.radio, frequencyMinutes === opt.value && styles.radioSelected]}
+                  style={[
+                    styles.radio,
+                    { borderColor: theme.onSurfaceVariant },
+                    frequencyMinutes === opt.value && styles.radioSelected,
+                  ]}
                 />
                 <Text
                   style={[
                     styles.optionLabel,
+                    { color: theme.onSurface },
                     frequencyMinutes === opt.value && styles.optionLabelSelected,
                   ]}
                 >
@@ -71,18 +81,20 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
         <Text style={styles.sectionLabel}>BEHAVIOUR</Text>
         <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.cardShadow} />
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: theme.surface }]}>
             <View style={styles.toggleRow}>
               <View style={styles.toggleInfo}>
-                <Text style={styles.toggleTitle}>Urgent overrides quiet hours</Text>
-                <Text style={styles.toggleSubtitle}>
+                <Text style={[styles.toggleTitle, { color: theme.onSurface }]}>
+                  Urgent overrides quiet hours
+                </Text>
+                <Text style={[styles.toggleSubtitle, { color: theme.onSurfaceVariant }]}>
                   URGENT tasks always nudge, even during quiet hours
                 </Text>
               </View>
               <Switch
                 value={urgentOverride}
                 onValueChange={setUrgentOverride}
-                trackColor={{ true: Colors.primary900, false: Colors.outlineLight }}
+                trackColor={{ true: Colors.primary900, false: theme.outline }}
                 thumbColor={Colors.white}
               />
             </View>
@@ -106,7 +118,6 @@ export default function OnboardingNudgesScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundLight,
     padding: 24,
     justifyContent: 'space-between',
   },
@@ -121,7 +132,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: Colors.primary900, marginBottom: 12 },
   description: {
     fontSize: 14,
-    color: Colors.onSurfaceVariantLight,
     lineHeight: 22,
     marginBottom: 20,
   },
@@ -145,7 +155,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   card: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
@@ -158,17 +167,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.outlineLight },
   optionSelected: { backgroundColor: Colors.primary50 },
   radio: {
     width: 18,
     height: 18,
     borderRadius: 2,
     borderWidth: 2,
-    borderColor: Colors.onSurfaceVariantLight,
   },
   radioSelected: { borderColor: Colors.primary900, backgroundColor: Colors.primary900 },
-  optionLabel: { fontSize: 15, color: Colors.onSurfaceLight },
+  optionLabel: { fontSize: 15 },
   optionLabelSelected: { color: Colors.primary900, fontWeight: '700' },
   toggleRow: {
     flexDirection: 'row',
@@ -178,7 +185,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   toggleInfo: { flex: 1 },
-  toggleTitle: { fontSize: 15, color: Colors.onSurfaceLight, fontWeight: '600' },
-  toggleSubtitle: { fontSize: 12, color: Colors.onSurfaceVariantLight, marginTop: 2 },
+  toggleTitle: { fontSize: 15, fontWeight: '600' },
+  toggleSubtitle: { fontSize: 12, marginTop: 2 },
   footer: { gap: 12 },
 });

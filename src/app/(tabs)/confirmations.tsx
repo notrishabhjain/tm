@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
 import { getPriorityColor } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { SenderStatsRepository } from '@/data/repositories/SenderStatsRepository';
@@ -19,6 +20,7 @@ const learnedKwRepo = new LearnedKeywordRepository(db);
 
 export default function ConfirmationsScreen(): React.JSX.Element {
   const queryClient = useQueryClient();
+  const theme = useTheme();
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['tasks', 'confirmation'],
@@ -94,7 +96,7 @@ export default function ConfirmationsScreen(): React.JSX.Element {
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {tasks.length > 0 && (
         <View style={styles.header}>
           <Text style={styles.headerText}>
@@ -111,6 +113,9 @@ export default function ConfirmationsScreen(): React.JSX.Element {
             task={item}
             onConfirm={(t) => confirmMutation.mutate(t)}
             onReject={(t) => rejectMutation.mutate(t)}
+            surfaceColor={theme.surface}
+            onSurfaceColor={theme.onSurface}
+            onSurfaceVariantColor={theme.onSurfaceVariant}
           />
         )}
         contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
@@ -131,10 +136,16 @@ function ConfirmationCard({
   task,
   onConfirm,
   onReject,
+  surfaceColor,
+  onSurfaceColor,
+  onSurfaceVariantColor,
 }: {
   task: Task;
   onConfirm: (task: Task) => void;
   onReject: (task: Task) => void;
+  surfaceColor: string;
+  onSurfaceColor: string;
+  onSurfaceVariantColor: string;
 }): React.JSX.Element {
   const priorityColor = getPriorityColor(task.priority);
   const DEPTH = 4;
@@ -142,21 +153,23 @@ function ConfirmationCard({
   return (
     <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
       <View style={[styles.cardShadow, { backgroundColor: priorityColor }]} />
-      <View style={[styles.card, { borderColor: priorityColor }]}>
+      <View style={[styles.card, { borderColor: priorityColor, backgroundColor: surfaceColor }]}>
         <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
         <View style={styles.cardContent}>
-          <Text style={styles.taskText}>{task.title}</Text>
+          <Text style={[styles.taskText, { color: onSurfaceColor }]}>{task.title}</Text>
           {task.body != null && task.body !== task.title && (
-            <Text style={styles.taskBody} numberOfLines={3}>
+            <Text style={[styles.taskBody, { color: onSurfaceVariantColor }]} numberOfLines={3}>
               {task.body}
             </Text>
           )}
           <View style={styles.metaRow}>
-            <Text style={styles.sourceMeta}>
+            <Text style={[styles.sourceMeta, { color: onSurfaceVariantColor }]}>
               {task.sender ? `${task.sender} · ` : ''}
               {task.sourceApp.split('.').pop() ?? task.sourceApp}
             </Text>
-            <Text style={styles.confidence}>{Math.round(task.confidence * 100)}% conf</Text>
+            <Text style={[styles.confidence, { color: onSurfaceVariantColor }]}>
+              {Math.round(task.confidence * 100)}% conf
+            </Text>
           </View>
           <View style={styles.buttonRow}>
             <NeoButton
@@ -220,7 +233,6 @@ function NeoButton({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundLight,
   },
   header: {
     paddingHorizontal: 16,
@@ -256,7 +268,6 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderRadius: 2,
     overflow: 'hidden',
@@ -271,13 +282,11 @@ const styles = StyleSheet.create({
   taskText: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.onSurfaceLight,
     lineHeight: 21,
     marginBottom: 4,
   },
   taskBody: {
     fontSize: 13,
-    color: Colors.onSurfaceVariantLight,
     lineHeight: 19,
     marginBottom: 8,
   },
@@ -288,11 +297,9 @@ const styles = StyleSheet.create({
   },
   sourceMeta: {
     fontSize: 12,
-    color: Colors.onSurfaceVariantLight,
   },
   confidence: {
     fontSize: 12,
-    color: Colors.onSurfaceVariantLight,
     fontStyle: 'italic',
   },
   buttonRow: {

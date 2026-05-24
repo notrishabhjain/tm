@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
 import { setSetting } from '@/data/storage/settings';
 import NotificationListener from '../../../modules/notification-listener/src';
@@ -10,6 +11,7 @@ import NotificationListener from '../../../modules/notification-listener/src';
 const DEPTH = 4;
 
 export default function OnboardingDoneScreen(): React.JSX.Element {
+  const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -25,7 +27,14 @@ export default function OnboardingDoneScreen(): React.JSX.Element {
 
   return (
     <View
-      style={[styles.container, { paddingTop: insets.top + 32, paddingBottom: insets.bottom + 24 }]}
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.background,
+          paddingTop: insets.top + 32,
+          paddingBottom: insets.bottom + 24,
+        },
+      ]}
     >
       <View style={styles.content}>
         <View style={[styles.checkWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>

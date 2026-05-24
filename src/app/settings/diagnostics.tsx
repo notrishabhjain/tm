@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import {
   getNotificationBuffer,
   getExtractionBuffer,
@@ -29,6 +30,7 @@ const TABS: DiagTab[] = ['Notifications', 'Extraction', 'Discarded', 'DB', 'Syst
 
 export default function DiagnosticsScreen(): React.JSX.Element {
   const router = useRouter();
+  const theme = useTheme();
   const [activeTab, setActiveTab] = useState<DiagTab>('Notifications');
 
   const handleExport = async (): Promise<void> => {
@@ -58,7 +60,7 @@ export default function DiagnosticsScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
           <Text style={styles.backText}>Back</Text>
@@ -72,7 +74,10 @@ export default function DiagnosticsScreen(): React.JSX.Element {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.tabBar}
+        style={[
+          styles.tabBar,
+          { backgroundColor: theme.surface, borderBottomColor: theme.outline },
+        ]}
         contentContainerStyle={styles.tabBarContent}
       >
         {TABS.map((tab) => (
@@ -81,7 +86,15 @@ export default function DiagnosticsScreen(): React.JSX.Element {
             style={[styles.tab, activeTab === tab && styles.tabActive]}
             onPress={() => setActiveTab(tab)}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+            <Text
+              style={[
+                styles.tabText,
+                { color: theme.onSurfaceVariant },
+                activeTab === tab && styles.tabTextActive,
+              ]}
+            >
+              {tab}
+            </Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -99,12 +112,15 @@ export default function DiagnosticsScreen(): React.JSX.Element {
 
 function NotificationsTab(): React.JSX.Element {
   const buffer = getNotificationBuffer();
+  const theme = useTheme();
 
   if (buffer.length === 0) {
     return (
       <View style={styles.emptyTab}>
-        <Text style={styles.emptyText}>No notifications captured yet.</Text>
-        <Text style={styles.emptyHint}>
+        <Text style={[styles.emptyText, { color: theme.onSurface }]}>
+          No notifications captured yet.
+        </Text>
+        <Text style={[styles.emptyHint, { color: theme.onSurfaceVariant }]}>
           Notifications from monitored apps will appear here after they are processed.
         </Text>
       </View>
@@ -114,26 +130,45 @@ function NotificationsTab(): React.JSX.Element {
   return (
     <View style={styles.logList}>
       {buffer.map((item, i) => (
-        <NotificationRow key={i} item={item} />
+        <NotificationRow
+          key={i}
+          item={item}
+          surfaceColor={theme.surface}
+          outlineColor={theme.outline}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+        />
       ))}
     </View>
   );
 }
 
-function NotificationRow({ item }: { item: CapturedNotification }): React.JSX.Element {
+function NotificationRow({
+  item,
+  surfaceColor,
+  outlineColor,
+  onSurfaceColor,
+  onSurfaceVariantColor,
+}: {
+  item: CapturedNotification;
+  surfaceColor: string;
+  outlineColor: string;
+  onSurfaceColor: string;
+  onSurfaceVariantColor: string;
+}): React.JSX.Element {
   const statusColor = item.status === 'PASSED' ? Colors.success : Colors.error;
 
   return (
-    <View style={styles.logRow}>
+    <View style={[styles.logRow, { backgroundColor: surfaceColor, borderColor: outlineColor }]}>
       <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
       <View style={styles.logContent}>
-        <Text style={styles.logTitle} numberOfLines={1}>
+        <Text style={[styles.logTitle, { color: onSurfaceColor }]} numberOfLines={1}>
           [{item.appName}] {item.title}
         </Text>
-        <Text style={styles.logBody} numberOfLines={2}>
+        <Text style={[styles.logBody, { color: onSurfaceVariantColor }]} numberOfLines={2}>
           {item.text}
         </Text>
-        <Text style={styles.logMeta}>
+        <Text style={[styles.logMeta, { color: onSurfaceVariantColor }]}>
           {item.status} · {new Date(item.capturedAt).toLocaleTimeString()}
         </Text>
       </View>
@@ -143,11 +178,14 @@ function NotificationRow({ item }: { item: CapturedNotification }): React.JSX.El
 
 function ExtractionTab(): React.JSX.Element {
   const buffer = getExtractionBuffer();
+  const theme = useTheme();
 
   if (buffer.length === 0) {
     return (
       <View style={styles.emptyTab}>
-        <Text style={styles.emptyText}>No extraction decisions yet.</Text>
+        <Text style={[styles.emptyText, { color: theme.onSurface }]}>
+          No extraction decisions yet.
+        </Text>
       </View>
     );
   }
@@ -155,13 +193,32 @@ function ExtractionTab(): React.JSX.Element {
   return (
     <View style={styles.logList}>
       {buffer.map((item, i) => (
-        <ExtractionRow key={i} item={item} />
+        <ExtractionRow
+          key={i}
+          item={item}
+          surfaceColor={theme.surface}
+          outlineColor={theme.outline}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+        />
       ))}
     </View>
   );
 }
 
-function ExtractionRow({ item }: { item: ExtractionDecisionLog }): React.JSX.Element {
+function ExtractionRow({
+  item,
+  surfaceColor,
+  outlineColor,
+  onSurfaceColor,
+  onSurfaceVariantColor,
+}: {
+  item: ExtractionDecisionLog;
+  surfaceColor: string;
+  outlineColor: string;
+  onSurfaceColor: string;
+  onSurfaceVariantColor: string;
+}): React.JSX.Element {
   const decisionColor =
     item.decision === 'CREATE'
       ? Colors.success
@@ -170,13 +227,13 @@ function ExtractionRow({ item }: { item: ExtractionDecisionLog }): React.JSX.Ele
         : Colors.error;
 
   return (
-    <View style={styles.logRow}>
+    <View style={[styles.logRow, { backgroundColor: surfaceColor, borderColor: outlineColor }]}>
       <View style={[styles.statusDot, { backgroundColor: decisionColor }]} />
       <View style={styles.logContent}>
-        <Text style={styles.logTitle} numberOfLines={1}>
+        <Text style={[styles.logTitle, { color: onSurfaceColor }]} numberOfLines={1}>
           {item.input.slice(0, 60)}
         </Text>
-        <Text style={styles.logMeta}>
+        <Text style={[styles.logMeta, { color: onSurfaceVariantColor }]}>
           {item.decision} · score: {item.finalScore.toFixed(2)} · {item.language}
         </Text>
         {item.matchedKeywords.length > 0 && (
@@ -191,6 +248,7 @@ function ExtractionRow({ item }: { item: ExtractionDecisionLog }): React.JSX.Ele
 
 function DiscardedTab(): React.JSX.Element {
   const queryClient = useQueryClient();
+  const theme = useTheme();
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ['discarded-log'],
@@ -225,7 +283,7 @@ function DiscardedTab(): React.JSX.Element {
   if (isLoading) {
     return (
       <View style={styles.emptyTab}>
-        <Text style={styles.emptyText}>Loading...</Text>
+        <Text style={[styles.emptyText, { color: theme.onSurface }]}>Loading...</Text>
       </View>
     );
   }
@@ -233,8 +291,10 @@ function DiscardedTab(): React.JSX.Element {
   if (entries.length === 0) {
     return (
       <View style={styles.emptyTab}>
-        <Text style={styles.emptyText}>No discarded notifications yet.</Text>
-        <Text style={styles.emptyHint}>
+        <Text style={[styles.emptyText, { color: theme.onSurface }]}>
+          No discarded notifications yet.
+        </Text>
+        <Text style={[styles.emptyHint, { color: theme.onSurfaceVariant }]}>
           Notifications that scored below the confidence threshold appear here. You can promote any
           of them to the confirmation queue manually.
         </Text>
@@ -250,6 +310,10 @@ function DiscardedTab(): React.JSX.Element {
           entry={entry}
           onPromote={() => promoteMutation.mutate(entry)}
           promoting={promoteMutation.isPending}
+          surfaceColor={theme.surface}
+          outlineColor={theme.outline}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
         />
       ))}
     </View>
@@ -260,22 +324,32 @@ function DiscardedRow({
   entry,
   onPromote,
   promoting,
+  surfaceColor,
+  outlineColor,
+  onSurfaceColor,
+  onSurfaceVariantColor,
 }: {
   entry: DiscardedLogEntry;
   onPromote: () => void;
   promoting: boolean;
+  surfaceColor: string;
+  outlineColor: string;
+  onSurfaceColor: string;
+  onSurfaceVariantColor: string;
 }): React.JSX.Element {
   const appLabel = entry.sourceApp.split('.').pop() ?? entry.sourceApp;
   return (
-    <View style={styles.discardedRow}>
+    <View
+      style={[styles.discardedRow, { backgroundColor: surfaceColor, borderColor: outlineColor }]}
+    >
       <View style={styles.logContent}>
-        <Text style={styles.logTitle} numberOfLines={1}>
+        <Text style={[styles.logTitle, { color: onSurfaceColor }]} numberOfLines={1}>
           [{appLabel}]{entry.sender ? ` ${entry.sender}` : ''}
         </Text>
-        <Text style={styles.logBody} numberOfLines={2}>
+        <Text style={[styles.logBody, { color: onSurfaceVariantColor }]} numberOfLines={2}>
           {entry.bodyPreview}
         </Text>
-        <Text style={styles.logMeta}>
+        <Text style={[styles.logMeta, { color: onSurfaceVariantColor }]}>
           {entry.reason} · score: {entry.confidence.toFixed(2)} ·{' '}
           {new Date(entry.createdAt).toLocaleTimeString()}
         </Text>
@@ -328,6 +402,7 @@ async function fetchDBStats(): Promise<DBStats> {
 }
 
 function DBTab(): React.JSX.Element {
+  const theme = useTheme();
   const {
     data: stats,
     isLoading,
@@ -341,7 +416,7 @@ function DBTab(): React.JSX.Element {
   if (isLoading || !stats) {
     return (
       <View style={styles.emptyTab}>
-        <Text style={styles.emptyText}>Loading stats...</Text>
+        <Text style={[styles.emptyText, { color: theme.onSurface }]}>Loading stats...</Text>
       </View>
     );
   }
@@ -350,14 +425,54 @@ function DBTab(): React.JSX.Element {
 
   return (
     <View style={styles.dbTab}>
-      <SystemRow label="Total Tasks" value={String(totalTasks)} highlight />
+      <SystemRow
+        label="Total Tasks"
+        value={String(totalTasks)}
+        highlight
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      />
       {Object.entries(stats.taskCounts).map(([status, count]) => (
-        <SystemRow key={status} label={`  ${status}`} value={String(count)} />
+        <SystemRow
+          key={status}
+          label={`  ${status}`}
+          value={String(count)}
+          outlineColor={theme.outline}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+        />
       ))}
-      <SystemRow label="Discarded Log" value={String(stats.discardedCount)} />
-      <SystemRow label="VIP Contacts" value={String(stats.vipCount)} />
-      <SystemRow label="Monitored Apps" value={String(stats.monitoredAppsCount)} />
-      {stats.dbSizeKb !== null && <SystemRow label="DB File Size" value={`${stats.dbSizeKb} KB`} />}
+      <SystemRow
+        label="Discarded Log"
+        value={String(stats.discardedCount)}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      />
+      <SystemRow
+        label="VIP Contacts"
+        value={String(stats.vipCount)}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      />
+      <SystemRow
+        label="Monitored Apps"
+        value={String(stats.monitoredAppsCount)}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      />
+      {stats.dbSizeKb !== null && (
+        <SystemRow
+          label="DB File Size"
+          value={`${stats.dbSizeKb} KB`}
+          outlineColor={theme.outline}
+          onSurfaceColor={theme.onSurface}
+          onSurfaceVariantColor={theme.onSurfaceVariant}
+        />
+      )}
       <Pressable style={styles.refreshBtn} onPress={() => void refetch()}>
         <Text style={styles.refreshBtnText}>Refresh</Text>
       </Pressable>
@@ -366,12 +481,37 @@ function DBTab(): React.JSX.Element {
 }
 
 function SystemTab(): React.JSX.Element {
+  const theme = useTheme();
   return (
     <View style={styles.dbTab}>
-      <SystemRow label="App Version" value="0.1.0" />
-      <SystemRow label="Commit" value={process.env['EXPO_PUBLIC_COMMIT_SHA'] ?? 'dev'} />
-      <SystemRow label="React Native" value="0.76.9" />
-      <SystemRow label="Expo SDK" value="52" />
+      <SystemRow
+        label="App Version"
+        value="0.1.0"
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      />
+      <SystemRow
+        label="Commit"
+        value={process.env['EXPO_PUBLIC_COMMIT_SHA'] ?? 'dev'}
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      />
+      <SystemRow
+        label="React Native"
+        value="0.76.9"
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      />
+      <SystemRow
+        label="Expo SDK"
+        value="52"
+        outlineColor={theme.outline}
+        onSurfaceColor={theme.onSurface}
+        onSurfaceVariantColor={theme.onSurfaceVariant}
+      />
     </View>
   );
 }
@@ -380,21 +520,43 @@ function SystemRow({
   label,
   value,
   highlight,
+  outlineColor,
+  onSurfaceColor,
+  onSurfaceVariantColor,
 }: {
   label: string;
   value: string;
   highlight?: boolean;
+  outlineColor: string;
+  onSurfaceColor: string;
+  onSurfaceVariantColor: string;
 }): React.JSX.Element {
   return (
-    <View style={styles.systemRow}>
-      <Text style={[styles.systemLabel, highlight && styles.systemLabelHighlight]}>{label}</Text>
-      <Text style={[styles.systemValue, highlight && styles.systemValueHighlight]}>{value}</Text>
+    <View style={[styles.systemRow, { borderBottomColor: outlineColor }]}>
+      <Text
+        style={[
+          styles.systemLabel,
+          { color: onSurfaceVariantColor },
+          highlight && styles.systemLabelHighlight,
+        ]}
+      >
+        {label}
+      </Text>
+      <Text
+        style={[
+          styles.systemValue,
+          { color: onSurfaceColor },
+          highlight && styles.systemValueHighlight,
+        ]}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -411,9 +573,7 @@ const styles = StyleSheet.create({
   exportBtn: { padding: 4, minWidth: 56, alignItems: 'flex-end' },
   exportText: { fontSize: 14, color: Colors.white, fontWeight: '700' },
   tabBar: {
-    backgroundColor: Colors.surfaceLight,
     borderBottomWidth: 2,
-    borderBottomColor: Colors.outlineLight,
     maxHeight: 46,
   },
   tabBarContent: { alignItems: 'center' },
@@ -424,20 +584,18 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.transparent,
   },
   tabActive: { borderBottomColor: Colors.primary900 },
-  tabText: { fontSize: 12, fontWeight: '600', color: Colors.onSurfaceVariantLight },
+  tabText: { fontSize: 12, fontWeight: '600' },
   tabTextActive: { color: Colors.primary900, fontWeight: '800' },
   content: { flex: 1 },
   emptyTab: { padding: 32, alignItems: 'center' },
   emptyText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.onSurfaceLight,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyHint: {
     fontSize: 12,
-    color: Colors.onSurfaceVariantLight,
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -445,27 +603,23 @@ const styles = StyleSheet.create({
   logRow: {
     flexDirection: 'row',
     gap: 10,
-    backgroundColor: Colors.surfaceLight,
     padding: 12,
     borderRadius: 2,
     borderWidth: 1,
-    borderColor: Colors.outlineLight,
   },
   statusDot: { width: 8, height: 8, borderRadius: 2, marginTop: 4 },
   logContent: { flex: 1 },
-  logTitle: { fontSize: 12, fontWeight: '700', color: Colors.onSurfaceLight, marginBottom: 2 },
-  logBody: { fontSize: 11, color: Colors.onSurfaceVariantLight, marginBottom: 2 },
-  logMeta: { fontSize: 11, color: Colors.onSurfaceVariantLight },
+  logTitle: { fontSize: 12, fontWeight: '700', marginBottom: 2 },
+  logBody: { fontSize: 11, marginBottom: 2 },
+  logMeta: { fontSize: 11 },
   logKeywords: { fontSize: 11, color: Colors.primary900, marginTop: 2, fontWeight: '600' },
   discardedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Colors.surfaceLight,
     padding: 12,
     borderRadius: 2,
     borderWidth: 1,
-    borderColor: Colors.outlineLight,
     marginBottom: 8,
   },
   promoteBtn: {
@@ -482,11 +636,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.outlineLight,
   },
-  systemLabel: { fontSize: 13, color: Colors.onSurfaceVariantLight },
+  systemLabel: { fontSize: 13 },
   systemLabelHighlight: { color: Colors.primary900, fontWeight: '700' },
-  systemValue: { fontSize: 13, color: Colors.onSurfaceLight, fontWeight: '500' },
+  systemValue: { fontSize: 13, fontWeight: '500' },
   systemValueHighlight: { color: Colors.primary900, fontWeight: '800' },
   refreshBtn: {
     marginTop: 16,

@@ -2,12 +2,14 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 
 export default function EmailReportScreen(): React.JSX.Element {
+  const theme = useTheme();
   const router = useRouter();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
           <Text style={styles.backText}>Back</Text>
@@ -17,12 +19,14 @@ export default function EmailReportScreen(): React.JSX.Element {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.card}>
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>STATUS</Text>
-            <Text style={styles.statusValue}>Not configured</Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          <View style={[styles.statusRow, { borderBottomColor: theme.outline }]}>
+            <Text style={[styles.statusLabel, { color: theme.onSurfaceVariant }]}>STATUS</Text>
+            <Text style={[styles.statusValue, { color: theme.onSurfaceVariant }]}>
+              Not configured
+            </Text>
           </View>
-          <Text style={styles.description}>
+          <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
             Daily email digests summarise your completed and pending tasks. This feature requires
             SMTP server credentials and is not yet available.
           </Text>
@@ -33,7 +37,7 @@ export default function EmailReportScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -50,9 +54,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, padding: 16 },
   card: {
     marginTop: 8,
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
-    borderColor: Colors.outlineLight,
     borderRadius: 2,
     padding: 16,
   },
@@ -63,23 +65,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.outlineLight,
   },
   statusLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.onSurfaceVariantLight,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   statusValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.onSurfaceVariantLight,
   },
   description: {
     fontSize: 13,
-    color: Colors.onSurfaceVariantLight,
     lineHeight: 20,
   },
 });

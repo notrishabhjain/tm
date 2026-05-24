@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet, Pressable, Alert } from 'react-native
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { LearnedKeywordRepository } from '@/data/repositories/LearnedKeywordRepository';
 import { db } from '@/data/db/client';
@@ -14,6 +15,7 @@ const DEPTH = 4;
 type VocabTab = 'ACTIVE' | 'PENDING' | 'DEMOTED';
 
 export default function VocabularyScreen(): React.JSX.Element {
+  const theme = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<VocabTab>('ACTIVE');
@@ -66,7 +68,7 @@ export default function VocabularyScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
           <Text style={styles.backText}>Back</Text>
@@ -76,14 +78,25 @@ export default function VocabularyScreen(): React.JSX.Element {
       </View>
 
       {/* Tab bar */}
-      <View style={styles.tabBar}>
+      <View
+        style={[
+          styles.tabBar,
+          { backgroundColor: theme.surface, borderBottomColor: theme.outline },
+        ]}
+      >
         {(['ACTIVE', 'PENDING', 'DEMOTED'] as VocabTab[]).map((t) => (
           <Pressable
             key={t}
             style={[styles.tab, tab === t && styles.tabActive]}
             onPress={() => setTab(t)}
           >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+            <Text
+              style={[
+                styles.tabText,
+                { color: theme.onSurfaceVariant },
+                tab === t && styles.tabTextActive,
+              ]}
+            >
               {t.charAt(0) + t.slice(1).toLowerCase()} ({tabCounts[t]})
             </Text>
           </Pressable>
@@ -103,10 +116,10 @@ export default function VocabularyScreen(): React.JSX.Element {
         renderItem={({ item }) => (
           <View style={[styles.rowWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
             <View style={styles.rowShadow} />
-            <View style={styles.row}>
+            <View style={[styles.row, { backgroundColor: theme.surface }]}>
               <View style={styles.rowMain}>
-                <Text style={styles.phrase}>{item.ngram}</Text>
-                <Text style={styles.meta}>
+                <Text style={[styles.phrase, { color: theme.onSurface }]}>{item.ngram}</Text>
+                <Text style={[styles.meta, { color: theme.onSurfaceVariant }]}>
                   {item.language} · seen {item.occurrenceCount}×
                 </Text>
               </View>
@@ -124,7 +137,7 @@ export default function VocabularyScreen(): React.JSX.Element {
                     style={styles.actionBtn}
                     onPress={() => setStatusMutation.mutate({ id: item.id, status: 'DEMOTED' })}
                   >
-                    <Text style={[styles.actionBtnText, { color: Colors.onSurfaceVariantLight }]}>
+                    <Text style={[styles.actionBtnText, { color: theme.onSurfaceVariant }]}>
                       Demote
                     </Text>
                   </Pressable>
@@ -150,7 +163,7 @@ export default function VocabularyScreen(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -166,9 +179,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '800', color: Colors.white },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceLight,
     borderBottomWidth: 2,
-    borderBottomColor: Colors.outlineLight,
   },
   tab: {
     flex: 1,
@@ -178,7 +189,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.transparent,
   },
   tabActive: { borderBottomColor: Colors.primary900 },
-  tabText: { fontSize: 12, fontWeight: '600', color: Colors.onSurfaceVariantLight },
+  tabText: { fontSize: 12, fontWeight: '600' },
   tabTextActive: { color: Colors.primary900, fontWeight: '800' },
   list: { paddingTop: 8, paddingBottom: 16 },
   emptyContainer: { flex: 1 },
@@ -195,15 +206,14 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
     padding: 14,
   },
   rowMain: { flex: 1 },
-  phrase: { fontSize: 14, fontWeight: '700', color: Colors.onSurfaceLight, marginBottom: 2 },
-  meta: { fontSize: 11, color: Colors.onSurfaceVariantLight },
+  phrase: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  meta: { fontSize: 11 },
   actions: { flexDirection: 'row', gap: 12 },
   actionBtn: { padding: 4 },
   actionBtnText: { fontSize: 12, fontWeight: '700' },

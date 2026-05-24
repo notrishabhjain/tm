@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
+import { useTheme } from '@/ui/theme';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
@@ -34,6 +35,7 @@ function startOfDay(date: Date): number {
 
 export default function HistoryScreen(): React.JSX.Element {
   const [filter, setFilter] = useState<FilterPeriod>('ALL');
+  const theme = useTheme();
 
   const { data: allTasks = [], isLoading } = useQuery({
     queryKey: ['tasks', 'completed'],
@@ -59,7 +61,7 @@ export default function HistoryScreen(): React.JSX.Element {
   }, [tasks]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Filter strip */}
       <View style={styles.filterRow}>
         {(Object.keys(FILTER_LABELS) as FilterPeriod[]).map((f) => (
@@ -79,8 +81,8 @@ export default function HistoryScreen(): React.JSX.Element {
       {tasks.length > 0 && (
         <View style={[styles.statsWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
           <View style={styles.statsShadow} />
-          <View style={styles.statsCard}>
-            <Text style={styles.statsTotal}>
+          <View style={[styles.statsCard, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.statsTotal, { color: theme.onSurface }]}>
               {tasks.length} task{tasks.length !== 1 ? 's' : ''} completed
             </Text>
             <View style={styles.breakdownRow}>
@@ -89,7 +91,7 @@ export default function HistoryScreen(): React.JSX.Element {
                 .map((p) => (
                   <View key={p} style={styles.breakdownItem}>
                     <View style={[styles.breakdownDot, { backgroundColor: getPriorityColor(p) }]} />
-                    <Text style={styles.breakdownLabel}>
+                    <Text style={[styles.breakdownLabel, { color: theme.onSurfaceVariant }]}>
                       {p.charAt(0) + p.slice(1).toLowerCase()} {priorityBreakdown[p]}
                     </Text>
                   </View>
@@ -102,7 +104,13 @@ export default function HistoryScreen(): React.JSX.Element {
       <FlatList
         data={tasks}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <HistoryTaskRow task={item} />}
+        renderItem={({ item }) => (
+          <HistoryTaskRow
+            task={item}
+            surfaceColor={theme.surface}
+            onSurfaceVariantColor={theme.onSurfaceVariant}
+          />
+        )}
         contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
         ListEmptyComponent={
           isLoading ? null : (
@@ -121,19 +129,27 @@ export default function HistoryScreen(): React.JSX.Element {
   );
 }
 
-function HistoryTaskRow({ task }: { task: Task }): React.JSX.Element {
+function HistoryTaskRow({
+  task,
+  surfaceColor,
+  onSurfaceVariantColor,
+}: {
+  task: Task;
+  surfaceColor: string;
+  onSurfaceVariantColor: string;
+}): React.JSX.Element {
   const priorityColor = getPriorityColor(task.priority);
 
   return (
     <View style={[styles.rowWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
       <View style={[styles.rowShadow, { backgroundColor: priorityColor + '55' }]} />
-      <View style={[styles.row, { borderColor: priorityColor }]}>
+      <View style={[styles.row, { borderColor: priorityColor, backgroundColor: surfaceColor }]}>
         <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
         <View style={styles.rowContent}>
-          <Text style={styles.taskTitle} numberOfLines={1}>
+          <Text style={[styles.taskTitle, { color: onSurfaceVariantColor }]} numberOfLines={1}>
             {task.title}
           </Text>
-          <Text style={styles.rowMeta}>
+          <Text style={[styles.rowMeta, { color: onSurfaceVariantColor }]}>
             {task.completedAt ? formatDate(task.completedAt) : 'Unknown'} ·{' '}
             {task.sourceApp.split('.').pop()}
           </Text>
@@ -147,7 +163,7 @@ function HistoryTaskRow({ task }: { task: Task }): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.backgroundLight },
+  container: { flex: 1 },
   filterRow: {
     flexDirection: 'row',
     gap: 8,
@@ -185,7 +201,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   statsCard: {
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.primary900,
     borderRadius: 2,
@@ -194,14 +209,13 @@ const styles = StyleSheet.create({
   statsTotal: {
     fontSize: 14,
     fontWeight: '800',
-    color: Colors.onSurfaceLight,
     marginBottom: 8,
     letterSpacing: 0.2,
   },
   breakdownRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   breakdownItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   breakdownDot: { width: 8, height: 8, borderRadius: 2 },
-  breakdownLabel: { fontSize: 12, color: Colors.onSurfaceVariantLight, fontWeight: '500' },
+  breakdownLabel: { fontSize: 12, fontWeight: '500' },
   list: { paddingTop: 8, paddingBottom: 16 },
   emptyContainer: { flex: 1 },
   rowWrapper: { marginHorizontal: 16, marginVertical: 4, position: 'relative' },
@@ -216,7 +230,6 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderRadius: 2,
     overflow: 'hidden',
@@ -226,11 +239,10 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.onSurfaceVariantLight,
     textDecorationLine: 'line-through',
     marginBottom: 2,
   },
-  rowMeta: { fontSize: 11, color: Colors.onSurfaceVariantLight },
+  rowMeta: { fontSize: 11 },
   doneBadge: {
     marginRight: 12,
     paddingHorizontal: 8,
