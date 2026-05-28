@@ -39,6 +39,7 @@ export interface NotificationData {
   bigText: string;
   subText: string;
   postTime: number;
+  notificationKey: string;
   isGroup: boolean;
 }
 
@@ -100,6 +101,7 @@ export interface SenderStats {
 export interface DiscardedLogEntry {
   id: string;
   notificationId: string;
+  notificationKey: string | null;
   sourceApp: string;
   sender: string | null;
   bodyPreview: string;

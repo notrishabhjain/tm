@@ -109,7 +109,10 @@ export default function HomeScreen(): React.JSX.Element {
     onError: (_err, _id, context) => {
       if (context?.previous) queryClient.setQueryData(['tasks', 'pending'], context.previous);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      void NotificationListener.updateWidget();
+    },
   });
 
   const deleteMutation = useMutation({
@@ -126,7 +129,10 @@ export default function HomeScreen(): React.JSX.Element {
     onError: (_err, _id, context) => {
       if (context?.previous) queryClient.setQueryData(['tasks', 'pending'], context.previous);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      void NotificationListener.updateWidget();
+    },
   });
 
   const filtered = useMemo(() => {

@@ -12,6 +12,7 @@ import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogReposito
 import { LearnedKeywordRepository } from '@/data/repositories/LearnedKeywordRepository';
 import { db } from '@/data/db/client';
 import { extractNgrams, languageForText } from '@/services/ngram-extractor';
+import NotificationListener from '../../../modules/notification-listener/src';
 import type { Task } from '@/domain/types';
 
 const taskRepo = new TaskRepository(db);
@@ -58,13 +59,17 @@ export default function ConfirmationsScreen(): React.JSX.Element {
         queryClient.setQueryData(['tasks', 'confirmation'], context.previous);
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      void NotificationListener.updateWidget();
+    },
   });
 
   const rejectMutation = useMutation({
     mutationFn: async (task: Task) => {
       await discardedRepo.insert({
         notificationId: task.id,
+        notificationKey: null,
         sourceApp: task.sourceApp,
         sender: task.sender ?? null,
         bodyPreview: task.body ?? task.title,
@@ -93,6 +98,7 @@ export default function ConfirmationsScreen(): React.JSX.Element {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
       void queryClient.invalidateQueries({ queryKey: ['discarded-log'] });
+      void NotificationListener.updateWidget();
     },
   });
 

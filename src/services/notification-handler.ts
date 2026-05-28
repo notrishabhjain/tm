@@ -55,6 +55,20 @@ export async function handleNotification(taskData: {
 
   initializeDatabase();
 
+  // ── Notification-key deduplication (DB-level, survives Kotlin cache expiry) ──
+  if (notification.notificationKey) {
+    const taskRepo = new TaskRepository(db);
+    const discardedRepo = new DiscardedLogRepository(db);
+    const [existing, alreadyDiscarded] = await Promise.all([
+      taskRepo.findByNotificationKey(notification.notificationKey),
+      discardedRepo.existsByNotificationKey(notification.notificationKey),
+    ]);
+    if (existing ?? alreadyDiscarded) {
+      logCapturedNotification(notification, 'FILTERED');
+      return;
+    }
+  }
+
   // ── App filter ───────────────────────────────────────────────────────────────
   const monitoredRepo = new MonitoredAppRepository(db);
   const activePackages = await monitoredRepo.getActivePackageNames();
@@ -86,6 +100,7 @@ export async function handleNotification(taskData: {
       needsConfirmation: false,
       matchedKeywords: ['vip_contact'],
       language: 'EN',
+      notificationKey: notification.notificationKey || null,
       createdAt: notification.postTime || Date.now(),
     });
     logExtractionDecision({
@@ -131,6 +146,7 @@ export async function handleNotification(taskData: {
     const discardedRepo = new DiscardedLogRepository(db);
     await discardedRepo.insert({
       notificationId: `${notification.packageName}-${notification.postTime}`,
+      notificationKey: notification.notificationKey || null,
       sourceApp: notification.packageName,
       sender: notification.title,
       bodyPreview: (notification.bigText || notification.text).slice(0, 100),
@@ -185,6 +201,7 @@ export async function handleNotification(taskData: {
     matchedKeywords,
     language: 'EN',
     dueDate: result.extractedDeadline ?? null,
+    notificationKey: notification.notificationKey || null,
     createdAt: notification.postTime || Date.now(),
   });
 
@@ -219,5 +236,10 @@ async function refreshPersistentNotification(taskRepo: TaskRepository): Promise<
     });
   } catch {
     /* ForegroundService may not be running — non-fatal */
+  }
+  try {
+    await NotificationListener.updateWidget();
+  } catch {
+    /* Widget may not be pinned — non-fatal */
   }
 }

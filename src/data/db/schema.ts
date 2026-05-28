@@ -19,6 +19,7 @@ export const tasks = sqliteTable(
     calendarEventId: text('calendar_event_id'),
     dueDate: integer('due_date'),
     screenshotPath: text('screenshot_path'),
+    notificationKey: text('notification_key'),
     createdAt: integer('created_at').notNull(),
     completedAt: integer('completed_at'),
     deletedAt: integer('deleted_at'),
@@ -29,6 +30,7 @@ export const tasks = sqliteTable(
     priorityIdx: index('idx_tasks_priority').on(table.priority),
     confirmIdx: index('idx_tasks_needs_confirmation').on(table.needsConfirmation),
     deletedAtIdx: index('idx_tasks_deleted_at').on(table.deletedAt),
+    notificationKeyIdx: uniqueIndex('idx_tasks_notification_key').on(table.notificationKey),
   })
 );
 
@@ -110,6 +112,7 @@ export const trainingLog = sqliteTable('training_log', {
 export const discardedLog = sqliteTable('discarded_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   notificationId: text('notification_id').notNull().default(''),
+  notificationKey: text('notification_key'),
   sourceApp: text('source_app').notNull(),
   sender: text('sender'),
   bodyPreview: text('body_preview').notNull(),

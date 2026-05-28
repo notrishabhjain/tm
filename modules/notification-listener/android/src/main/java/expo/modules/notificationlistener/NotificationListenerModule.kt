@@ -1,5 +1,6 @@
 package expo.modules.notificationlistener
 
+import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -132,6 +133,25 @@ class NotificationListenerModule : Module() {
 
         AsyncFunction("scanActiveNotifications") {
             TaskMindNotificationListenerService.triggerActiveScan()
+        }
+
+        AsyncFunction("updateWidget") {
+            TaskWidgetProvider.triggerUpdate(context)
+        }
+
+        AsyncFunction("requestPinWidget") {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val manager = AppWidgetManager.getInstance(context)
+                val provider = ComponentName(context, TaskWidgetProvider::class.java)
+                if (manager.isRequestPinAppWidgetSupported) {
+                    manager.requestPinAppWidget(provider, null, null)
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
         }
     }
 

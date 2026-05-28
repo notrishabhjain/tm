@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
@@ -171,6 +171,23 @@ export default function SettingsScreen(): React.JSX.Element {
             label="Export / Import"
             subtitle="JSON or CSV"
             onPress={() => void router.push('/settings/export-import')}
+          />
+        </Section>
+
+        <Section title="Widget">
+          <NavRow
+            label="Pin Widget to Home Screen"
+            subtitle="Shows pending tasks on your home screen"
+            onPress={() => {
+              void NotificationListener.requestPinWidget().then((supported) => {
+                if (!supported) {
+                  Alert.alert(
+                    'Not Supported',
+                    'Your launcher does not support pinning widgets programmatically. Long-press your home screen and add the TaskMind widget manually.'
+                  );
+                }
+              });
+            }}
           />
         </Section>
 

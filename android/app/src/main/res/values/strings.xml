@@ -3,4 +3,7 @@
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
   <string name="accessibility_service_description">TaskMind captures a screenshot when you share content to preserve task context. No data leaves your device.</string>
+  <string name="widget_description">Shows your pending TaskMind tasks</string>
+  <string name="widget_no_tasks">No pending tasks</string>
+  <string name="widget_tap_to_open">Tap to open TaskMind</string>
 </resources>

@@ -12,6 +12,7 @@ export interface NotificationData {
   bigText: string;
   subText: string;
   postTime: number;
+  notificationKey: string; // stable Android sbn.key — used for deduplication
   isGroup: boolean;
   // MessagingStyle thread — last N messages from the conversation
   thread: ThreadMessage[];

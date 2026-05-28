@@ -21,6 +21,7 @@ export interface CreateTaskInput {
   needsConfirmation: boolean;
   dueDate?: number | null;
   screenshotPath?: string | null;
+  notificationKey?: string | null;
   createdAt?: number;
 }
 
@@ -65,6 +66,7 @@ export class TaskRepository {
       needsConfirmation: input.needsConfirmation,
       dueDate: input.dueDate ?? null,
       screenshotPath: input.screenshotPath ?? null,
+      notificationKey: input.notificationKey ?? null,
       createdAt: now,
     });
 
@@ -188,6 +190,15 @@ export class TaskRepository {
       .orderBy(desc(tasks.createdAt))
       .limit(10);
     return rows as { id: string; title: string }[];
+  }
+
+  async findByNotificationKey(notificationKey: string): Promise<Task | null> {
+    const result = await this.db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.notificationKey, notificationKey), isNull(tasks.deletedAt)))
+      .limit(1);
+    return result[0] ? mapRow(result[0]) : null;
   }
 
   async countByStatus(): Promise<Record<string, number>> {

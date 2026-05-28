@@ -23,7 +23,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         fun triggerActiveScan() {
             serviceInstance?.scanActiveNotificationsInternal()
         }
-        private const val DEDUP_WINDOW_MS = 5000L
+        private const val DEDUP_WINDOW_MS = 60_000L
         private const val DEDUP_CACHE_MAX = 100
         private const val MAX_THREAD_MESSAGES = 10
 
@@ -117,12 +117,12 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         // Hard discard filter (applied before deduplication)
         if (shouldDiscard(packageName, title, text, bigText, category)) return
 
-        // Deduplication: same (package, title, text) within 5 seconds
-        val dedupKey = "$packageName|$title|$text"
+        // Deduplication: same notification key within 60 seconds (covers rapid re-deliveries)
+        val notificationKey = sbn.key
         val now = System.currentTimeMillis()
-        val lastSeen = dedupCache[dedupKey]
+        val lastSeen = dedupCache[notificationKey]
         if (lastSeen != null && (now - lastSeen) < DEDUP_WINDOW_MS) return
-        dedupCache[dedupKey] = now
+        dedupCache[notificationKey] = now
 
         val appName = try {
             packageManager.getApplicationLabel(
@@ -153,6 +153,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
             "bigText" to bigText,
             "subText" to subText,
             "postTime" to sbn.postTime,
+            "notificationKey" to notificationKey,
             "isGroup" to isGroup,
             "thread" to thread,
             "category" to category,

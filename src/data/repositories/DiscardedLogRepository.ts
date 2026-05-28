@@ -9,6 +9,7 @@ function mapRow(row: typeof discardedLog.$inferSelect): DiscardedLogEntry {
   return {
     id: String(row.id),
     notificationId: row.notificationId,
+    notificationKey: row.notificationKey ?? null,
     sourceApp: row.sourceApp,
     sender: row.sender ?? null,
     bodyPreview: row.bodyPreview,
@@ -24,6 +25,7 @@ export class DiscardedLogRepository {
   async insert(entry: Omit<DiscardedLogEntry, 'id'>): Promise<void> {
     await this.db.insert(discardedLog).values({
       notificationId: entry.notificationId,
+      notificationKey: entry.notificationKey ?? null,
       sourceApp: entry.sourceApp,
       sender: entry.sender ?? null,
       bodyPreview: entry.bodyPreview.slice(0, 300),
@@ -57,6 +59,15 @@ export class DiscardedLogRepository {
 
   async deleteById(id: number): Promise<void> {
     await this.db.delete(discardedLog).where(eq(discardedLog.id, id));
+  }
+
+  async existsByNotificationKey(notificationKey: string): Promise<boolean> {
+    const result = await this.db
+      .select({ id: discardedLog.id })
+      .from(discardedLog)
+      .where(eq(discardedLog.notificationKey, notificationKey))
+      .limit(1);
+    return result.length > 0;
   }
 
   async count(): Promise<number> {

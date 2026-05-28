@@ -80,6 +80,33 @@ function withNotificationListenerManifest(config) {
       });
     }
 
+    // TaskWidgetProvider
+    const widgetExists = application.receiver.some(
+      (r) => r.$?.['android:name'] === 'expo.modules.notificationlistener.TaskWidgetProvider'
+    );
+    if (!widgetExists) {
+      application.receiver.push({
+        $: {
+          'android:name': 'expo.modules.notificationlistener.TaskWidgetProvider',
+          'android:exported': 'true',
+          'android:label': 'TaskMind Tasks',
+        },
+        'intent-filter': [
+          {
+            action: [{ $: { 'android:name': 'android.appwidget.action.APPWIDGET_UPDATE' } }],
+          },
+        ],
+        'meta-data': [
+          {
+            $: {
+              'android:name': 'android.appwidget.provider',
+              'android:resource': '@xml/task_widget_info',
+            },
+          },
+        ],
+      });
+    }
+
     return modConfig;
   });
 }

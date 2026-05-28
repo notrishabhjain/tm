@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A2540"
+    android:padding="12dp">
+
+    <!-- Header row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="TASKMIND"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.12" />
+
+        <TextView
+            android:id="@+id/widget_count_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:background="#1E3A5F" />
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1E3A5F"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Task row 1 -->
+    <LinearLayout
+        android:id="@+id/widget_task_row_1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/widget_task_dot_1"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:background="#2E5B8E"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/widget_task_text_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#E8ECF0"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <!-- Task row 2 -->
+    <LinearLayout
+        android:id="@+id/widget_task_row_2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/widget_task_dot_2"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:background="#2E5B8E"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/widget_task_text_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#E8ECF0"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <!-- Task row 3 -->
+    <LinearLayout
+        android:id="@+id/widget_task_row_3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="4dp"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/widget_task_dot_3"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:background="#2E5B8E"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/widget_task_text_3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#E8ECF0"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <!-- Empty state -->
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_no_tasks"
+        android:textColor="#6B8FBF"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <!-- Spacer -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Footer -->
+    <TextView
+        android:id="@+id/widget_footer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_tap_to_open"
+        android:textColor="#6B8FBF"
+        android:textSize="10sp" />
+
+</LinearLayout>
