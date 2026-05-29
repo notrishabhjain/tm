@@ -111,7 +111,6 @@ export default function HomeScreen(): React.JSX.Element {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      void NotificationListener.updateWidget();
     },
   });
 
@@ -131,7 +130,6 @@ export default function HomeScreen(): React.JSX.Element {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      void NotificationListener.updateWidget();
     },
   });
 

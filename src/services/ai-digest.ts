@@ -103,7 +103,6 @@ async function runDigest(): Promise<{ sent: boolean; error?: string }> {
         channelId: CHANNEL_ID,
         pressAction: { id: 'default', launchActivity: 'default' },
         color: '#0A2540',
-        smallIcon: 'ic_notification',
       },
     });
 

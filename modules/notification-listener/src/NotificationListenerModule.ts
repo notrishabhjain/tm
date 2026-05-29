@@ -97,16 +97,6 @@ const NotificationListenerModule = {
     return NativeModule.scanActiveNotifications() as Promise<void>;
   },
 
-  updateWidget(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.updateWidget() as Promise<void>;
-  },
-
-  requestPinWidget(): Promise<boolean> {
-    if (!NativeModule) return Promise.resolve(false);
-    return NativeModule.requestPinWidget() as Promise<boolean>;
-  },
-
   addNotificationListener(listener: (data: NotificationData) => void) {
     if (!emitter) return { remove: () => undefined };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

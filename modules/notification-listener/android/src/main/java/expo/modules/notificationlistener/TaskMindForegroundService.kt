@@ -35,9 +35,8 @@ class TaskMindForegroundService : Service() {
             ACTION_UPDATE_NOTIFICATION -> {
                 val pendingCount = intent.getIntExtra("pendingCount", 0)
                 val urgentCount = intent.getIntExtra("urgentCount", 0)
-                val topTask = intent.getStringExtra("topTaskText") ?: ""
-                val secondTask = intent.getStringExtra("secondTaskText")
-                val notification = buildNotification(pendingCount, urgentCount, topTask, secondTask)
+                val taskTexts = intent.getStringArrayListExtra("taskTexts") ?: arrayListOf()
+                val notification = buildNotification(pendingCount, urgentCount, taskTexts)
                 if (isRunning) {
                     notificationManager.notify(NOTIFICATION_ID, notification)
                 } else {
@@ -51,7 +50,7 @@ class TaskMindForegroundService : Service() {
             }
             else -> {
                 // Initial start
-                val notification = buildNotification(0, 0, "No pending tasks", null)
+                val notification = buildNotification(0, 0, arrayListOf())
                 startForeground(NOTIFICATION_ID, notification)
             }
         }
@@ -61,8 +60,7 @@ class TaskMindForegroundService : Service() {
     private fun buildNotification(
         pendingCount: Int,
         urgentCount: Int,
-        topTaskText: String,
-        secondTaskText: String?
+        taskTexts: List<String>
     ): Notification {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
         val launchPI = PendingIntent.getActivity(
@@ -80,14 +78,11 @@ class TaskMindForegroundService : Service() {
 
         val contentText = when {
             pendingCount == 0 -> "No pending tasks"
-            urgentCount > 0 -> "$pendingCount pending • $urgentCount urgent"
+            urgentCount > 0 -> "$pendingCount pending · $urgentCount urgent"
             else -> "$pendingCount pending tasks"
         }
 
-        val bigText = buildString {
-            if (topTaskText.isNotBlank()) append("• $topTaskText")
-            if (secondTaskText != null) append("\n• $secondTaskText")
-        }
+        val bigText = taskTexts.joinToString("\n") { "• $it" }
 
         val builder = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)

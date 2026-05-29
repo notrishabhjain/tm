@@ -25,8 +25,7 @@ export interface NotificationData {
 export interface PersistentNotificationParams {
   pendingCount: number;
   urgentCount: number;
-  topTaskText: string;
-  secondTaskText: string | null;
+  taskTexts: string[];
 }
 
 export type PermissionStatus = 'granted' | 'denied' | 'unknown';

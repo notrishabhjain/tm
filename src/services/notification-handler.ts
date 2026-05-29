@@ -57,14 +57,21 @@ export async function handleNotification(taskData: {
   initializeDatabase();
 
   // ── Notification-key deduplication (DB-level, survives Kotlin cache expiry) ──
+  // Messaging apps (WhatsApp, Signal) reuse the same notificationKey for a conversation
+  // thread, updating the body with each new message. We only skip if the text content
+  // is also identical — a changed body means a new message on the same thread.
   if (notification.notificationKey) {
     const taskRepo = new TaskRepository(db);
     const discardedRepo = new DiscardedLogRepository(db);
-    const [existing, alreadyDiscarded] = await Promise.all([
+    const currentText = (notification.bigText || notification.text || '').slice(0, 200);
+    const [existing, discardedEntry] = await Promise.all([
       taskRepo.findByNotificationKey(notification.notificationKey),
-      discardedRepo.existsByNotificationKey(notification.notificationKey),
+      discardedRepo.findByNotificationKey(notification.notificationKey),
     ]);
-    if (existing ?? alreadyDiscarded) {
+    const storedText = (existing?.body ?? discardedEntry?.bodyPreview ?? '').slice(0, 200);
+    const sameContent =
+      (existing !== null || discardedEntry !== null) && storedText === currentText;
+    if (sameContent) {
       logCapturedNotification(notification, 'FILTERED');
       return;
     }
@@ -279,22 +286,21 @@ export async function handleNotification(taskData: {
   await refreshPersistentNotification(taskRepo);
 }
 
+const PRIORITY_ORDER: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+
 async function refreshPersistentNotification(taskRepo: TaskRepository): Promise<void> {
   try {
     const pending = await taskRepo.getPendingTasks();
     const urgent = pending.filter((t) => t.priority === 'URGENT');
+    const sorted = [...pending].sort(
+      (a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3)
+    );
     await NotificationListener.updatePersistentNotification({
       pendingCount: pending.length,
       urgentCount: urgent.length,
-      topTaskText: pending[0]?.title ?? '',
-      secondTaskText: pending[1]?.title ?? null,
+      taskTexts: sorted.slice(0, 5).map((t) => t.title),
     });
   } catch {
     /* ForegroundService may not be running — non-fatal */
-  }
-  try {
-    await NotificationListener.updateWidget();
-  } catch {
-    /* Widget may not be pinned — non-fatal */
   }
 }

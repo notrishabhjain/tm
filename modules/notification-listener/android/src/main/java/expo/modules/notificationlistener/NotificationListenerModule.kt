@@ -71,12 +71,15 @@ class NotificationListenerModule : Module() {
         }
 
         AsyncFunction("updatePersistentNotification") { params: Map<String, Any> ->
+            @Suppress("UNCHECKED_CAST")
+            val taskTexts = (params["taskTexts"] as? List<*>)
+                ?.mapNotNull { it as? String }
+                ?: emptyList()
             val intent = Intent(context, TaskMindForegroundService::class.java).apply {
                 action = TaskMindForegroundService.ACTION_UPDATE_NOTIFICATION
                 putExtra("pendingCount", (params["pendingCount"] as? Number)?.toInt() ?: 0)
                 putExtra("urgentCount", (params["urgentCount"] as? Number)?.toInt() ?: 0)
-                putExtra("topTaskText", params["topTaskText"] as? String ?: "")
-                putExtra("secondTaskText", params["secondTaskText"] as? String)
+                putStringArrayListExtra("taskTexts", ArrayList(taskTexts))
             }
             context.startService(intent)
         }

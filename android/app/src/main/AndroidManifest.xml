@@ -57,13 +57,7 @@
       </intent-filter>
     </receiver>
     <receiver android:name="expo.modules.notificationlistener.QuickActionReceiver" android:exported="false"/>
-    <receiver android:name="expo.modules.notificationlistener.TaskWidgetProvider" android:exported="true" android:label="TaskMind Tasks">
-      <intent-filter>
-        <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
-      </intent-filter>
-      <meta-data android:name="android.appwidget.provider" android:resource="@xml/task_widget_info"/>
-    </receiver>
-    <service
+<service
         android:name="expo.modules.notificationlistener.TaskMindAccessibilityService"
         android:exported="true"
         android:label="TaskMind Screenshot Service"

@@ -70,6 +70,16 @@ export class DiscardedLogRepository {
     return result.length > 0;
   }
 
+  async findByNotificationKey(notificationKey: string): Promise<DiscardedLogEntry | null> {
+    const result = await this.db
+      .select()
+      .from(discardedLog)
+      .where(eq(discardedLog.notificationKey, notificationKey))
+      .orderBy(desc(discardedLog.createdAt))
+      .limit(1);
+    return result[0] ? mapRow(result[0]) : null;
+  }
+
   async count(): Promise<number> {
     return this.db.$count(discardedLog);
   }
