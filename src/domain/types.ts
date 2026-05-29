@@ -12,7 +12,8 @@ export type DiscardReason =
   | 'TOO_SHORT'
   | 'FILTERED'
   | 'USER_REJECTED'
-  | 'SPAM_OR_OTP';
+  | 'SPAM_OR_OTP'
+  | 'AI_DISCARD';
 
 export interface Task {
   id: string;

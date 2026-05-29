@@ -28,6 +28,13 @@ export interface AppSettings {
   auto_backup_enabled: boolean;
   diag_notification_buffer: string;
   diag_extraction_buffer: string;
+  // Cloud AI
+  ai_enabled: boolean;
+  ai_api_key: string;
+  ai_model: string;
+  ai_digest_enabled: boolean;
+  ai_digest_time: string;
+  ai_last_digest_date: string;
 }
 
 const DEFAULTS: AppSettings = {
@@ -49,6 +56,12 @@ const DEFAULTS: AppSettings = {
   auto_backup_enabled: true,
   diag_notification_buffer: '[]',
   diag_extraction_buffer: '[]',
+  ai_enabled: false,
+  ai_api_key: '',
+  ai_model: 'meta/llama-3.1-8b-instruct',
+  ai_digest_enabled: false,
+  ai_digest_time: '09:00',
+  ai_last_digest_date: '',
 };
 
 export function getSetting<K extends keyof AppSettings>(key: K): AppSettings[K] {

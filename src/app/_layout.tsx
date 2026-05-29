@@ -11,6 +11,7 @@ import { getSetting } from '@/data/storage/settings';
 import { seedDatabaseIfNeeded } from '@/services/db-seeder';
 import { handleNotification } from '@/services/notification-handler';
 import { restoreNudgeFromSettings } from '@/services/nudge-scheduler';
+import { runDailyDigestIfNeeded } from '@/services/ai-digest';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import NotificationListener from '../../modules/notification-listener/src';
 
@@ -119,6 +120,7 @@ export default function RootLayout(): React.JSX.Element {
         await seedDatabaseIfNeeded();
         const nudgeFreq = getSetting('nudge_freq_minutes');
         void restoreNudgeFromSettings(nudgeFreq);
+        void runDailyDigestIfNeeded();
         // Purge tasks archived > 30 days ago (non-fatal)
         try {
           await new TaskRepository(db).purgeOldArchivedTasks();

@@ -128,8 +128,13 @@ export default function SettingsScreen(): React.JSX.Element {
 
         <Section title="Intelligence">
           <NavRow
+            label="Cloud AI"
+            subtitle={getSetting('ai_enabled') ? 'NVIDIA · enabled' : 'Off — fully on-device'}
+            onPress={() => void router.push('/settings/ai-cloud')}
+          />
+          <NavRow
             label="Signal Engine"
-            subtitle="17-signal deterministic scorer, no AI models"
+            subtitle="17-signal deterministic scorer, local model"
             onPress={() => void router.push('/settings/ai-model')}
           />
           <NavRow

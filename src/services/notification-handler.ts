@@ -12,6 +12,7 @@ import { extractNgrams, languageForText } from './ngram-extractor';
 import { scoreNotification, buildSenderKey } from './signal-scorer';
 import { resolveCancellation } from './cancellation-resolver';
 import { extractTitle } from './title-extractor';
+import { classifyNotification } from './ai-classifier';
 import { getSetting } from '@/data/storage/settings';
 
 // Returns true if the current local time falls within user-configured quiet hours.
@@ -115,6 +116,60 @@ export async function handleNotification(taskData: {
     });
     await refreshPersistentNotification(new TaskRepository(db));
     return;
+  }
+
+  // ── Cloud AI classifier (when enabled, replaces heuristic pipeline) ─────────
+  if (getSetting('ai_enabled') && getSetting('ai_api_key')) {
+    const aiResult = await classifyNotification(notification);
+    if (aiResult !== null) {
+      const taskRepo2 = new TaskRepository(db);
+      const messageText2 = notification.bigText || notification.text || notification.title;
+      if (aiResult.isTask) {
+        const title2 =
+          aiResult.title ??
+          extractTitle(messageText2, notification.title ?? '', notification.packageName);
+        await taskRepo2.createTask({
+          title: title2,
+          body: notification.bigText || notification.text,
+          sourceApp: notification.packageName,
+          sender: notification.title,
+          priority: aiResult.priority,
+          confidence: 0.95,
+          needsConfirmation: false,
+          matchedKeywords: ['ai_classifier'],
+          language: 'EN',
+          dueDate: aiResult.dueDate ?? null,
+          notificationKey: notification.notificationKey || null,
+          createdAt: notification.postTime || Date.now(),
+        });
+        logExtractionDecision({
+          input: messageText2,
+          language: 'EN',
+          ruleScore: 0,
+          modelScore: 0.95,
+          finalScore: 0.95,
+          matchedKeywords: ['ai_classifier'],
+          decision: 'CREATE',
+          timestamp: Date.now(),
+        });
+      } else {
+        const discardedRepo2 = new DiscardedLogRepository(db);
+        await discardedRepo2.insert({
+          notificationId: `${notification.packageName}-${notification.postTime}`,
+          notificationKey: notification.notificationKey || null,
+          sourceApp: notification.packageName,
+          sender: notification.title,
+          bodyPreview: (notification.bigText || notification.text).slice(0, 100),
+          reason: 'AI_DISCARD',
+          confidence: 0.05,
+          createdAt: Date.now(),
+        });
+        logCapturedNotification(notification, 'FILTERED');
+      }
+      await refreshPersistentNotification(taskRepo2);
+      return;
+    }
+    // AI call failed (no key, timeout, error) → fall through to heuristic
   }
 
   // ── Cancellation resolver ────────────────────────────────────────────────────
