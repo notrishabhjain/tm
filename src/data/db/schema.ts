@@ -30,7 +30,7 @@ export const tasks = sqliteTable(
     priorityIdx: index('idx_tasks_priority').on(table.priority),
     confirmIdx: index('idx_tasks_needs_confirmation').on(table.needsConfirmation),
     deletedAtIdx: index('idx_tasks_deleted_at').on(table.deletedAt),
-    notificationKeyIdx: uniqueIndex('idx_tasks_notification_key').on(table.notificationKey),
+    notificationKeyIdx: index('idx_tasks_nk').on(table.notificationKey),
   })
 );
 

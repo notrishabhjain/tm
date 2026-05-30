@@ -149,6 +149,11 @@ export function initializeDatabase(): void {
     'ALTER TABLE tasks ADD COLUMN notification_key TEXT;',
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_notification_key ON tasks(notification_key) WHERE notification_key IS NOT NULL;',
     'ALTER TABLE discarded_log ADD COLUMN notification_key TEXT;',
+    // Drop unique constraint — messaging apps (WhatsApp/Signal) reuse the same
+    // sbn.key for a whole conversation, so multiple distinct messages must share
+    // the same notification_key. Content-aware dedup in JS prevents true duplicates.
+    'DROP INDEX IF EXISTS idx_tasks_notification_key;',
+    'CREATE INDEX IF NOT EXISTS idx_tasks_nk ON tasks(notification_key) WHERE notification_key IS NOT NULL;',
   ];
   for (const sql of columnMigrations) {
     try {

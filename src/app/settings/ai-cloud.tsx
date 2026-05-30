@@ -46,9 +46,15 @@ export default function AiCloudScreen(): React.JSX.Element {
 
   const handleAiToggle = useCallback(
     (val: boolean) => {
-      if (val && !apiKey.trim()) {
+      const trimmedKey = apiKey.trim();
+      if (val && !trimmedKey) {
         Alert.alert('API key required', 'Enter your NVIDIA API key before enabling Cloud AI.');
         return;
+      }
+      // Persist the key at the same time as enabling so the notification handler
+      // can read it — don't require a separate "Save key" tap before toggling on.
+      if (val && trimmedKey) {
+        setSetting('ai_api_key', trimmedKey);
       }
       setAiEnabled(val);
       setSetting('ai_enabled', val);
@@ -97,6 +103,7 @@ export default function AiCloudScreen(): React.JSX.Element {
       Alert.alert('No API key', 'Enter your NVIDIA API key first.');
       return;
     }
+    setSetting('ai_api_key', key); // persist so the notification handler can read it
     setTesting(true);
     setTestResult(null);
     const result = await testConnection(key, model);

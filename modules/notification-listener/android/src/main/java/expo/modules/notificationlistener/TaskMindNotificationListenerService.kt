@@ -117,12 +117,16 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         // Hard discard filter (applied before deduplication)
         if (shouldDiscard(packageName, title, text, bigText, category)) return
 
-        // Deduplication: same notification key within 60 seconds (covers rapid re-deliveries)
+        // Deduplication: same notification key + same content within 60 seconds.
+        // Using content-aware key so distinct messages on the same conversation thread
+        // (which share sbn.key in WhatsApp/Signal) each pass through independently.
         val notificationKey = sbn.key
         val now = System.currentTimeMillis()
-        val lastSeen = dedupCache[notificationKey]
+        val contentHash = (bigText.ifBlank { text }).hashCode()
+        val dedupKey = "$notificationKey|$contentHash"
+        val lastSeen = dedupCache[dedupKey]
         if (lastSeen != null && (now - lastSeen) < DEDUP_WINDOW_MS) return
-        dedupCache[notificationKey] = now
+        dedupCache[dedupKey] = now
 
         val appName = try {
             packageManager.getApplicationLabel(

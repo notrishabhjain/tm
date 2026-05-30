@@ -56,22 +56,19 @@ export async function handleNotification(taskData: {
 
   initializeDatabase();
 
-  // ── Notification-key deduplication (DB-level, survives Kotlin cache expiry) ──
-  // Messaging apps (WhatsApp, Signal) reuse the same notificationKey for a conversation
-  // thread, updating the body with each new message. We only skip if the text content
-  // is also identical — a changed body means a new message on the same thread.
+  // ── Notification-key + content deduplication (DB-level) ─────────────────────
+  // Messaging apps (WhatsApp, Signal) reuse the same notificationKey for a whole
+  // conversation thread. We check both key AND content so that distinct messages
+  // on the same thread each pass through, while true re-deliveries are filtered.
   if (notification.notificationKey) {
     const taskRepo = new TaskRepository(db);
     const discardedRepo = new DiscardedLogRepository(db);
     const currentText = (notification.bigText || notification.text || '').slice(0, 200);
-    const [existing, discardedEntry] = await Promise.all([
-      taskRepo.findByNotificationKey(notification.notificationKey),
-      discardedRepo.findByNotificationKey(notification.notificationKey),
+    const [inTasks, inDiscarded] = await Promise.all([
+      taskRepo.existsByNotificationKeyAndContent(notification.notificationKey, currentText),
+      discardedRepo.existsByNotificationKeyAndContent(notification.notificationKey, currentText),
     ]);
-    const storedText = (existing?.body ?? discardedEntry?.bodyPreview ?? '').slice(0, 200);
-    const sameContent =
-      (existing !== null || discardedEntry !== null) && storedText === currentText;
-    if (sameContent) {
+    if (inTasks || inDiscarded) {
       logCapturedNotification(notification, 'FILTERED');
       return;
     }

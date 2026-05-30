@@ -80,6 +80,16 @@ export class DiscardedLogRepository {
     return result[0] ? mapRow(result[0]) : null;
   }
 
+  async existsByNotificationKeyAndContent(key: string, bodyPrefix: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ bodyPreview: discardedLog.bodyPreview })
+      .from(discardedLog)
+      .where(eq(discardedLog.notificationKey, key))
+      .limit(20);
+    // bodyPreview is stored with a 100-char cap, so compare the first 100 chars
+    return rows.some((r) => r.bodyPreview === bodyPrefix.slice(0, 100));
+  }
+
   async count(): Promise<number> {
     return this.db.$count(discardedLog);
   }
