@@ -201,6 +201,15 @@ export class TaskRepository {
     return result[0] ? mapRow(result[0]) : null;
   }
 
+  async existsByNotificationKeyAndContent(key: string, bodyPrefix: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ body: tasks.body })
+      .from(tasks)
+      .where(and(eq(tasks.notificationKey, key), isNull(tasks.deletedAt)))
+      .limit(20);
+    return rows.some((r) => (r.body ?? '').slice(0, 200) === bodyPrefix);
+  }
+
   async countByStatus(): Promise<Record<string, number>> {
     const rows = await this.db.select().from(tasks).where(isNull(tasks.deletedAt));
     return rows.reduce(
