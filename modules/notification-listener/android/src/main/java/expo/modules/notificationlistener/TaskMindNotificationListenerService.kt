@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
+import com.facebook.react.HeadlessJsTaskService
 import java.util.LinkedHashMap
 
 class TaskMindNotificationListenerService : NotificationListenerService() {
@@ -165,7 +166,58 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
             "importance" to importance
         )
 
-        NotificationListenerModule.sendNotificationEvent(data)
+        dispatchNotificationData(data)
+    }
+
+    // Routes the captured notification to JS. If the React JS context is alive
+    // (app open or recently backgrounded) we deliver via the live event emitter.
+    // Otherwise the app was swiped away/killed, so we spin up a Headless JS task
+    // that runs the exact same `handleNotification` pipeline in the background —
+    // this is what makes AI classification, task creation and the persistent
+    // notification keep working without the user opening the app.
+    private fun dispatchNotificationData(data: Map<String, Any>) {
+        if (NotificationListenerModule.instance != null) {
+            NotificationListenerModule.sendNotificationEvent(data)
+            return
+        }
+        try {
+            val bundle = android.os.Bundle().apply {
+                putString("packageName", data["packageName"] as? String ?: "")
+                putString("appName", data["appName"] as? String ?: "")
+                putString("title", data["title"] as? String ?: "")
+                putString("text", data["text"] as? String ?: "")
+                putString("bigText", data["bigText"] as? String ?: "")
+                putString("subText", data["subText"] as? String ?: "")
+                putDouble("postTime", ((data["postTime"] as? Long) ?: 0L).toDouble())
+                putString("notificationKey", data["notificationKey"] as? String ?: "")
+                putBoolean("isGroup", (data["isGroup"] as? Boolean) ?: false)
+                putString("category", data["category"] as? String ?: "")
+                putString("channelId", data["channelId"] as? String ?: "")
+                putInt("importance", (data["importance"] as? Int) ?: 3)
+                putString("threadJson", threadToJson(data["thread"]))
+            }
+            val intent = Intent(this, TaskMindHeadlessTaskService::class.java)
+            intent.putExtras(bundle)
+            startService(intent)
+            HeadlessJsTaskService.acquireWakeLockNow(this)
+        } catch (_: Exception) {
+            // Background-start restrictions or context unavailable — drop silently.
+            // The next time the app opens, scanActiveNotifications() reconciles.
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun threadToJson(thread: Any?): String {
+        val list = thread as? List<Map<String, Any>> ?: return "[]"
+        val arr = org.json.JSONArray()
+        for (msg in list) {
+            val obj = org.json.JSONObject()
+            obj.put("sender", msg["sender"] ?: "")
+            obj.put("text", msg["text"] ?: "")
+            obj.put("timestamp", msg["timestamp"] ?: 0L)
+            arr.put(obj)
+        }
+        return arr.toString()
     }
 
     private fun extractThread(sbn: StatusBarNotification): List<Map<String, Any>> {

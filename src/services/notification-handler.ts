@@ -94,17 +94,33 @@ export async function handleNotification(taskData: {
   if (isVip) {
     const taskRepo = new TaskRepository(db);
     const messageText = notification.bigText || notification.text || notification.title;
-    const title = extractTitle(messageText, notification.title ?? '', notification.packageName);
+    // VIP contacts are an explicit user allowlist — they always create a task.
+    // When Cloud AI is enabled we still pass the message through it to get a
+    // cleaner title / smarter priority, but we never let AI suppress a VIP.
+    let title = extractTitle(messageText, notification.title ?? '', notification.packageName);
+    let priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW' = 'URGENT';
+    let dueDate: number | null = null;
+    const aiActive = Boolean(getSetting('ai_enabled') && getSetting('ai_api_key'));
+    if (aiActive) {
+      const aiResult = await classifyNotification(notification);
+      if (aiResult !== null) {
+        if (aiResult.title) title = aiResult.title;
+        // Keep VIP urgent unless AI is confident it's genuinely lower priority.
+        if (aiResult.isTask && aiResult.certainty === 'high') priority = aiResult.priority;
+        dueDate = aiResult.dueDate ?? null;
+      }
+    }
     await taskRepo.createTask({
       title,
       body: notification.bigText || notification.text,
       sourceApp: notification.packageName,
       sender: notification.title,
-      priority: 'URGENT',
+      priority,
       confidence: 1.0,
       needsConfirmation: false,
-      matchedKeywords: ['vip_contact'],
+      matchedKeywords: aiActive ? ['vip_contact', 'ai_classifier'] : ['vip_contact'],
       language: 'EN',
+      dueDate,
       notificationKey: notification.notificationKey || null,
       createdAt: notification.postTime || Date.now(),
     });
@@ -118,11 +134,15 @@ export async function handleNotification(taskData: {
       decision: 'CREATE',
       timestamp: Date.now(),
     });
-    await refreshPersistentNotification(new TaskRepository(db));
+    await refreshPersistentNotification(taskRepo);
     return;
   }
 
-  // ── Cloud AI classifier (when enabled, replaces heuristic pipeline) ─────────
+  // ── Cloud AI classifier (primary decision layer when enabled) ───────────────
+  // Every non-VIP notification is routed through AI first. AI decides:
+  //   isTask=false           → discard
+  //   isTask, certainty high → create the task directly
+  //   isTask, certainty med/low → create but flag for user confirmation
   if (getSetting('ai_enabled') && getSetting('ai_api_key')) {
     const aiResult = await classifyNotification(notification);
     if (aiResult !== null) {
@@ -132,15 +152,17 @@ export async function handleNotification(taskData: {
         const title2 =
           aiResult.title ??
           extractTitle(messageText2, notification.title ?? '', notification.packageName);
+        const needsConfirmation = aiResult.certainty !== 'high';
+        const confidence = aiResult.certainty === 'high' ? 0.95 : 0.6;
         await taskRepo2.createTask({
           title: title2,
           body: notification.bigText || notification.text,
           sourceApp: notification.packageName,
           sender: notification.title,
           priority: aiResult.priority,
-          confidence: 0.95,
-          needsConfirmation: false,
-          matchedKeywords: ['ai_classifier'],
+          confidence,
+          needsConfirmation,
+          matchedKeywords: ['ai_classifier', `ai_${aiResult.certainty}`],
           language: 'EN',
           dueDate: aiResult.dueDate ?? null,
           notificationKey: notification.notificationKey || null,
@@ -150,10 +172,10 @@ export async function handleNotification(taskData: {
           input: messageText2,
           language: 'EN',
           ruleScore: 0,
-          modelScore: 0.95,
-          finalScore: 0.95,
-          matchedKeywords: ['ai_classifier'],
-          decision: 'CREATE',
+          modelScore: confidence,
+          finalScore: confidence,
+          matchedKeywords: ['ai_classifier', `ai_${aiResult.certainty}`],
+          decision: needsConfirmation ? 'CONFIRM' : 'CREATE',
           timestamp: Date.now(),
         });
       } else {
@@ -173,7 +195,7 @@ export async function handleNotification(taskData: {
       await refreshPersistentNotification(taskRepo2);
       return;
     }
-    // AI call failed (no key, timeout, error) → fall through to heuristic
+    // AI call failed (no key, timeout, error) → fall through to heuristic safety net
   }
 
   // ── Cancellation resolver ────────────────────────────────────────────────────

@@ -5,6 +5,10 @@ export interface AIClassifierResult {
   isTask: boolean;
   title: string | null;
   priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
+  // How confident the model is that this is a genuine, actionable task.
+  // Drives whether the task is auto-created (high) or routed to the
+  // confirmation queue for the user to approve (medium/low).
+  certainty: 'high' | 'medium' | 'low';
   dueDate: number | null;
   reason: string;
 }
@@ -20,12 +24,18 @@ Respond ONLY with valid JSON — no markdown, no explanation outside the JSON.
   "isTask": true|false,
   "title": "<≤60 char imperative title in English, or null if isTask=false>",
   "priority": "URGENT|HIGH|MEDIUM|LOW",
+  "certainty": "high|medium|low",
   "dueDate": "<ISO 8601 date-time string or null>",
   "reason": "<one sentence>"
 }
 
 isTask=false: OTPs, promotions, delivery tracking, news, sports scores, payment receipts, system alerts with no user action.
 isTask=true: messages needing a reply, assigned tasks, deadlines, questions, meetings, things to send or complete.
+
+certainty: how sure you are this is a genuine actionable task the user must do.
+ - high = unambiguous task/request/deadline → can be auto-added.
+ - medium = probably a task but context is thin or it could be informational → should be confirmed by the user.
+ - low = weak/ambiguous signal → should be confirmed by the user.
 
 Priority: URGENT=deadline<24h or "urgent/ASAP/critical"; HIGH=1-3 days or "important/priority"; MEDIUM=general task; LOW=optional/whenever.`;
 
@@ -49,6 +59,9 @@ function parseResult(raw: string): AIClassifierResult | null {
     const priority = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'].includes(String(p.priority))
       ? (p.priority as AIClassifierResult['priority'])
       : 'MEDIUM';
+    const certainty = ['high', 'medium', 'low'].includes(String(p.certainty))
+      ? (p.certainty as AIClassifierResult['certainty'])
+      : 'medium';
     let dueDate: number | null = null;
     if (p.dueDate && typeof p.dueDate === 'string') {
       const d = new Date(p.dueDate as string);
@@ -58,6 +71,7 @@ function parseResult(raw: string): AIClassifierResult | null {
       isTask: Boolean(p.isTask),
       title: typeof p.title === 'string' && p.title.length > 0 ? (p.title as string) : null,
       priority,
+      certainty,
       dueDate,
       reason: typeof p.reason === 'string' ? (p.reason as string) : '',
     };

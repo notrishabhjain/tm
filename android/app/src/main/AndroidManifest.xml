@@ -31,6 +31,7 @@
       </intent-filter>
     </service>
     <service android:name="expo.modules.notificationlistener.TaskMindForegroundService" android:foregroundServiceType="dataSync" android:exported="false"/>
+    <service android:name="expo.modules.notificationlistener.TaskMindHeadlessTaskService" android:exported="false"/>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
