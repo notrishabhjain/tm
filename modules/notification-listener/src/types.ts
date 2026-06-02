@@ -30,4 +30,14 @@ export interface PersistentNotificationParams {
 
 export type PermissionStatus = 'granted' | 'denied' | 'unknown';
 
+export interface FocusState {
+  enabled: boolean; // auto-lock on URGENT tasks
+  sessionEndsAt: number; // epoch ms of an active manual session (0 = none)
+  bypassesLeft: number; // timed bypasses remaining today
+  maxBypasses: number;
+  hasOverlayPermission: boolean; // SYSTEM_ALERT_WINDOW granted
+  accessibilityEnabled: boolean; // accessibility service enabled
+  lockActive: boolean; // lock currently in effect right now
+}
+
 export type NotificationEvent = 'onNotification' | 'onQuickActionDoneTop' | 'onQuickActionOpen';

@@ -4,4 +4,5 @@ export type {
   PersistentNotificationParams,
   PermissionStatus,
   NotificationEvent,
+  FocusState,
 } from './types';

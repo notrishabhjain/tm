@@ -135,6 +135,11 @@ export default function SettingsScreen(): React.JSX.Element {
             onPress={() => void router.push('/settings/ai-cloud')}
           />
           <NavRow
+            label="Focus Lock"
+            subtitle="Block distracting apps until tasks are done"
+            onPress={() => void router.push('/settings/focus-lock')}
+          />
+          <NavRow
             label="Signal Engine"
             subtitle="17-signal deterministic scorer, local model"
             onPress={() => void router.push('/settings/ai-model')}
