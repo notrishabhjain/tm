@@ -9,6 +9,9 @@ export interface AIClassifierResult {
   certainty: 'high' | 'medium' | 'low';
   dueDate: number | null;
   reason: string;
+  howTo: string | null; // "Reply to the message with confirmation"
+  estimatedMinutes: number | null; // 15
+  notes: string | null; // additional context extracted from notification
 }
 
 export interface SenderContext {
@@ -35,6 +38,9 @@ Respond ONLY with valid JSON — no markdown, no explanation outside the JSON:
   "priority": "URGENT|HIGH|MEDIUM|LOW",
   "certainty": "high|medium|low",
   "dueDate": "<ISO 8601 date-time string or null>",
+  "howTo": "<brief 1-2 sentence description of HOW to complete this task, or null>",
+  "estimatedMinutes": <integer estimate of minutes needed, or null>,
+  "notes": "<any additional context from the notification that would help, or null>",
   "reason": "<one sentence explaining the decision>"
 }
 
@@ -142,6 +148,12 @@ function parseResult(raw: string): AIClassifierResult | null {
       const d = new Date(p.dueDate as string);
       if (!isNaN(d.getTime())) dueDate = d.getTime();
     }
+    const howTo = typeof p.howTo === 'string' && p.howTo.length > 0 ? (p.howTo as string) : null;
+    const estimatedMinutes =
+      typeof p.estimatedMinutes === 'number' && p.estimatedMinutes > 0
+        ? Math.round(p.estimatedMinutes as number)
+        : null;
+    const notes = typeof p.notes === 'string' && p.notes.length > 0 ? (p.notes as string) : null;
     return {
       isTask: Boolean(p.isTask),
       title: typeof p.title === 'string' && p.title.length > 0 ? (p.title as string) : null,
@@ -149,6 +161,9 @@ function parseResult(raw: string): AIClassifierResult | null {
       certainty,
       dueDate,
       reason: typeof p.reason === 'string' ? (p.reason as string) : '',
+      howTo,
+      estimatedMinutes,
+      notes,
     };
   } catch {
     return null;
@@ -183,6 +198,9 @@ export async function classifyNotification(
         priority: 'LOW',
         certainty: 'high',
         dueDate: null,
+        howTo: null,
+        estimatedMinutes: null,
+        notes: null,
         reason: 'Noise app with no personal request signal',
       };
     }

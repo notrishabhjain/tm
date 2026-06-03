@@ -22,6 +22,9 @@ export default function SettingsScreen(): React.JSX.Element {
   );
   const [urgentOverride, setUrgentOverride] = useState(getSetting('urgent_override_quiet'));
   const [aiEnabled, setAiEnabled] = useState(getSetting('ai_enabled'));
+  const [googleTasksConnected, setGoogleTasksConnected] = useState(
+    getSetting('google_tasks_enabled')
+  );
   const nudgeFreq = getSetting('nudge_freq_minutes');
 
   const { data: monitoredApps = [] } = useQuery({
@@ -51,6 +54,7 @@ export default function SettingsScreen(): React.JSX.Element {
     useCallback(() => {
       void checkPermission();
       setAiEnabled(getSetting('ai_enabled'));
+      setGoogleTasksConnected(getSetting('google_tasks_enabled'));
     }, [checkPermission])
   );
 
@@ -157,6 +161,19 @@ export default function SettingsScreen(): React.JSX.Element {
             label="Analyze Text"
             subtitle="Extract tasks from long text"
             onPress={() => void router.push('/settings/transcript-import')}
+          />
+        </Section>
+
+        <Section title="Integrations">
+          <NavRow
+            label="Google Tasks"
+            subtitle={
+              googleTasksConnected
+                ? 'Connected — tasks sync automatically'
+                : 'Sync new tasks to Google Tasks app'
+            }
+            subtitleColor={googleTasksConnected ? Colors.success : undefined}
+            onPress={() => void router.push('/settings/google-tasks')}
           />
         </Section>
 

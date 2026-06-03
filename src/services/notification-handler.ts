@@ -13,6 +13,8 @@ import { scoreNotification, buildSenderKey } from './signal-scorer';
 import { resolveCancellation } from './cancellation-resolver';
 import { extractTitle } from './title-extractor';
 import { classifyNotification } from './ai-classifier';
+import { createGoogleTask } from './google-tasks';
+import { appDisplayName } from './app-name-map';
 import { getSetting } from '@/data/storage/settings';
 
 // Returns true if the current local time falls within user-configured quiet hours.
@@ -113,7 +115,7 @@ export async function handleNotification(taskData: {
         dueDate = aiResult.dueDate ?? null;
       }
     }
-    await taskRepo.createTask({
+    const vipTask = await taskRepo.createTask({
       title,
       body: notification.bigText || notification.text,
       sourceApp: notification.packageName,
@@ -137,6 +139,23 @@ export async function handleNotification(taskData: {
       decision: 'CREATE',
       timestamp: Date.now(),
     });
+    // Sync to Google Tasks (non-blocking, fire-and-forget)
+    if (getSetting('google_tasks_enabled')) {
+      const notesLines: string[] = [];
+      notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
+      if (vipTask.body) notesLines.push(`\nContext:\n${vipTask.body.slice(0, 500)}`);
+      void createGoogleTask({
+        title: vipTask.title,
+        notes: notesLines.join('\n'),
+        dueDate: vipTask.dueDate,
+      })
+        .then((googleTaskId) => {
+          if (googleTaskId) void taskRepo.setGoogleTaskId(vipTask.id, googleTaskId);
+        })
+        .catch(() => {
+          /* non-fatal */
+        });
+    }
     await refreshPersistentNotification(taskRepo);
     return;
   }
@@ -160,7 +179,7 @@ export async function handleNotification(taskData: {
           extractTitle(messageText2, notification.title ?? '', notification.packageName);
         const needsConfirmation = aiResult.certainty !== 'high';
         const confidence = aiResult.certainty === 'high' ? 0.95 : 0.6;
-        await taskRepo2.createTask({
+        const aiTask = await taskRepo2.createTask({
           title: title2,
           body: notification.bigText || notification.text,
           sourceApp: notification.packageName,
@@ -173,6 +192,8 @@ export async function handleNotification(taskData: {
           dueDate: aiResult.dueDate ?? null,
           notificationKey: notification.notificationKey || null,
           createdAt: notification.postTime || Date.now(),
+          howTo: aiResult.howTo ?? null,
+          estimatedMinutes: aiResult.estimatedMinutes ?? null,
         });
         logExtractionDecision({
           input: messageText2,
@@ -184,6 +205,26 @@ export async function handleNotification(taskData: {
           decision: needsConfirmation ? 'CONFIRM' : 'CREATE',
           timestamp: Date.now(),
         });
+        // Sync to Google Tasks (non-blocking, fire-and-forget)
+        if (getSetting('google_tasks_enabled')) {
+          const notesLines: string[] = [];
+          if (aiResult.howTo) notesLines.push(`How to complete: ${aiResult.howTo}`);
+          if (aiResult.estimatedMinutes)
+            notesLines.push(`Estimated time: ${aiResult.estimatedMinutes} min`);
+          notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
+          if (aiTask.body) notesLines.push(`\nContext:\n${aiTask.body.slice(0, 500)}`);
+          void createGoogleTask({
+            title: aiTask.title,
+            notes: notesLines.join('\n'),
+            dueDate: aiTask.dueDate,
+          })
+            .then((googleTaskId) => {
+              if (googleTaskId) void taskRepo2.setGoogleTaskId(aiTask.id, googleTaskId);
+            })
+            .catch(() => {
+              /* non-fatal */
+            });
+        }
       } else {
         const discardedRepo2 = new DiscardedLogRepository(db);
         await discardedRepo2.insert({
@@ -277,7 +318,7 @@ export async function handleNotification(taskData: {
     ? [...result.signals, 'quiet_hours_demotion']
     : result.signals;
 
-  await taskRepo.createTask({
+  const heuristicTask = await taskRepo.createTask({
     title: candidateTitle,
     body: notification.bigText || notification.text,
     sourceApp: notification.packageName,
@@ -291,6 +332,24 @@ export async function handleNotification(taskData: {
     notificationKey: notification.notificationKey || null,
     createdAt: notification.postTime || Date.now(),
   });
+
+  // Sync to Google Tasks (non-blocking, fire-and-forget)
+  if (getSetting('google_tasks_enabled')) {
+    const notesLines: string[] = [];
+    notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
+    if (heuristicTask.body) notesLines.push(`\nContext:\n${heuristicTask.body.slice(0, 500)}`);
+    void createGoogleTask({
+      title: heuristicTask.title,
+      notes: notesLines.join('\n'),
+      dueDate: heuristicTask.dueDate,
+    })
+      .then((googleTaskId) => {
+        if (googleTaskId) void taskRepo.setGoogleTaskId(heuristicTask.id, googleTaskId);
+      })
+      .catch(() => {
+        /* non-fatal */
+      });
+  }
 
   if (!needsConfirmation) {
     await senderStatsRepo.incrementAutoAccept(senderKey);

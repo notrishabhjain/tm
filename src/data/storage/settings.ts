@@ -35,6 +35,15 @@ export interface AppSettings {
   ai_digest_enabled: boolean;
   ai_digest_time: string;
   ai_last_digest_date: string;
+  // Google Tasks integration
+  google_tasks_enabled: boolean;
+  google_tasks_client_id: string;
+  google_tasks_access_token: string;
+  google_tasks_refresh_token: string;
+  google_tasks_token_expiry: number;
+  google_tasks_list_id: string;
+  google_tasks_code_verifier: string;
+  google_tasks_oauth_state: string;
 }
 
 const DEFAULTS: AppSettings = {
@@ -62,6 +71,14 @@ const DEFAULTS: AppSettings = {
   ai_digest_enabled: false,
   ai_digest_time: '09:00',
   ai_last_digest_date: '',
+  google_tasks_enabled: false,
+  google_tasks_client_id: '',
+  google_tasks_access_token: '',
+  google_tasks_refresh_token: '',
+  google_tasks_token_expiry: 0,
+  google_tasks_list_id: '',
+  google_tasks_code_verifier: '',
+  google_tasks_oauth_state: '',
 };
 
 export function getSetting<K extends keyof AppSettings>(key: K): AppSettings[K] {

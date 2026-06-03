@@ -12,13 +12,21 @@ export function createTaskEntity(params: {
   needsConfirmation: boolean;
   dueDate: number | null;
   screenshotPath: string | null;
+  googleTaskId?: string | null;
+  howTo?: string | null;
+  estimatedMinutes?: number | null;
   createdAt: number;
   completedAt: number | null;
   deletedAt: number | null;
 }): Task {
   if (!params.title.trim()) throw new Error('Task title cannot be empty');
   if (params.confidence < 0 || params.confidence > 1) throw new Error('Confidence must be 0-1');
-  return { ...params };
+  return {
+    ...params,
+    googleTaskId: params.googleTaskId ?? null,
+    howTo: params.howTo ?? null,
+    estimatedMinutes: params.estimatedMinutes ?? null,
+  };
 }
 
 export function isTaskActionable(task: Task): boolean {

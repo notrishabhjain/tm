@@ -27,6 +27,9 @@ export interface Task {
   needsConfirmation: boolean;
   dueDate: number | null;
   screenshotPath: string | null;
+  googleTaskId: string | null;
+  howTo: string | null;
+  estimatedMinutes: number | null;
   createdAt: number;
   completedAt: number | null;
   deletedAt: number | null;
