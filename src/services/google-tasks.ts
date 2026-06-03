@@ -1,5 +1,4 @@
 import * as WebBrowser from 'expo-web-browser';
-import * as Crypto from 'expo-crypto';
 import { getSetting, setSetting } from '@/data/storage/settings';
 
 const TASKS_API = 'https://tasks.googleapis.com/tasks/v1';
@@ -14,24 +13,34 @@ export interface GoogleTaskInput {
   dueDate?: number | null; // timestamp ms
 }
 
-// PKCE helpers
-async function generateCodeVerifier(): Promise<string> {
-  const bytes = await Crypto.getRandomBytesAsync(32);
-  return Buffer.from(bytes).toString('base64url');
+// PKCE helpers — use the Web Crypto API built into Hermes / RN 0.76+.
+// No expo-crypto dependency needed.
+
+function base64UrlEncode(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function generateCodeVerifier(): string {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return base64UrlEncode(array.buffer);
 }
 
 async function generateCodeChallenge(verifier: string): Promise<string> {
-  const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier, {
-    encoding: Crypto.CryptoEncoding.BASE64,
-  });
-  // Convert base64 to base64url
-  return digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const encoded = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', encoded);
+  return base64UrlEncode(digest);
 }
 
 export async function startOAuthFlow(clientId: string): Promise<void> {
-  const codeVerifier = await generateCodeVerifier();
+  const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
-  const state = await generateCodeVerifier(); // reuse for CSRF state
+  const state = generateCodeVerifier();
 
   setSetting('google_tasks_code_verifier', codeVerifier);
   setSetting('google_tasks_oauth_state', state);
