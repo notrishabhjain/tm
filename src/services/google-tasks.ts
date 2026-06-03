@@ -1,4 +1,4 @@
-import * as WebBrowser from 'expo-web-browser';
+import { Linking } from 'react-native';
 import { getSetting, setSetting } from '@/data/storage/settings';
 
 const TASKS_API = 'https://tasks.googleapis.com/tasks/v1';
@@ -59,7 +59,7 @@ export async function startOAuthFlow(clientId: string): Promise<void> {
   });
 
   const url = `${OAUTH_URL}?${params.toString()}`;
-  await WebBrowser.openBrowserAsync(url);
+  await Linking.openURL(url);
 }
 
 export async function handleOAuthCallback(callbackUrl: string): Promise<boolean> {
