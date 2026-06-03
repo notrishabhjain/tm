@@ -102,7 +102,10 @@ export async function handleNotification(taskData: {
     let dueDate: number | null = null;
     const aiActive = Boolean(getSetting('ai_enabled') && getSetting('ai_api_key'));
     if (aiActive) {
-      const aiResult = await classifyNotification(notification);
+      const senderStatsForVip = new SenderStatsRepository(db);
+      const vipSenderKey = buildSenderKey(notification.packageName, notification.title ?? '');
+      const vipSenderCtx = await senderStatsForVip.get(vipSenderKey);
+      const aiResult = await classifyNotification(notification, vipSenderCtx ?? undefined);
       if (aiResult !== null) {
         if (aiResult.title) title = aiResult.title;
         // Keep VIP urgent unless AI is confident it's genuinely lower priority.
@@ -144,7 +147,10 @@ export async function handleNotification(taskData: {
   //   isTask, certainty high → create the task directly
   //   isTask, certainty med/low → create but flag for user confirmation
   if (getSetting('ai_enabled') && getSetting('ai_api_key')) {
-    const aiResult = await classifyNotification(notification);
+    const senderStatsRepo2 = new SenderStatsRepository(db);
+    const aiSenderKey = buildSenderKey(notification.packageName, notification.title ?? '');
+    const aiSenderCtx = await senderStatsRepo2.get(aiSenderKey);
+    const aiResult = await classifyNotification(notification, aiSenderCtx ?? undefined);
     if (aiResult !== null) {
       const taskRepo2 = new TaskRepository(db);
       const messageText2 = notification.bigText || notification.text || notification.title;
