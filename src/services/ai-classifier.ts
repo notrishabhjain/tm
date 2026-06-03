@@ -71,10 +71,7 @@ Priority:
 - MEDIUM = general task, no stated deadline
 - LOW = optional, "whenever you get a chance", low stakes`;
 
-function buildUserMessage(
-  notification: NotificationData,
-  senderCtx?: SenderContext
-): string {
+function buildUserMessage(notification: NotificationData, senderCtx?: SenderContext): string {
   const appName = appDisplayName(notification.packageName);
   const parts: string[] = [`App: ${appName}`];
 
@@ -89,14 +86,20 @@ function buildUserMessage(
       .slice(-4) // last 4 messages for context
       .map((m: { sender?: string; text?: string }) => `  ${m.sender ?? 'them'}: ${m.text ?? ''}`)
       .join('\n');
-    parts.push(`Conversation context (last ${Math.min(notification.thread.length, 4)} messages):\n${threadLines}`);
+    parts.push(
+      `Conversation context (last ${Math.min(notification.thread.length, 4)} messages):\n${threadLines}`
+    );
   }
 
   // App-level hints
   if (isNoiseApp(notification.packageName)) {
-    parts.push('Note: This app typically sends promotional/informational notifications — be extra skeptical.');
+    parts.push(
+      'Note: This app typically sends promotional/informational notifications — be extra skeptical.'
+    );
   } else if (isMessagingApp(notification.packageName)) {
-    parts.push('Note: This is a direct messaging app — focus on whether the message is a request or question.');
+    parts.push(
+      'Note: This is a direct messaging app — focus on whether the message is a request or question.'
+    );
   }
 
   // Sender history hint
@@ -174,7 +177,14 @@ export async function classifyNotification(
       text.includes('reminder:') ||
       text.includes('due');
     if (!hasPersonalSignal) {
-      return { isTask: false, title: null, priority: 'LOW', certainty: 'high', dueDate: null, reason: 'Noise app with no personal request signal' };
+      return {
+        isTask: false,
+        title: null,
+        priority: 'LOW',
+        certainty: 'high',
+        dueDate: null,
+        reason: 'Noise app with no personal request signal',
+      };
     }
   }
 
