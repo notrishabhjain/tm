@@ -14,6 +14,11 @@ android {
 }
 
 dependencies {
+  // React Native runtime — needed for HeadlessJsTaskService / Arguments used by
+  // the background notification pipeline. Version is supplied by the app's React
+  // Native Gradle setup (same as expo-splash-screen and other Expo modules).
+  implementation 'com.facebook.react:react-android'
+
   // ML Kit bundled text recognition — models ship inside the APK, fully offline,
   // no data leaves the device at runtime.
   implementation 'com.google.mlkit:text-recognition:16.0.1'

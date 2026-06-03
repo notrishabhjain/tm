@@ -156,6 +156,72 @@ class NotificationListenerModule : Module() {
                 false
             }
         }
+
+        // ── Focus-lock (app blocking / anti-doomscroll) ─────────────────────────
+
+        AsyncFunction("focusGetState") {
+            mapOf(
+                "enabled" to context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                    .getBoolean("focus_lock_enabled", false),
+                "sessionEndsAt" to context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                    .getLong("focus_session_end", 0L).toDouble(),
+                "bypassesLeft" to FocusLockManager.bypassesLeftToday(context),
+                "maxBypasses" to FocusLockManager.MAX_BYPASSES_PER_DAY,
+                "hasOverlayPermission" to FocusLockManager.hasOverlayPermission(context),
+                "accessibilityEnabled" to isAccessibilityEnabled(),
+                "lockActive" to FocusLockManager.isLockActive(context)
+            )
+        }
+
+        AsyncFunction("focusSetEnabled") { enabled: Boolean ->
+            FocusLockManager.setEnabled(context, enabled)
+        }
+
+        AsyncFunction("focusStartSession") { minutes: Int ->
+            FocusLockManager.startSession(context, minutes)
+        }
+
+        AsyncFunction("focusEndSession") {
+            FocusLockManager.endSession(context)
+        }
+
+        AsyncFunction("focusGetBlockApps") {
+            FocusLockManager.blockedApps(context).toList()
+        }
+
+        AsyncFunction("focusSetBlockApps") { packages: List<String> ->
+            FocusLockManager.setBlockApps(context, packages.toSet())
+        }
+
+        AsyncFunction("requestOverlayPermission") {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                android.net.Uri.parse("package:${context.packageName}")
+            ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            try {
+                context.startActivity(intent)
+            } catch (_: Exception) {
+            }
+        }
+
+        AsyncFunction("openAccessibilitySettings") {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            try {
+                context.startActivity(intent)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun isAccessibilityEnabled(): Boolean {
+        val cn = ComponentName(context, TaskMindAccessibilityService::class.java)
+        val enabled = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: ""
+        return enabled.split(':').any { it.equals(cn.flattenToString(), ignoreCase = true) }
     }
 
     companion object {

@@ -1,5 +1,10 @@
 import { requireNativeModule, EventEmitter } from 'expo-modules-core';
-import type { NotificationData, PersistentNotificationParams, PermissionStatus } from './types';
+import type {
+  NotificationData,
+  PersistentNotificationParams,
+  PermissionStatus,
+  FocusState,
+} from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let NativeModule: any = null;
@@ -95,6 +100,55 @@ const NotificationListenerModule = {
   scanActiveNotifications(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.scanActiveNotifications() as Promise<void>;
+  },
+
+  focusGetState(): Promise<FocusState> {
+    if (!NativeModule)
+      return Promise.resolve({
+        enabled: false,
+        sessionEndsAt: 0,
+        bypassesLeft: 0,
+        maxBypasses: 3,
+        hasOverlayPermission: false,
+        accessibilityEnabled: false,
+        lockActive: false,
+      });
+    return NativeModule.focusGetState() as Promise<FocusState>;
+  },
+
+  focusSetEnabled(enabled: boolean): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.focusSetEnabled(enabled) as Promise<void>;
+  },
+
+  focusStartSession(minutes: number): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.focusStartSession(minutes) as Promise<void>;
+  },
+
+  focusEndSession(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.focusEndSession() as Promise<void>;
+  },
+
+  focusGetBlockApps(): Promise<string[]> {
+    if (!NativeModule) return Promise.resolve([]);
+    return NativeModule.focusGetBlockApps() as Promise<string[]>;
+  },
+
+  focusSetBlockApps(packages: string[]): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.focusSetBlockApps(packages) as Promise<void>;
+  },
+
+  requestOverlayPermission(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.requestOverlayPermission() as Promise<void>;
+  },
+
+  openAccessibilitySettings(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.openAccessibilitySettings() as Promise<void>;
   },
 
   addNotificationListener(listener: (data: NotificationData) => void) {
