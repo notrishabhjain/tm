@@ -31,7 +31,8 @@ export default function GoogleTasksScreen(): React.JSX.Element {
   );
 
   const handleConnect = async (): Promise<void> => {
-    const trimmed = clientId.trim();
+    // Strip any accidentally-pasted URL prefix — only the raw client ID is needed
+    const trimmed = clientId.trim().replace(/^https?:\/\//i, '');
     if (!trimmed) {
       Alert.alert('Client ID required', 'Paste your Google OAuth Client ID before connecting.');
       return;
@@ -107,19 +108,20 @@ export default function GoogleTasksScreen(): React.JSX.Element {
             2. Enable the <Text style={styles.bold}>Google Tasks API</Text>
           </Text>
           <Text style={[styles.step, { color: theme.onSurface }]}>
-            3. Go to Credentials → Create Credentials → OAuth 2.0 Client ID
+            3. Configure the <Text style={styles.bold}>OAuth consent screen</Text> and add your
+            Google account as a Test User
           </Text>
           <Text style={[styles.step, { color: theme.onSurface }]}>
-            4. Choose <Text style={styles.bold}>Web application</Text> type
+            4. Go to Credentials → Create Credentials → OAuth 2.0 Client ID
           </Text>
           <Text style={[styles.step, { color: theme.onSurface }]}>
-            5. Under "Authorized redirect URIs" add:
+            5. Choose <Text style={styles.bold}>Android</Text> type — enter package name:
           </Text>
           <View style={[styles.codeBox, { backgroundColor: '#0A2540' }]}>
-            <Text style={styles.codeText}>taskmind://oauth/google</Text>
+            <Text style={styles.codeText}>com.taskmind.app</Text>
           </View>
           <Text style={[styles.step, { color: theme.onSurface }]}>
-            6. Copy your Client ID and paste it below
+            6. Copy your Client ID (ends with .apps.googleusercontent.com) and paste below
           </Text>
 
           <Pressable style={styles.consoleBtn} onPress={openConsole}>
