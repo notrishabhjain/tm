@@ -1,50 +1,131 @@
 import type { NotificationData } from '../../modules/notification-listener/src/types';
 import { getSetting } from '@/data/storage/settings';
+import { appDisplayName, isMessagingApp, isNoiseApp } from './app-name-map';
 
 export interface AIClassifierResult {
   isTask: boolean;
   title: string | null;
   priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
-  // How confident the model is that this is a genuine, actionable task.
-  // Drives whether the task is auto-created (high) or routed to the
-  // confirmation queue for the user to approve (medium/low).
   certainty: 'high' | 'medium' | 'low';
   dueDate: number | null;
   reason: string;
+  howTo: string | null; // "Reply to the message with confirmation"
+  estimatedMinutes: number | null; // 15
+  notes: string | null; // additional context extracted from notification
+}
+
+export interface SenderContext {
+  confirmCount: number;
+  rejectCount: number;
+  autoAcceptCount: number;
 }
 
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
-const TIMEOUT_MS = 10_000;
+const TIMEOUT_MS = 12_000;
 
-const SYSTEM_PROMPT = `You are a task extraction AI for a personal productivity app. Android notification text arrives. Decide if it requires user action and extract a task if so.
+const SYSTEM_PROMPT = `You are a strict personal task filter for a productivity app. You receive Android notification text and must decide whether it requires the user to personally take a specific action.
 
-Respond ONLY with valid JSON — no markdown, no explanation outside the JSON.
+The bar for isTask=true is HIGH. Ask yourself:
+1. Is someone ASKING THIS USER to do something specific?
+2. Is there an action verb the user must perform (reply, send, review, complete, call, attend, pay)?
+3. Would ignoring this notification have a real consequence for the user?
+4. Is it addressed TO this user personally (not a broadcast, not a status update)?
 
+Respond ONLY with valid JSON — no markdown, no explanation outside the JSON:
 {
   "isTask": true|false,
-  "title": "<≤60 char imperative title in English, or null if isTask=false>",
+  "title": "<≤60 char imperative title starting with a verb, or null if isTask=false>",
   "priority": "URGENT|HIGH|MEDIUM|LOW",
   "certainty": "high|medium|low",
   "dueDate": "<ISO 8601 date-time string or null>",
-  "reason": "<one sentence>"
+  "howTo": "<brief 1-2 sentence description of HOW to complete this task, or null>",
+  "estimatedMinutes": <integer estimate of minutes needed, or null>,
+  "notes": "<any additional context from the notification that would help, or null>",
+  "reason": "<one sentence explaining the decision>"
 }
 
-isTask=false: OTPs, promotions, delivery tracking, news, sports scores, payment receipts, system alerts with no user action.
-isTask=true: messages needing a reply, assigned tasks, deadlines, questions, meetings, things to send or complete.
+ALWAYS isTask=false for:
+- OTPs, 2FA codes, login verification
+- Payment receipts, bank transaction alerts, balance updates
+- Delivery tracking ("your order is out for delivery", "package dispatched")
+- Promotional offers, sales, discounts, coupons, cashback
+- News, sports scores, trending topics
+- App update available notifications
+- Social media likes, story views, follower counts, post impressions
+- "Daily digest", "weekly summary", "your activity this week"
+- System status updates ("battery low", "storage full", "backup complete")
+- Automated reminders that don't need a reply (e.g. weather, step counts)
+- Marketing emails or newsletters
+- "Someone viewed your profile"
+- Streaming recommendations ("New episode available", "Top picks for you")
 
-certainty: how sure you are this is a genuine actionable task the user must do.
- - high = unambiguous task/request/deadline → can be auto-added.
- - medium = probably a task but context is thin or it could be informational → should be confirmed by the user.
- - low = weak/ambiguous signal → should be confirmed by the user.
+isTask=true ONLY when:
+- A specific named person is requesting something from the user ("Can you send me X?", "Please review Y", "Are you free at Z?")
+- A calendar event or meeting reminder where the user must attend or reschedule
+- An assigned task from a work tool (Jira, Asana, Trello, GitHub review request)
+- A direct message that ends with a question or request the user must answer
+- A deadline is explicitly named and the user must act before it
 
-Priority: URGENT=deadline<24h or "urgent/ASAP/critical"; HIGH=1-3 days or "important/priority"; MEDIUM=general task; LOW=optional/whenever.`;
+certainty levels:
+- high = clear unambiguous personal request or assigned task → auto-added to task list
+- medium = probably a request but context is thin or ambiguous → ask user to confirm
+- low = borderline case, could be informational → ask user to confirm
 
-function buildUserMessage(notification: NotificationData): string {
-  const parts: string[] = [];
-  if (notification.packageName) parts.push(`App: ${notification.packageName}`);
+Priority:
+- URGENT = deadline within 24h, or words like "urgent/ASAP/immediately/critical"
+- HIGH = deadline 1-3 days, or words like "important/priority/soon"
+- MEDIUM = general task, no stated deadline
+- LOW = optional, "whenever you get a chance", low stakes`;
+
+function buildUserMessage(notification: NotificationData, senderCtx?: SenderContext): string {
+  const appName = appDisplayName(notification.packageName);
+  const parts: string[] = [`App: ${appName}`];
+
   if (notification.title) parts.push(`Sender: ${notification.title}`);
+
   const text = notification.bigText || notification.text;
-  if (text) parts.push(`Text: ${text}`);
+  if (text) parts.push(`Message: ${text}`);
+
+  // Include thread context when available (MessagingStyle conversations)
+  if (Array.isArray(notification.thread) && notification.thread.length > 1) {
+    const threadLines = notification.thread
+      .slice(-4) // last 4 messages for context
+      .map((m: { sender?: string; text?: string }) => `  ${m.sender ?? 'them'}: ${m.text ?? ''}`)
+      .join('\n');
+    parts.push(
+      `Conversation context (last ${Math.min(notification.thread.length, 4)} messages):\n${threadLines}`
+    );
+  }
+
+  // App-level hints
+  if (isNoiseApp(notification.packageName)) {
+    parts.push(
+      'Note: This app typically sends promotional/informational notifications — be extra skeptical.'
+    );
+  } else if (isMessagingApp(notification.packageName)) {
+    parts.push(
+      'Note: This is a direct messaging app — focus on whether the message is a request or question.'
+    );
+  }
+
+  // Sender history hint
+  if (senderCtx) {
+    const total = senderCtx.confirmCount + senderCtx.rejectCount;
+    if (total >= 3) {
+      const rejectRate = Math.round((senderCtx.rejectCount / total) * 100);
+      const confirmRate = 100 - rejectRate;
+      if (rejectRate >= 70) {
+        parts.push(
+          `Sender history: user has rejected ${rejectRate}% of notifications from this sender — likely noise.`
+        );
+      } else if (confirmRate >= 70) {
+        parts.push(
+          `Sender history: user confirms ${confirmRate}% of notifications from this sender — usually tasks.`
+        );
+      }
+    }
+  }
+
   return parts.join('\n');
 }
 
@@ -54,7 +135,7 @@ function parseResult(raw: string): AIClassifierResult | null {
     if (!jsonMatch) return null;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const parsed = JSON.parse(jsonMatch[0]);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
     const p = parsed as any;
     const priority = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'].includes(String(p.priority))
       ? (p.priority as AIClassifierResult['priority'])
@@ -67,6 +148,12 @@ function parseResult(raw: string): AIClassifierResult | null {
       const d = new Date(p.dueDate as string);
       if (!isNaN(d.getTime())) dueDate = d.getTime();
     }
+    const howTo = typeof p.howTo === 'string' && p.howTo.length > 0 ? (p.howTo as string) : null;
+    const estimatedMinutes =
+      typeof p.estimatedMinutes === 'number' && p.estimatedMinutes > 0
+        ? Math.round(p.estimatedMinutes as number)
+        : null;
+    const notes = typeof p.notes === 'string' && p.notes.length > 0 ? (p.notes as string) : null;
     return {
       isTask: Boolean(p.isTask),
       title: typeof p.title === 'string' && p.title.length > 0 ? (p.title as string) : null,
@@ -74,6 +161,9 @@ function parseResult(raw: string): AIClassifierResult | null {
       certainty,
       dueDate,
       reason: typeof p.reason === 'string' ? (p.reason as string) : '',
+      howTo,
+      estimatedMinutes,
+      notes,
     };
   } catch {
     return null;
@@ -82,12 +172,39 @@ function parseResult(raw: string): AIClassifierResult | null {
 
 export async function classifyNotification(
   notification: NotificationData,
+  senderCtx?: SenderContext,
   apiKey?: string,
   model?: string
 ): Promise<AIClassifierResult | null> {
   const key = apiKey ?? getSetting('ai_api_key');
   const mdl = model ?? getSetting('ai_model');
   if (!key) return null;
+
+  // Short-circuit obvious noise apps before burning an API call
+  if (isNoiseApp(notification.packageName)) {
+    const text = (notification.bigText || notification.text || '').toLowerCase();
+    // Only pass through if the text looks like a direct personal message
+    const hasPersonalSignal =
+      text.includes('?') ||
+      text.includes('please') ||
+      text.includes('urgent') ||
+      text.includes('asap') ||
+      text.includes('reminder:') ||
+      text.includes('due');
+    if (!hasPersonalSignal) {
+      return {
+        isTask: false,
+        title: null,
+        priority: 'LOW',
+        certainty: 'high',
+        dueDate: null,
+        howTo: null,
+        estimatedMinutes: null,
+        notes: null,
+        reason: 'Noise app with no personal request signal',
+      };
+    }
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -104,10 +221,10 @@ export async function classifyNotification(
         model: mdl,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildUserMessage(notification) },
+          { role: 'user', content: buildUserMessage(notification, senderCtx) },
         ],
-        max_tokens: 200,
-        temperature: 0.1,
+        max_tokens: 250,
+        temperature: 0.05,
       }),
     });
 

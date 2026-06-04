@@ -154,6 +154,9 @@ export function initializeDatabase(): void {
     // the same notification_key. Content-aware dedup in JS prevents true duplicates.
     'DROP INDEX IF EXISTS idx_tasks_notification_key;',
     'CREATE INDEX IF NOT EXISTS idx_tasks_nk ON tasks(notification_key) WHERE notification_key IS NOT NULL;',
+    'ALTER TABLE tasks ADD COLUMN google_task_id TEXT;',
+    'ALTER TABLE tasks ADD COLUMN how_to TEXT;',
+    'ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER;',
   ];
   for (const sql of columnMigrations) {
     try {

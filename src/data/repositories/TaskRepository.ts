@@ -22,6 +22,9 @@ export interface CreateTaskInput {
   dueDate?: number | null;
   screenshotPath?: string | null;
   notificationKey?: string | null;
+  googleTaskId?: string | null;
+  howTo?: string | null;
+  estimatedMinutes?: number | null;
   createdAt?: number;
 }
 
@@ -38,6 +41,9 @@ function mapRow(row: typeof tasks.$inferSelect): Task {
     needsConfirmation: row.needsConfirmation ?? false,
     dueDate: row.dueDate ?? null,
     screenshotPath: row.screenshotPath ?? null,
+    googleTaskId: row.googleTaskId ?? null,
+    howTo: row.howTo ?? null,
+    estimatedMinutes: row.estimatedMinutes ?? null,
     createdAt: row.createdAt,
     completedAt: row.completedAt ?? null,
     deletedAt: row.deletedAt ?? null,
@@ -67,6 +73,9 @@ export class TaskRepository {
       dueDate: input.dueDate ?? null,
       screenshotPath: input.screenshotPath ?? null,
       notificationKey: input.notificationKey ?? null,
+      googleTaskId: input.googleTaskId ?? null,
+      howTo: input.howTo ?? null,
+      estimatedMinutes: input.estimatedMinutes ?? null,
       createdAt: now,
     });
 
@@ -144,6 +153,10 @@ export class TaskRepository {
 
   async setCalendarEvent(id: string, calendarEventId: string): Promise<void> {
     await this.db.update(tasks).set({ calendarEventId }).where(eq(tasks.id, id));
+  }
+
+  async setGoogleTaskId(id: string, googleTaskId: string): Promise<void> {
+    await this.db.update(tasks).set({ googleTaskId }).where(eq(tasks.id, id));
   }
 
   async purgeOldArchivedTasks(retentionMs = 30 * 24 * 60 * 60 * 1000): Promise<number> {
