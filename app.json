@@ -32,7 +32,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A2540"
     },
-    "scheme": "taskmind",
+    "scheme": ["taskmind", "com.googleusercontent.apps.REPLACE_WITH_YOUR_CLIENT_ID_PREFIX"],
     "plugins": [
       "expo-router",
       [

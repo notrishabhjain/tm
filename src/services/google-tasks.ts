@@ -4,8 +4,14 @@ import { getSetting, setSetting } from '@/data/storage/settings';
 const TASKS_API = 'https://tasks.googleapis.com/tasks/v1';
 const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const REDIRECT_URI = 'taskmind://oauth/google';
 const SCOPE = 'https://www.googleapis.com/auth/tasks';
+
+// Android credentials use the reversed-client-ID URI scheme.
+// e.g. "123456-abc.apps.googleusercontent.com" → "com.googleusercontent.apps.123456-abc:/"
+function getRedirectUri(clientId: string): string {
+  const prefix = clientId.replace('.apps.googleusercontent.com', '');
+  return `com.googleusercontent.apps.${prefix}:/oauth/google`;
+}
 
 export interface GoogleTaskInput {
   title: string;
@@ -46,9 +52,10 @@ export async function startOAuthFlow(clientId: string): Promise<void> {
   setSetting('google_tasks_oauth_state', state);
   setSetting('google_tasks_client_id', clientId);
 
+  const redirectUri = getRedirectUri(clientId);
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: SCOPE,
     code_challenge: codeChallenge,
@@ -79,7 +86,7 @@ export async function handleOAuthCallback(callbackUrl: string): Promise<boolean>
       body: new URLSearchParams({
         code,
         client_id: clientId,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri: getRedirectUri(clientId),
         grant_type: 'authorization_code',
         code_verifier: codeVerifier,
       }).toString(),
