@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,11 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/ui/theme';
 import { Colors } from '@/ui/theme/colors';
 import { getSetting } from '@/data/storage/settings';
-import { startOAuthFlow, disconnectGoogleTasks } from '@/services/google-tasks';
+import {
+  startOAuthFlow,
+  disconnectGoogleTasks,
+  handleOAuthCallback,
+} from '@/services/google-tasks';
 
 export default function GoogleTasksScreen(): React.JSX.Element {
   const router = useRouter();
@@ -34,6 +38,28 @@ export default function GoogleTasksScreen(): React.JSX.Element {
       if (savedSecret) setClientSecret(savedSecret);
     }, [])
   );
+
+  // Listen for the OAuth callback URL while the flow is in progress.
+  // The redirect uses the reversed-client-ID scheme (e.g. com.googleusercontent.apps.xxx:/)
+  // which Android delivers via onNewIntent → Linking event without navigating Expo Router.
+  useEffect(() => {
+    if (!connecting) return;
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      if (!url.includes('code=')) return;
+      void handleOAuthCallback(url).then((ok) => {
+        setConnecting(false);
+        if (ok) {
+          setConnected(true);
+        } else {
+          Alert.alert(
+            'Connection failed',
+            'Could not complete sign-in. Make sure your Client ID and Client Secret are correct and try again.'
+          );
+        }
+      });
+    });
+    return () => sub.remove();
+  }, [connecting]);
 
   const handleConnect = async (): Promise<void> => {
     // Strip any accidentally-pasted URL prefix — only the raw client ID is needed
@@ -133,19 +159,17 @@ export default function GoogleTasksScreen(): React.JSX.Element {
             4. Go to Credentials → Create Credentials → OAuth 2.0 Client ID
           </Text>
           <Text style={[styles.step, { color: theme.onSurface }]}>
-            5. Choose <Text style={styles.bold}>Desktop app</Text> type
+            5. Choose <Text style={styles.bold}>Desktop app</Text> type and give it a name
           </Text>
           <Text style={[styles.step, { color: theme.onSurface }]}>
-            6. Under "Authorized redirect URIs" add exactly:
+            6. Click <Text style={styles.bold}>Create</Text> — no redirect URI needed for Desktop
+            apps
           </Text>
-          <View style={[styles.codeBox, { backgroundColor: '#0A2540' }]}>
-            <Text style={styles.codeText}>taskmind://oauth/google</Text>
-          </View>
           <Text style={[styles.step, { color: theme.onSurface }]}>
-            7. Click <Text style={styles.bold}>Create</Text> — Google shows your Client ID{' '}
-            <Text style={styles.italic}>(ends with .apps.googleusercontent.com)</Text> and Client
-            Secret <Text style={styles.italic}>(starts with GOCSPX-)</Text>. Copy both and paste
-            below.
+            7. Copy your <Text style={styles.bold}>Client ID</Text>{' '}
+            <Text style={styles.italic}>(ends with .apps.googleusercontent.com)</Text> and{' '}
+            <Text style={styles.bold}>Client Secret</Text>{' '}
+            <Text style={styles.italic}>(starts with GOCSPX-)</Text>. Paste both below.
           </Text>
 
           <Pressable style={styles.consoleBtn} onPress={openConsole}>

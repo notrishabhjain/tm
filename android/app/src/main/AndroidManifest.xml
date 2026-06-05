@@ -44,6 +44,7 @@
         <data android:scheme="taskmind"/>
         <data android:scheme="com.taskmind.app"/>
         <data android:scheme="exp+taskmind"/>
+        <data android:scheme="com.googleusercontent.apps.705668130599-631n9lqh3ip8c66lsm880f6d3irq3o6l"/>
       </intent-filter>
       <intent-filter>
         <action android:name="android.intent.action.SEND"/>
