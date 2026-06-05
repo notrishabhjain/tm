@@ -40,6 +40,12 @@ export default function GoogleTasksScreen(): React.JSX.Element {
     setConnecting(true);
     try {
       await startOAuthFlow(trimmed);
+    } catch (e) {
+      Alert.alert(
+        'Could not open sign-in',
+        e instanceof Error ? e.message : 'An unexpected error occurred. Please try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setConnecting(false);
       setConnected(getSetting('google_tasks_enabled'));

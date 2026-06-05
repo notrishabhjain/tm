@@ -7,10 +7,10 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/tasks';
 
 // Android credentials use the reversed-client-ID URI scheme.
-// e.g. "123456-abc.apps.googleusercontent.com" → "com.googleusercontent.apps.123456-abc:/"
+// e.g. "123456-abc.apps.googleusercontent.com" → "com.googleusercontent.apps.123456-abc://oauth/google"
 function getRedirectUri(clientId: string): string {
   const prefix = clientId.replace('.apps.googleusercontent.com', '');
-  return `com.googleusercontent.apps.${prefix}:/oauth/google`;
+  return `com.googleusercontent.apps.${prefix}://oauth/google`;
 }
 
 export interface GoogleTaskInput {
@@ -38,6 +38,11 @@ function generateCodeVerifier(): string {
 }
 
 async function generateCodeChallenge(verifier: string): Promise<string> {
+  if (!crypto?.subtle) {
+    throw new Error(
+      'Web Crypto API unavailable. Ensure New Architecture is enabled and the app is rebuilt.'
+    );
+  }
   const encoded = new TextEncoder().encode(verifier);
   const digest = await crypto.subtle.digest('SHA-256', encoded);
   return base64UrlEncode(digest);
