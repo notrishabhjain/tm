@@ -6,11 +6,37 @@ const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/tasks';
 
-// Use the app's own scheme as the OAuth redirect URI.
-// Desktop app credentials (the correct type for browser-based OAuth) accept any
-// registered custom URI. Using "taskmind://" keeps the scheme already in app.json,
-// avoids a native rebuild, and lets Expo Router route the callback normally.
-const REDIRECT_URI = 'taskmind://oauth/google';
+// Build the redirect URI from the client ID using the reversed-client-ID scheme.
+// Google only accepts this format (or http://localhost) for Desktop app credentials.
+// e.g. "705668130599-abc.apps.googleusercontent.com"
+//   → "com.googleusercontent.apps.705668130599-abc:/"
+export function buildRedirectUri(clientId: string): string {
+  const appId = clientId.endsWith('.apps.googleusercontent.com')
+    ? clientId.slice(0, -'.apps.googleusercontent.com'.length)
+    : clientId;
+  return `com.googleusercontent.apps.${appId}:/`;
+}
+
+// Robust query-string parser — avoids new URL() which may choke on custom schemes
+// containing dots (e.g. com.googleusercontent.apps.xxx) in some Hermes builds.
+function parseQueryParams(url: string): Record<string, string> {
+  const qi = url.indexOf('?');
+  if (qi === -1) return {};
+  const result: Record<string, string> = {};
+  for (const pair of url.slice(qi + 1).split('&')) {
+    const ei = pair.indexOf('=');
+    if (ei > 0) {
+      try {
+        result[decodeURIComponent(pair.slice(0, ei))] = decodeURIComponent(
+          pair.slice(ei + 1).replace(/\+/g, ' ')
+        );
+      } catch {
+        // skip malformed pairs
+      }
+    }
+  }
+  return result;
+}
 
 export interface GoogleTaskInput {
   title: string;
@@ -65,15 +91,17 @@ export async function startOAuthFlow(clientId: string, clientSecret?: string): P
   const codeVerifier = generateCodeVerifier();
   const { challenge, method } = await generateCodeChallenge(codeVerifier);
   const state = generateCodeVerifier();
+  const redirectUri = buildRedirectUri(clientId);
 
   setSetting('google_tasks_code_verifier', codeVerifier);
   setSetting('google_tasks_oauth_state', state);
   setSetting('google_tasks_client_id', clientId);
+  setSetting('google_tasks_redirect_uri', redirectUri);
   if (clientSecret) setSetting('google_tasks_client_secret', clientSecret);
 
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: SCOPE,
     code_challenge: challenge,
@@ -83,18 +111,19 @@ export async function startOAuthFlow(clientId: string, clientSecret?: string): P
     prompt: 'consent',
   });
 
-  const url = `${OAUTH_URL}?${params.toString()}`;
-  await Linking.openURL(url);
+  await Linking.openURL(`${OAUTH_URL}?${params.toString()}`);
 }
 
 export async function handleOAuthCallback(callbackUrl: string): Promise<boolean> {
-  const url = new URL(callbackUrl);
-  const code = url.searchParams.get('code');
-  const state = url.searchParams.get('state');
+  const cbParams = parseQueryParams(callbackUrl);
+  const code = cbParams['code'];
+  const state = cbParams['state'];
   const savedState = getSetting('google_tasks_oauth_state');
   const codeVerifier = getSetting('google_tasks_code_verifier');
   const clientId = getSetting('google_tasks_client_id');
   const clientSecret = getSetting('google_tasks_client_secret');
+  // Use the exact redirect_uri stored when the flow started
+  const redirectUri = getSetting('google_tasks_redirect_uri') || buildRedirectUri(clientId);
 
   if (!code || !state || state !== savedState || !codeVerifier || !clientId) {
     // eslint-disable-next-line no-console
@@ -112,11 +141,10 @@ export async function handleOAuthCallback(callbackUrl: string): Promise<boolean>
     const bodyParams: Record<string, string> = {
       code,
       client_id: clientId,
-      redirect_uri: REDIRECT_URI,
+      redirect_uri: redirectUri,
       grant_type: 'authorization_code',
       code_verifier: codeVerifier,
     };
-    // Desktop app credentials require client_secret in the token exchange.
     if (clientSecret) bodyParams['client_secret'] = clientSecret;
 
     const resp = await fetch(TOKEN_URL, {
