@@ -44,7 +44,10 @@ export default function GoogleTasksScreen(): React.JSX.Element {
     }
     const trimmedSecret = clientSecret.trim();
     if (!trimmedSecret) {
-      Alert.alert('Client Secret required', 'Paste your Google OAuth Client Secret before connecting. You can find it in Google Cloud Console → Credentials → click on your Desktop app credential.');
+      Alert.alert(
+        'Client Secret required',
+        'Paste your Google OAuth Client Secret before connecting. You can find it in Google Cloud Console → Credentials → click on your Desktop app credential.'
+      );
       return;
     }
     setConnecting(true);
@@ -267,7 +270,13 @@ const styles = StyleSheet.create({
   step: { fontSize: 14, lineHeight: 22, marginBottom: 4 },
   bold: { fontWeight: '700' },
   italic: { fontStyle: 'italic' },
-  inputLabel: { fontSize: 11, fontWeight: '600', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8 },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
   codeBox: {
     borderRadius: 2,
     padding: 10,
