@@ -175,6 +175,11 @@ export default function SettingsScreen(): React.JSX.Element {
             subtitleColor={googleTasksConnected ? Colors.success : undefined}
             onPress={() => void router.push('/settings/google-tasks')}
           />
+          <NavRow
+            label="Call Transcription"
+            subtitle="Auto-extract tasks from call recordings"
+            onPress={() => void router.push('/settings/call-transcription')}
+          />
         </Section>
 
         <Section title="Nudges">
