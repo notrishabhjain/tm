@@ -20,6 +20,7 @@ export default function GoogleTasksScreen(): React.JSX.Element {
   const theme = useTheme();
   const [connected, setConnected] = useState(false);
   const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
   const [connecting, setConnecting] = useState(false);
 
   useFocusEffect(
@@ -29,6 +30,8 @@ export default function GoogleTasksScreen(): React.JSX.Element {
       setConnecting(false);
       const saved = getSetting('google_tasks_client_id');
       if (saved) setClientId(saved);
+      const savedSecret = getSetting('google_tasks_client_secret');
+      if (savedSecret) setClientSecret(savedSecret);
     }, [])
   );
 
@@ -39,10 +42,15 @@ export default function GoogleTasksScreen(): React.JSX.Element {
       Alert.alert('Client ID required', 'Paste your Google OAuth Client ID before connecting.');
       return;
     }
+    const trimmedSecret = clientSecret.trim();
+    if (!trimmedSecret) {
+      Alert.alert('Client Secret required', 'Paste your Google OAuth Client Secret before connecting. You can find it in Google Cloud Console → Credentials → click on your Desktop app credential.');
+      return;
+    }
     setConnecting(true);
     // Stay in "connecting" state while Chrome is open — useFocusEffect resets it on return
     try {
-      await startOAuthFlow(trimmed);
+      await startOAuthFlow(trimmed, trimmedSecret);
     } catch (e) {
       setConnecting(false);
       Alert.alert(
@@ -131,7 +139,10 @@ export default function GoogleTasksScreen(): React.JSX.Element {
             <Text style={styles.codeText}>taskmind://oauth/google</Text>
           </View>
           <Text style={[styles.step, { color: theme.onSurface }]}>
-            7. Copy your Client ID (ends with .apps.googleusercontent.com) and paste below
+            7. Click <Text style={styles.bold}>Create</Text> — Google shows your Client ID{' '}
+            <Text style={styles.italic}>(ends with .apps.googleusercontent.com)</Text> and Client
+            Secret <Text style={styles.italic}>(starts with GOCSPX-)</Text>. Copy both and paste
+            below.
           </Text>
 
           <Pressable style={styles.consoleBtn} onPress={openConsole}>
@@ -142,7 +153,8 @@ export default function GoogleTasksScreen(): React.JSX.Element {
 
       {!connected && (
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-          <Text style={[styles.cardTitle, { color: theme.primary }]}>OAuth Client ID</Text>
+          <Text style={[styles.cardTitle, { color: theme.primary }]}>OAuth Credentials</Text>
+          <Text style={[styles.inputLabel, { color: theme.onSurfaceVariant }]}>Client ID</Text>
           <TextInput
             style={[
               styles.input,
@@ -152,12 +164,30 @@ export default function GoogleTasksScreen(): React.JSX.Element {
                 backgroundColor: theme.background,
               },
             ]}
-            placeholder="Paste Client ID here (ends with .apps.googleusercontent.com)"
+            placeholder="Paste Client ID (ends with .apps.googleusercontent.com)"
             placeholderTextColor={theme.onSurfaceVariant}
             value={clientId}
             onChangeText={setClientId}
             autoCapitalize="none"
             autoCorrect={false}
+          />
+          <Text style={[styles.inputLabel, { color: theme.onSurfaceVariant }]}>Client Secret</Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                color: theme.onSurface,
+                borderColor: theme.outline,
+                backgroundColor: theme.background,
+              },
+            ]}
+            placeholder="Paste Client Secret (starts with GOCSPX-)"
+            placeholderTextColor={theme.onSurfaceVariant}
+            value={clientSecret}
+            onChangeText={setClientSecret}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry={false}
           />
 
           <View style={styles.btnWrapper}>
@@ -236,6 +266,8 @@ const styles = StyleSheet.create({
   },
   step: { fontSize: 14, lineHeight: 22, marginBottom: 4 },
   bold: { fontWeight: '700' },
+  italic: { fontStyle: 'italic' },
+  inputLabel: { fontSize: 11, fontWeight: '600', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8 },
   codeBox: {
     borderRadius: 2,
     padding: 10,

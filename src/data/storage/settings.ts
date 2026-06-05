@@ -38,6 +38,7 @@ export interface AppSettings {
   // Google Tasks integration
   google_tasks_enabled: boolean;
   google_tasks_client_id: string;
+  google_tasks_client_secret: string;
   google_tasks_access_token: string;
   google_tasks_refresh_token: string;
   google_tasks_token_expiry: number;
@@ -73,6 +74,7 @@ const DEFAULTS: AppSettings = {
   ai_last_digest_date: '',
   google_tasks_enabled: false,
   google_tasks_client_id: '',
+  google_tasks_client_secret: '',
   google_tasks_access_token: '',
   google_tasks_refresh_token: '',
   google_tasks_token_expiry: 0,

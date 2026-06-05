@@ -61,7 +61,7 @@ async function generateCodeChallenge(
   return { challenge: verifier, method: 'plain' };
 }
 
-export async function startOAuthFlow(clientId: string): Promise<void> {
+export async function startOAuthFlow(clientId: string, clientSecret?: string): Promise<void> {
   const codeVerifier = generateCodeVerifier();
   const { challenge, method } = await generateCodeChallenge(codeVerifier);
   const state = generateCodeVerifier();
@@ -69,6 +69,7 @@ export async function startOAuthFlow(clientId: string): Promise<void> {
   setSetting('google_tasks_code_verifier', codeVerifier);
   setSetting('google_tasks_oauth_state', state);
   setSetting('google_tasks_client_id', clientId);
+  if (clientSecret) setSetting('google_tasks_client_secret', clientSecret);
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -93,22 +94,42 @@ export async function handleOAuthCallback(callbackUrl: string): Promise<boolean>
   const savedState = getSetting('google_tasks_oauth_state');
   const codeVerifier = getSetting('google_tasks_code_verifier');
   const clientId = getSetting('google_tasks_client_id');
+  const clientSecret = getSetting('google_tasks_client_secret');
 
-  if (!code || !state || state !== savedState || !codeVerifier || !clientId) return false;
+  if (!code || !state || state !== savedState || !codeVerifier || !clientId) {
+    // eslint-disable-next-line no-console
+    console.warn('[GoogleTasks] callback validation failed', {
+      hasCode: Boolean(code),
+      hasState: Boolean(state),
+      stateMatch: state === savedState,
+      hasVerifier: Boolean(codeVerifier),
+      hasClientId: Boolean(clientId),
+    });
+    return false;
+  }
 
   try {
+    const bodyParams: Record<string, string> = {
+      code,
+      client_id: clientId,
+      redirect_uri: REDIRECT_URI,
+      grant_type: 'authorization_code',
+      code_verifier: codeVerifier,
+    };
+    // Desktop app credentials require client_secret in the token exchange.
+    if (clientSecret) bodyParams['client_secret'] = clientSecret;
+
     const resp = await fetch(TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: clientId,
-        redirect_uri: REDIRECT_URI,
-        grant_type: 'authorization_code',
-        code_verifier: codeVerifier,
-      }).toString(),
+      body: new URLSearchParams(bodyParams).toString(),
     });
-    if (!resp.ok) return false;
+    if (!resp.ok) {
+      const errBody = await resp.text();
+      // eslint-disable-next-line no-console
+      console.error('[GoogleTasks] token exchange failed', resp.status, errBody);
+      return false;
+    }
     const tokens = (await resp.json()) as {
       access_token: string;
       refresh_token?: string;
@@ -121,7 +142,9 @@ export async function handleOAuthCallback(callbackUrl: string): Promise<boolean>
     setSetting('google_tasks_code_verifier', '');
     setSetting('google_tasks_oauth_state', '');
     return true;
-  } catch {
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[GoogleTasks] token exchange error', e);
     return false;
   }
 }
@@ -134,17 +157,21 @@ async function getValidAccessToken(): Promise<string | null> {
   // Refresh
   const refreshToken = getSetting('google_tasks_refresh_token');
   const clientId = getSetting('google_tasks_client_id');
+  const clientSecret = getSetting('google_tasks_client_secret');
   if (!refreshToken || !clientId) return null;
 
   try {
+    const refreshParams: Record<string, string> = {
+      refresh_token: refreshToken,
+      client_id: clientId,
+      grant_type: 'refresh_token',
+    };
+    if (clientSecret) refreshParams['client_secret'] = clientSecret;
+
     const resp = await fetch(TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        refresh_token: refreshToken,
-        client_id: clientId,
-        grant_type: 'refresh_token',
-      }).toString(),
+      body: new URLSearchParams(refreshParams).toString(),
     });
     if (!resp.ok) return null;
     const tokens = (await resp.json()) as { access_token: string; expires_in: number };
@@ -223,4 +250,5 @@ export function disconnectGoogleTasks(): void {
   setSetting('google_tasks_refresh_token', '');
   setSetting('google_tasks_token_expiry', 0);
   setSetting('google_tasks_list_id', '');
+  setSetting('google_tasks_client_secret', '');
 }
