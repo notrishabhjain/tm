@@ -7,10 +7,12 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/tasks';
 
 // Android credentials use the reversed-client-ID URI scheme.
-// e.g. "123456-abc.apps.googleusercontent.com" → "com.googleusercontent.apps.123456-abc://oauth/google"
+// IMPORTANT: must use single slash ":/" (no host) — Google rejects "://" because
+// that creates a URI with "oauth" as the host, which fails Android credential validation.
+// e.g. "123456-abc.apps.googleusercontent.com" → "com.googleusercontent.apps.123456-abc:/oauth/google"
 function getRedirectUri(clientId: string): string {
   const prefix = clientId.replace('.apps.googleusercontent.com', '');
-  return `com.googleusercontent.apps.${prefix}://oauth/google`;
+  return `com.googleusercontent.apps.${prefix}:/oauth/google`;
 }
 
 export interface GoogleTaskInput {

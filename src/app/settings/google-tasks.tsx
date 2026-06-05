@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,11 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/ui/theme';
 import { Colors } from '@/ui/theme/colors';
 import { getSetting } from '@/data/storage/settings';
-import { startOAuthFlow, disconnectGoogleTasks } from '@/services/google-tasks';
+import {
+  startOAuthFlow,
+  handleOAuthCallback,
+  disconnectGoogleTasks,
+} from '@/services/google-tasks';
 
 export default function GoogleTasksScreen(): React.JSX.Element {
   const router = useRouter();
@@ -21,6 +25,15 @@ export default function GoogleTasksScreen(): React.JSX.Element {
   const [connected, setConnected] = useState(false);
   const [clientId, setClientId] = useState('');
   const [connecting, setConnecting] = useState(false);
+  // Holds cleanup fn for any in-flight OAuth listener so we can cancel on unmount
+  const pendingOAuth = useRef<(() => void) | null>(null);
+
+  useEffect(
+    () => () => {
+      pendingOAuth.current?.();
+    },
+    []
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -30,26 +43,74 @@ export default function GoogleTasksScreen(): React.JSX.Element {
     }, [])
   );
 
-  const handleConnect = async (): Promise<void> => {
+  const handleConnect = (): void => {
     // Strip any accidentally-pasted URL prefix — only the raw client ID is needed
     const trimmed = clientId.trim().replace(/^https?:\/\//i, '');
     if (!trimmed) {
       Alert.alert('Client ID required', 'Paste your Google OAuth Client ID before connecting.');
       return;
     }
+
+    // Derive the scheme from the client ID prefix so we recognise the callback
+    const idPrefix = trimmed.replace('.apps.googleusercontent.com', '');
+    const callbackScheme = idPrefix ? `com.googleusercontent.apps.${idPrefix}` : 'taskmind';
+
     setConnecting(true);
-    try {
-      await startOAuthFlow(trimmed);
-    } catch (e) {
-      Alert.alert(
-        'Could not open sign-in',
-        e instanceof Error ? e.message : 'An unexpected error occurred. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setConnecting(false);
-      setConnected(getSetting('google_tasks_enabled'));
-    }
+
+    // Register the deep-link listener BEFORE opening Chrome.
+    // Android delivers the OAuth callback URI through Linking even when Expo
+    // Router cannot route "scheme:/" single-slash URIs (which Google requires).
+    let done = false;
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      if (done || !url.startsWith(callbackScheme + ':')) return;
+      done = true;
+      sub.remove();
+      clearTimeout(tid);
+      pendingOAuth.current = null;
+
+      const q = url.includes('?') ? url.slice(url.indexOf('?') + 1) : '';
+      void handleOAuthCallback(`${callbackScheme}://oauth/google?${q}`).then((ok) => {
+        setConnecting(false);
+        setConnected(ok);
+        if (!ok) {
+          Alert.alert('Connection failed', 'Google sign-in did not complete. Please try again.');
+        }
+      });
+    });
+
+    // Auto-cancel after 5 min if the user abandons Chrome
+    const tid = setTimeout(
+      () => {
+        if (!done) {
+          done = true;
+          sub.remove();
+          pendingOAuth.current = null;
+          setConnecting(false);
+        }
+      },
+      5 * 60 * 1000
+    );
+
+    pendingOAuth.current = () => {
+      done = true;
+      sub.remove();
+      clearTimeout(tid);
+    };
+
+    startOAuthFlow(trimmed).catch((e: unknown) => {
+      if (!done) {
+        done = true;
+        sub.remove();
+        clearTimeout(tid);
+        pendingOAuth.current = null;
+        setConnecting(false);
+        Alert.alert(
+          'Could not open sign-in',
+          e instanceof Error ? e.message : 'An unexpected error occurred. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    });
   };
 
   const handleDisconnect = (): void => {
@@ -165,11 +226,11 @@ export default function GoogleTasksScreen(): React.JSX.Element {
                 pressed && { transform: [{ translateX: 3 }, { translateY: 3 }] },
                 connecting && styles.btnDisabled,
               ]}
-              onPress={() => void handleConnect()}
+              onPress={handleConnect}
               disabled={connecting}
             >
               <Text style={styles.btnText}>
-                {connecting ? 'Opening browser…' : 'Connect Google Tasks'}
+                {connecting ? 'Connecting…' : 'Connect Google Tasks'}
               </Text>
             </Pressable>
           </View>
