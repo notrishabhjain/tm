@@ -1,14 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  StyleSheet,
-  Linking,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/ui/theme';
 import { Colors } from '@/ui/theme/colors';
@@ -23,19 +14,12 @@ export default function GoogleTasksScreen(): React.JSX.Element {
   const router = useRouter();
   const theme = useTheme();
   const [connected, setConnected] = useState(false);
-  const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
   const [connecting, setConnecting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      // Refresh on every focus — picks up the connected state after OAuth returns
       setConnected(getSetting('google_tasks_enabled'));
       setConnecting(false);
-      const saved = getSetting('google_tasks_client_id');
-      if (saved) setClientId(saved);
-      const savedSecret = getSetting('google_tasks_client_secret');
-      if (savedSecret) setClientSecret(savedSecret);
     }, [])
   );
 
@@ -62,24 +46,9 @@ export default function GoogleTasksScreen(): React.JSX.Element {
   }, [connecting]);
 
   const handleConnect = async (): Promise<void> => {
-    // Strip any accidentally-pasted URL prefix — only the raw client ID is needed
-    const trimmed = clientId.trim().replace(/^https?:\/\//i, '');
-    if (!trimmed) {
-      Alert.alert('Client ID required', 'Paste your Google OAuth Client ID before connecting.');
-      return;
-    }
-    const trimmedSecret = clientSecret.trim();
-    if (!trimmedSecret) {
-      Alert.alert(
-        'Client Secret required',
-        'Paste your Google OAuth Client Secret before connecting. You can find it in Google Cloud Console → Credentials → click on your Desktop app credential.'
-      );
-      return;
-    }
     setConnecting(true);
-    // Stay in "connecting" state while Chrome is open — useFocusEffect resets it on return
     try {
-      await startOAuthFlow(trimmed, trimmedSecret);
+      await startOAuthFlow();
     } catch (e) {
       setConnecting(false);
       Alert.alert(
@@ -102,10 +71,6 @@ export default function GoogleTasksScreen(): React.JSX.Element {
         },
       },
     ]);
-  };
-
-  const openConsole = (): void => {
-    void Linking.openURL('https://console.cloud.google.com/');
   };
 
   return (
@@ -143,79 +108,12 @@ export default function GoogleTasksScreen(): React.JSX.Element {
 
       {!connected && (
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-          <Text style={[styles.cardTitle, { color: theme.primary }]}>Setup (one-time)</Text>
-
-          <Text style={[styles.step, { color: theme.onSurface }]}>
-            1. Open Google Cloud Console and create a project
+          <Text style={[styles.cardTitle, { color: theme.primary }]}>Connect your account</Text>
+          <Text style={[styles.bodyText, { color: theme.onSurface }]}>
+            Sign in with your Google account to start syncing tasks. Make sure{' '}
+            <Text style={styles.bold}>rishabh59jain@gmail.com</Text> is set as a Test User in the
+            OAuth consent screen.
           </Text>
-          <Text style={[styles.step, { color: theme.onSurface }]}>
-            2. Enable the <Text style={styles.bold}>Google Tasks API</Text>
-          </Text>
-          <Text style={[styles.step, { color: theme.onSurface }]}>
-            3. Configure the <Text style={styles.bold}>OAuth consent screen</Text> → add your Google
-            account as a Test User
-          </Text>
-          <Text style={[styles.step, { color: theme.onSurface }]}>
-            4. Go to Credentials → Create Credentials → OAuth 2.0 Client ID
-          </Text>
-          <Text style={[styles.step, { color: theme.onSurface }]}>
-            5. Choose <Text style={styles.bold}>Desktop app</Text> type and give it a name
-          </Text>
-          <Text style={[styles.step, { color: theme.onSurface }]}>
-            6. Click <Text style={styles.bold}>Create</Text> — no redirect URI needed for Desktop
-            apps
-          </Text>
-          <Text style={[styles.step, { color: theme.onSurface }]}>
-            7. Copy your <Text style={styles.bold}>Client ID</Text>{' '}
-            <Text style={styles.italic}>(ends with .apps.googleusercontent.com)</Text> and{' '}
-            <Text style={styles.bold}>Client Secret</Text>{' '}
-            <Text style={styles.italic}>(starts with GOCSPX-)</Text>. Paste both below.
-          </Text>
-
-          <Pressable style={styles.consoleBtn} onPress={openConsole}>
-            <Text style={styles.consoleBtnText}>Open Google Cloud Console ↗</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {!connected && (
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-          <Text style={[styles.cardTitle, { color: theme.primary }]}>OAuth Credentials</Text>
-          <Text style={[styles.inputLabel, { color: theme.onSurfaceVariant }]}>Client ID</Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                color: theme.onSurface,
-                borderColor: theme.outline,
-                backgroundColor: theme.background,
-              },
-            ]}
-            placeholder="Paste Client ID (ends with .apps.googleusercontent.com)"
-            placeholderTextColor={theme.onSurfaceVariant}
-            value={clientId}
-            onChangeText={setClientId}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Text style={[styles.inputLabel, { color: theme.onSurfaceVariant }]}>Client Secret</Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                color: theme.onSurface,
-                borderColor: theme.outline,
-                backgroundColor: theme.background,
-              },
-            ]}
-            placeholder="Paste Client Secret (starts with GOCSPX-)"
-            placeholderTextColor={theme.onSurfaceVariant}
-            value={clientSecret}
-            onChangeText={setClientSecret}
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry={false}
-          />
 
           <View style={styles.btnWrapper}>
             <View style={[styles.btnShadow, { backgroundColor: Colors.black }]} />
@@ -291,37 +189,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 12,
   },
-  step: { fontSize: 14, lineHeight: 22, marginBottom: 4 },
   bold: { fontWeight: '700' },
-  italic: { fontStyle: 'italic' },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  codeBox: {
-    borderRadius: 2,
-    padding: 10,
-    marginVertical: 8,
-  },
-  codeText: { color: '#7DD3FC', fontFamily: 'monospace', fontSize: 13 },
-  consoleBtn: { marginTop: 8, alignSelf: 'flex-start' },
-  consoleBtnText: {
-    fontSize: 13,
-    color: '#60A5FA',
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  input: {
-    borderWidth: 2,
-    borderRadius: 2,
-    padding: 12,
-    fontSize: 13,
-    marginBottom: 16,
-    fontFamily: 'monospace',
-  },
   btnWrapper: { position: 'relative', paddingRight: 3, paddingBottom: 3 },
   btnShadow: {
     position: 'absolute',
