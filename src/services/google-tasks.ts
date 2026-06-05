@@ -19,8 +19,13 @@ export interface GoogleTaskInput {
   dueDate?: number | null; // timestamp ms
 }
 
-// PKCE helpers — use the Web Crypto API built into Hermes / RN 0.76+.
-// No expo-crypto dependency needed.
+// PKCE helpers — use Web Crypto when available (Hermes/RN 0.76+ New Arch),
+// fall back to Math.random + plain PKCE method on older runtimes.
+
+// Access crypto through globalThis to avoid "crypto is not defined" ReferenceErrors
+// on Hermes builds where it isn't injected as a bare global.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const webCrypto = (globalThis as any).crypto as Crypto | undefined;
 
 function base64UrlEncode(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -33,24 +38,33 @@ function base64UrlEncode(buffer: ArrayBuffer): string {
 
 function generateCodeVerifier(): string {
   const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
+  if (webCrypto?.getRandomValues) {
+    webCrypto.getRandomValues(array);
+  } else {
+    // Fallback entropy when Web Crypto is unavailable
+    for (let i = 0; i < array.length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+  }
   return base64UrlEncode(array.buffer);
 }
 
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  if (!crypto?.subtle) {
-    throw new Error(
-      'Web Crypto API unavailable. Ensure New Architecture is enabled and the app is rebuilt.'
-    );
+// Returns {challenge, method} — S256 when crypto.subtle is available, plain otherwise.
+async function generateCodeChallenge(
+  verifier: string
+): Promise<{ challenge: string; method: 'S256' | 'plain' }> {
+  if (webCrypto?.subtle) {
+    const encoded = new TextEncoder().encode(verifier);
+    const digest = await webCrypto.subtle.digest('SHA-256', encoded);
+    return { challenge: base64UrlEncode(digest), method: 'S256' };
   }
-  const encoded = new TextEncoder().encode(verifier);
-  const digest = await crypto.subtle.digest('SHA-256', encoded);
-  return base64UrlEncode(digest);
+  // Google OAuth supports 'plain' — challenge equals the verifier
+  return { challenge: verifier, method: 'plain' };
 }
 
 export async function startOAuthFlow(clientId: string): Promise<void> {
   const codeVerifier = generateCodeVerifier();
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
+  const { challenge, method } = await generateCodeChallenge(codeVerifier);
   const state = generateCodeVerifier();
 
   setSetting('google_tasks_code_verifier', codeVerifier);
@@ -63,8 +77,8 @@ export async function startOAuthFlow(clientId: string): Promise<void> {
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: SCOPE,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
+    code_challenge: challenge,
+    code_challenge_method: method,
     state,
     access_type: 'offline',
     prompt: 'consent',
