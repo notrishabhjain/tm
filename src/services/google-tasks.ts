@@ -6,14 +6,11 @@ const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/tasks';
 
-// Android credentials use the reversed-client-ID URI scheme.
-// IMPORTANT: must use single slash ":/" (no host) — Google rejects "://" because
-// that creates a URI with "oauth" as the host, which fails Android credential validation.
-// e.g. "123456-abc.apps.googleusercontent.com" → "com.googleusercontent.apps.123456-abc:/oauth/google"
-function getRedirectUri(clientId: string): string {
-  const prefix = clientId.replace('.apps.googleusercontent.com', '');
-  return `com.googleusercontent.apps.${prefix}:/oauth/google`;
-}
+// Use the app's own scheme as the OAuth redirect URI.
+// Desktop app credentials (the correct type for browser-based OAuth) accept any
+// registered custom URI. Using "taskmind://" keeps the scheme already in app.json,
+// avoids a native rebuild, and lets Expo Router route the callback normally.
+const REDIRECT_URI = 'taskmind://oauth/google';
 
 export interface GoogleTaskInput {
   title: string;
@@ -73,10 +70,9 @@ export async function startOAuthFlow(clientId: string): Promise<void> {
   setSetting('google_tasks_oauth_state', state);
   setSetting('google_tasks_client_id', clientId);
 
-  const redirectUri = getRedirectUri(clientId);
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: redirectUri,
+    redirect_uri: REDIRECT_URI,
     response_type: 'code',
     scope: SCOPE,
     code_challenge: challenge,
@@ -107,7 +103,7 @@ export async function handleOAuthCallback(callbackUrl: string): Promise<boolean>
       body: new URLSearchParams({
         code,
         client_id: clientId,
-        redirect_uri: getRedirectUri(clientId),
+        redirect_uri: REDIRECT_URI,
         grant_type: 'authorization_code',
         code_verifier: codeVerifier,
       }).toString(),
