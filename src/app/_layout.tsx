@@ -215,6 +215,14 @@ export default function RootLayout(): React.JSX.Element {
                   options={{ presentation: 'card' }}
                 />
                 <Stack.Screen
+                  name="settings/call-transcription"
+                  options={{ presentation: 'card' }}
+                />
+                <Stack.Screen
+                  name="call-transcript"
+                  options={{ presentation: 'modal', headerShown: false }}
+                />
+                <Stack.Screen
                   name="task/create"
                   options={{ presentation: 'modal', headerShown: false }}
                 />

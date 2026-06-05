@@ -248,11 +248,11 @@ export async function createGoogleTask(task: GoogleTaskInput): Promise<string | 
     const listId = await getDefaultListId(token);
     const body: Record<string, string> = { title: task.title };
     if (task.notes) body['notes'] = task.notes;
-    if (task.dueDate) {
-      const d = new Date(task.dueDate);
-      d.setUTCHours(0, 0, 0, 0);
-      body['due'] = d.toISOString();
-    }
+    // Always set a due date — use the extracted one or default to today midnight UTC.
+    const dueTs = task.dueDate ?? Date.now();
+    const d = new Date(dueTs);
+    d.setUTCHours(0, 0, 0, 0);
+    body['due'] = d.toISOString();
     const resp = await fetch(`${TASKS_API}/lists/${listId}/tasks`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

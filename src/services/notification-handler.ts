@@ -17,6 +17,10 @@ import { createGoogleTask } from './google-tasks';
 import { appDisplayName } from './app-name-map';
 import { getSetting } from '@/data/storage/settings';
 
+// In-memory guard: prevents concurrent processing of the same notification when Android
+// re-delivers it before the first DB write completes (common with messaging apps).
+const _inFlight = new Set<string>();
+
 // Returns true if the current local time falls within user-configured quiet hours.
 function isQuietHours(): boolean {
   try {
@@ -58,6 +62,23 @@ export async function handleNotification(taskData: {
 
   initializeDatabase();
 
+  // ── In-memory in-flight guard (synchronous, prevents race conditions) ────────
+  const contentSlice = (notification.bigText || notification.text || '').slice(0, 200);
+  const inFlightKey = notification.notificationKey
+    ? `${notification.notificationKey}:${contentSlice}`
+    : `${notification.packageName}:${notification.postTime}:${contentSlice}`;
+  if (_inFlight.has(inFlightKey)) return;
+  _inFlight.add(inFlightKey);
+
+  try {
+    await _handleNotification(notification);
+  } finally {
+    // Keep the key for 60 s to absorb late re-deliveries, then clean up.
+    setTimeout(() => _inFlight.delete(inFlightKey), 60_000);
+  }
+}
+
+async function _handleNotification(notification: NotificationData): Promise<void> {
   // ── Notification-key + content deduplication (DB-level) ─────────────────────
   // Messaging apps (WhatsApp, Signal) reuse the same notificationKey for a whole
   // conversation thread. We check both key AND content so that distinct messages
