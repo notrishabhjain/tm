@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { handleOAuthCallback } from '@/services/google-tasks';
-import { getSetting } from '@/data/storage/settings';
 import { Colors } from '@/ui/theme/colors';
 
 export default function GoogleOAuthCallback(): React.JSX.Element {
@@ -12,12 +11,7 @@ export default function GoogleOAuthCallback(): React.JSX.Element {
 
   useEffect(() => {
     const query = new URLSearchParams(params as Record<string, string>).toString();
-    // Reconstruct the full callback URL using the reversed-client-ID scheme so
-    // handleOAuthCallback can parse state and code from a predictable URL format.
-    const clientId = getSetting('google_tasks_client_id');
-    const prefix = clientId.replace('.apps.googleusercontent.com', '');
-    const scheme = prefix ? `com.googleusercontent.apps.${prefix}` : 'taskmind';
-    const fullUrl = `${scheme}://oauth/google?${query}`;
+    const fullUrl = `taskmind://oauth/google?${query}`;
     void handleOAuthCallback(fullUrl).then((ok) => {
       setStatus(ok ? 'success' : 'error');
       setTimeout(() => {
