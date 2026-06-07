@@ -13,26 +13,60 @@ export interface TranscriptTask {
   notes: string | null;
 }
 
+export interface TranscriptContext {
+  referenceTime?: number; // epoch ms — when the call took place (anchors relative dates)
+  callerLabel?: string; // phone number / name of the other party
+}
+
 const SYSTEM_PROMPT = `You are an action-item extractor for phone call transcripts. Find EVERY commitment, task, follow-up, and action item in the conversation — be comprehensive, not selective.
+
+You will be told the date and time the call took place ("Call date"). ALL relative date/time
+expressions in the transcript — "tomorrow", "next Monday", "in two days", "this evening",
+"by Friday", "in an hour" — refer to that call date, NOT to today. Resolve every such
+expression into an absolute ISO 8601 date-time computed from the call date before writing
+"dueDate". If no date or time is mentioned at all, leave "dueDate" as null.
 
 Return ONLY a valid JSON array. No markdown fences, no explanation text outside the array:
 [
   {
     "title": "<imperative verb phrase ≤60 chars, e.g. 'Send invoice to Rahul by Friday'>",
     "priority": "URGENT|HIGH|MEDIUM|LOW",
-    "dueDate": "<ISO 8601 date-time string if a deadline was mentioned, else null>",
+    "dueDate": "<absolute ISO 8601 date-time string resolved against the call date, or null>",
     "assignedToMe": <true if the person who recorded this call must act, false if the other party committed to doing it>,
     "notes": "<relevant context: names, amounts, references, project names — or null if nothing useful to add>"
   }
 ]
 
 Priority guide:
-- URGENT: deadline within 24 h, or the words urgent / ASAP / immediately / tonight
-- HIGH: deadline 2-3 days, or the words important / priority / by end of week / by tomorrow
+- URGENT: deadline within 24 h of the call, or the words urgent / ASAP / immediately / tonight
+- HIGH: deadline 2-3 days from the call, or the words important / priority / by end of week / by tomorrow
 - MEDIUM: general task with no stated urgency
 - LOW: optional / whenever you get a chance / low stakes
 
 If no action items are found in the transcript, return exactly: []`;
+
+function formatCallDate(ts: number): string {
+  return new Date(ts).toLocaleString('en-IN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function buildUserMessage(text: string, ctx?: TranscriptContext): string {
+  const parts: string[] = [];
+  if (ctx?.referenceTime) {
+    parts.push(
+      `Call date: ${formatCallDate(ctx.referenceTime)} — resolve every relative date/time in the transcript against this moment.`
+    );
+  }
+  if (ctx?.callerLabel) parts.push(`Other party: ${ctx.callerLabel}`);
+  parts.push(`Call transcript:\n\n${text}`);
+  return parts.join('\n');
+}
 
 function parseResult(raw: string): TranscriptTask[] {
   try {
@@ -63,7 +97,10 @@ function parseResult(raw: string): TranscriptTask[] {
   }
 }
 
-export async function extractTasksFromTranscript(text: string): Promise<TranscriptTask[]> {
+export async function extractTasksFromTranscript(
+  text: string,
+  ctx?: TranscriptContext
+): Promise<TranscriptTask[]> {
   const key = getSetting('ai_api_key');
   const model = getSetting('ai_model');
   if (!key) return [];
@@ -86,7 +123,7 @@ export async function extractTasksFromTranscript(text: string): Promise<Transcri
         model,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Call transcript:\n\n${truncated}` },
+          { role: 'user', content: buildUserMessage(truncated, ctx) },
         ],
         max_tokens: 1_200,
         temperature: 0.1,
