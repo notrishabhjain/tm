@@ -13,7 +13,24 @@ import { handleNotification } from '@/services/notification-handler';
 import { restoreNudgeFromSettings } from '@/services/nudge-scheduler';
 import { runDailyDigestIfNeeded } from '@/services/ai-digest';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
+import { stashCallTranscript } from '@/services/call-transcript-stash';
 import NotificationListener from '../../modules/notification-listener/src';
+
+// Subject marker the Termux hand-off script stamps on the share intent:
+// "TASKMIND_CALL_TRANSCRIPT|<callEpochMs>|<callerLabel>"
+const CALL_TRANSCRIPT_MARKER = 'TASKMIND_CALL_TRANSCRIPT|';
+
+function parseCallTranscriptSubject(subject: string): { callTime: number; callerLabel: string } {
+  const rest = subject.slice(CALL_TRANSCRIPT_MARKER.length);
+  const sepIndex = rest.indexOf('|');
+  const epochPart = sepIndex >= 0 ? rest.slice(0, sepIndex) : rest;
+  const labelPart = sepIndex >= 0 ? rest.slice(sepIndex + 1) : '';
+  const epochMs = Number(epochPart);
+  return {
+    callTime: Number.isFinite(epochMs) && epochMs > 0 ? epochMs : Date.now(),
+    callerLabel: labelPart.trim() || 'Unknown',
+  };
+}
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -161,14 +178,26 @@ export default function RootLayout(): React.JSX.Element {
   }, []);
 
   // Share intent: open share screen when app is brought to foreground with a shared text.
+  // Call transcripts arrive the same way (Termux hand-off, see
+  // settings/call-transcription.tsx) tagged with a TASKMIND_CALL_TRANSCRIPT subject —
+  // those are routed to the dedicated review screen instead.
   useEffect(() => {
     const checkShare = (): void => {
       void (async () => {
         try {
           const intent = await NotificationListener.peekShareIntent();
-          if (intent?.text) {
-            router.push('/share');
+          if (!intent?.text) return;
+
+          const subject = intent.subject ?? '';
+          if (subject.startsWith(CALL_TRANSCRIPT_MARKER)) {
+            const { callTime, callerLabel } = parseCallTranscriptSubject(subject);
+            stashCallTranscript({ text: intent.text, callTime, callerLabel });
+            await NotificationListener.clearShareIntent().catch(() => null);
+            router.push('/call-transcript');
+            return;
           }
+
+          router.push('/share');
         } catch {
           // Native module unavailable
         }

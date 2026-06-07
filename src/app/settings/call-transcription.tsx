@@ -6,31 +6,70 @@ import { useTheme } from '@/ui/theme';
 import { Colors } from '@/ui/theme/colors';
 
 const TERMUX_SETUP_SCRIPT = `pkg update -y
-pkg install -y clang cmake git ffmpeg python
+pkg install -y clang cmake git ffmpeg python termux-api
+termux-setup-storage
 git clone https://github.com/ggerganov/whisper.cpp ~/whisper.cpp
 cd ~/whisper.cpp
 cmake -B build -DWHISPER_BUILD_EXAMPLES=ON
 cmake --build build -j$(nproc)
 bash models/download-ggml-model.sh base.en
-echo "✓ whisper.cpp ready"`;
+mkdir -p ~/.termux
+echo "allow-external-apps=true" >> ~/.termux/termux.properties
+termux-reload-settings
+echo "✓ whisper.cpp ready — fully close and reopen Termux once to apply settings"`;
 
 const TRANSCRIBE_SCRIPT = `#!/data/data/com.termux/files/usr/bin/bash
-# transcribe_call.sh — paste this into ~/transcribe_call.sh
+# transcribe_call.sh — paste into ~/transcribe_call.sh, then: chmod +x ~/transcribe_call.sh
+#
+# Finds the newest call recording, transcribes it on-device with whisper.cpp,
+# then hands the transcript straight to TaskMind via the same share-intent
+# mechanism used for "Share to TaskMind" from WhatsApp — no files for the app
+# to read back, so no scoped-storage permission issues.
 set -e
-RECORDING="$1"
-[ -z "$RECORDING" ] && { echo "Usage: $0 <recording_file>"; exit 1; }
 
-WAV="/data/data/com.termux/files/home/taskmind_tmp.wav"
-OUT_TXT="/sdcard/Download/taskmind_transcript.txt"
+# Folder where your phone saves call recordings — verify with a file manager
+# and edit this path if your device uses a different one (e.g. some OEMs use
+# /storage/emulated/0/Recordings/Call/ or /storage/emulated/0/MIUI/sounds/).
+REC_DIR="/storage/emulated/0/Recordings/Record/Call"
+STATE_FILE="$HOME/.taskmind_last_call"
+WAV="$HOME/taskmind_tmp.wav"
+TXT_BASE="$HOME/taskmind_tmp"
 
-ffmpeg -i "$RECORDING" -ar 16000 -ac 1 "$WAV" -y -loglevel error
+# 1. Find the newest recording
+LATEST=$(ls -t "$REC_DIR"/*.m4a "$REC_DIR"/*.M4A 2>/dev/null | head -n 1)
+[ -z "$LATEST" ] && { echo "No recordings found in $REC_DIR — check REC_DIR is correct"; exit 0; }
+
+# 2. Skip if we already handed off this exact file (MacroDroid can fire more than once)
+[ "$(cat "$STATE_FILE" 2>/dev/null)" = "$LATEST" ] && { echo "Already processed: $LATEST"; exit 0; }
+
+# 3. Ignore stale matches — only act on a recording from the last 5 minutes
+MTIME=$(stat -c %Y "$LATEST")
+AGE=$(( $(date +%s) - MTIME ))
+[ "$AGE" -gt 300 ] && { echo "Newest recording is \${AGE}s old — not from this call, skipping"; exit 0; }
+
+# 4. Pull the caller's number out of the filename (e.g. "+919876543210_20260607_1545.m4a")
+CALLER=$(basename "$LATEST" | grep -oE '\\+?[0-9]{6,15}' | head -n 1)
+[ -z "$CALLER" ] && CALLER="Unknown"
+
+# 5. Convert to 16 kHz mono WAV and transcribe on-device
+ffmpeg -i "$LATEST" -ar 16000 -ac 1 "$WAV" -y -loglevel error
 ~/whisper.cpp/build/bin/whisper-cli -m ~/whisper.cpp/models/ggml-base.en.bin \\
-  -f "$WAV" -otxt -of /data/data/com.termux/files/home/taskmind_tmp 2>/dev/null
-mv /data/data/com.termux/files/home/taskmind_tmp.txt "$OUT_TXT"
+  -f "$WAV" -otxt -of "$TXT_BASE" 2>/dev/null
+TRANSCRIPT=$(cat "$TXT_BASE.txt" 2>/dev/null || echo "")
 
-ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$OUT_TXT")
-am start -a android.intent.action.VIEW -d "taskmind://call-transcript?path=$ENC" >/dev/null 2>&1 || true
-rm -f "$WAV"`;
+if [ -n "$TRANSCRIPT" ]; then
+  # 6. Hand off to TaskMind — tagged so the app knows it's a call transcript,
+  #    not a regular share, and can resolve "tomorrow" etc. against the call time.
+  EPOCH_MS=$(( MTIME * 1000 ))
+  am start -a android.intent.action.SEND -t text/plain \\
+    --es android.intent.extra.SUBJECT "TASKMIND_CALL_TRANSCRIPT|$EPOCH_MS|$CALLER" \\
+    --es android.intent.extra.TEXT "$TRANSCRIPT" \\
+    -n com.taskmind.app/.MainActivity >/dev/null 2>&1 || true
+fi
+
+# 7. Remember this file (skip it next run) and clean up temp files
+echo "$LATEST" > "$STATE_FILE"
+rm -f "$WAV" "$TXT_BASE.txt"`;
 
 function CodeBlock({ code, label }: { code: string; label: string }): React.JSX.Element {
   const theme = useTheme();
@@ -84,7 +123,9 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
 
       <Text style={[styles.title, { color: theme.onSurface }]}>Call Transcription Setup</Text>
       <Text style={[styles.intro, { color: theme.onSurfaceVariant }]}>
-        Automatically extract tasks from call recordings using on-device AI (whisper.cpp). Setup
+        Turn your recorded calls into tasks automatically: when a call ends, MacroDroid runs a
+        Termux script that transcribes the recording on-device with whisper.cpp and sends the
+        transcript straight to TaskMind, where AI extracts action items with correct dates. Setup
         takes about 20 minutes and only needs to be done once.
       </Text>
 
@@ -116,8 +157,10 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
       {/* Step 1 */}
       <Section title="Step 1 — Build whisper.cpp in Termux" theme={theme}>
         <Text style={[styles.body, { color: theme.onSurface }]}>
-          Open Termux and paste this script. It installs dependencies, clones whisper.cpp, compiles
-          it, and downloads the base English model (~75 MB). Takes ~15 min.
+          Open Termux and paste this script. It installs dependencies, grants Termux access to
+          shared storage (accept the permission prompt), clones and compiles whisper.cpp, downloads
+          the base English model (~75 MB), and enables external apps (needed for MacroDroid to
+          trigger Termux in Step 3). Takes ~15 min.
         </Text>
         <CodeBlock code={TERMUX_SETUP_SCRIPT} label="Termux setup (run once)" />
       </Section>
@@ -130,29 +173,49 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
           {'\n'}Paste the content below, save with Ctrl+X → Y → Enter, then make it executable:
           {'\n'}
           <Text style={styles.mono}>chmod +x ~/transcribe_call.sh</Text>
+          {'\n\n'}
+          <Text style={styles.bold}>Important:</Text> open the script and check that{' '}
+          <Text style={styles.mono}>REC_DIR</Text> matches where your phone actually saves call
+          recordings — browse to it with a file manager first (you mentioned a path like{' '}
+          <Text style={styles.mono}>Recordings/Record/Call</Text>; some OEMs use{' '}
+          <Text style={styles.mono}>Recordings/Call</Text> or{' '}
+          <Text style={styles.mono}>MIUI/sounds/Call</Text> instead).
         </Text>
         <CodeBlock code={TRANSCRIBE_SCRIPT} label="~/transcribe_call.sh" />
       </Section>
 
       {/* Step 3 */}
       <Section title="Step 3 — Configure MacroDroid" theme={theme}>
+        <Text style={[styles.body, { color: theme.onSurface }]}>
+          MacroDroid has no "file created" trigger, so the macro instead fires when the call ends
+          and waits for the recording to finish saving before handing off to Termux.
+        </Text>
         <StepRow num="1" theme={theme}>
           Open MacroDroid → tap <Text style={styles.bold}>+</Text> to create a new macro
         </StepRow>
         <StepRow num="2" theme={theme}>
-          <Text style={styles.bold}>Trigger</Text>: File Event → File Created → choose your call
-          recordings folder (usually <Text style={styles.mono}>/sdcard/Recordings/Calls/</Text> or{' '}
-          <Text style={styles.mono}>/sdcard/MIUI/sounds/</Text> — check your Phone app settings for
-          exact path)
+          <Text style={styles.bold}>Trigger</Text>: Phone →{' '}
+          <Text style={styles.bold}>Call Ended</Text> (any number)
         </StepRow>
         <StepRow num="3" theme={theme}>
-          <Text style={styles.bold}>Action</Text>: Termux → Run Command → Command:{' '}
-          <Text style={styles.mono}>bash ~/transcribe_call.sh [trigger_file_path]</Text>
-          {'\n'}(MacroDroid inserts the actual file path at runtime)
+          <Text style={styles.bold}>Action 1</Text>: Logic / Control → Wait → Wait Before Next
+          Action: <Text style={styles.bold}>15 seconds</Text> (gives the Phone app time to finish
+          writing the recording file)
         </StepRow>
         <StepRow num="4" theme={theme}>
-          Enable the macro. After your next call, TaskMind will open automatically with extracted
-          tasks.
+          <Text style={styles.bold}>Action 2</Text>: Connections → Send Intent → fill in:
+          {'\n'}• Action: <Text style={styles.mono}>com.termux.RUN_COMMAND</Text>
+          {'\n'}• Package: <Text style={styles.mono}>com.termux</Text>
+          {'\n'}• Target Class: <Text style={styles.mono}>com.termux.app.RunCommandService</Text>
+          {'\n'}• Target: <Text style={styles.bold}>Service</Text> (not Activity/Broadcast)
+          {'\n'}• Extra 1 — name <Text style={styles.mono}>com.termux.RUN_COMMAND_PATH</Text>, value{' '}
+          <Text style={styles.mono}>/data/data/com.termux/files/home/transcribe_call.sh</Text>
+          {'\n'}• Extra 2 — name <Text style={styles.mono}>com.termux.RUN_COMMAND_BACKGROUND</Text>,
+          value <Text style={styles.mono}>true</Text>
+        </StepRow>
+        <StepRow num="5" theme={theme}>
+          Save and enable the macro. After your next call (and the 15 s wait), TaskMind opens
+          automatically with the extracted tasks ready to review.
         </StepRow>
       </Section>
 
@@ -160,8 +223,23 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
       <Section title="Tips & Troubleshooting" theme={theme}>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
+          <Text style={styles.bold}>"Send Intent" greyed out / fails silently</Text>: make sure Step
+          1's <Text style={styles.mono}>allow-external-apps=true</Text> line ran and you fully
+          closed and reopened Termux afterwards — Android blocks external apps from launching Termux
+          commands until that's set.
+        </Text>
+        <Text style={[styles.body, { color: theme.onSurface }]}>
+          {'• '}
+          <Text style={styles.bold}>Wrong recordings folder</Text>: if nothing happens, open Termux
+          and run <Text style={styles.mono}>ls /storage/emulated/0/Recordings/Record/Call</Text> —
+          if that errors, find the real folder with a file manager and update{' '}
+          <Text style={styles.mono}>REC_DIR</Text> in the script.
+        </Text>
+        <Text style={[styles.body, { color: theme.onSurface }]}>
+          {'• '}
           <Text style={styles.bold}>Battery optimisation</Text>: exclude both Termux and MacroDroid
-          from battery saver (Settings → Battery → App battery usage).
+          from battery saver (Settings → Battery → App battery usage), otherwise Android may kill
+          the script mid-run.
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
@@ -172,13 +250,16 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
           {'• '}
           <Text style={styles.bold}>Model quality</Text>: the base.en model works well for clear
           audio. For noisy calls, replace <Text style={styles.mono}>ggml-base.en.bin</Text> with{' '}
-          <Text style={styles.mono}>ggml-small.en.bin</Text> (slower, more accurate).
+          <Text style={styles.mono}>ggml-small.en.bin</Text> (slower, more accurate) in both the
+          setup and transcription scripts.
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
           <Text style={styles.bold}>Test manually</Text>: in Termux, run{' '}
-          <Text style={styles.mono}>bash ~/transcribe_call.sh /path/to/recording.m4a</Text> to
-          verify the pipeline works before relying on MacroDroid.
+          <Text style={styles.mono}>bash ~/transcribe_call.sh</Text> right after a call to verify
+          the whole pipeline — including the hand-off to TaskMind — before relying on MacroDroid. To
+          force it to re-process the same recording, run{' '}
+          <Text style={styles.mono}>rm ~/.taskmind_last_call</Text> first.
         </Text>
       </Section>
     </ScrollView>

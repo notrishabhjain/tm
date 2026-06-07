@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, FlatList } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import * as FileSystem from 'expo-file-system';
+import { useRouter } from 'expo-router';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
 import { PriorityChip } from '@/ui/components/PriorityChip';
@@ -10,6 +9,7 @@ import { db } from '@/data/db/client';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { createGoogleTask } from '@/services/google-tasks';
 import { getSetting } from '@/data/storage/settings';
+import { consumeCallTranscript } from '@/services/call-transcript-stash';
 import { extractTasksFromTranscript } from '@/services/transcript-extractor';
 import type { TranscriptTask } from '@/services/transcript-extractor';
 
@@ -31,13 +31,20 @@ function formatDue(ts: number): string {
   return d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
 }
 
+function formatCallMeta(callTime: number, callerLabel: string): string {
+  const d = new Date(callTime);
+  const dateStr = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  const timeStr = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  return `Call with ${callerLabel} · ${dateStr}, ${timeStr}`;
+}
+
 export default function CallTranscriptScreen(): React.JSX.Element {
   const theme = useTheme();
   const router = useRouter();
-  const { path } = useLocalSearchParams<{ path?: string }>();
 
   const [state, setState] = useState<ScreenState>('loading');
   const [errorMsg, setErrorMsg] = useState('');
+  const [callMeta, setCallMeta] = useState('');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
@@ -56,31 +63,27 @@ export default function CallTranscriptScreen(): React.JSX.Element {
       return;
     }
 
-    if (!path) {
-      setErrorMsg('No transcript file path was provided.\nCheck your MacroDroid/Termux setup.');
-      setState('error');
-      return;
-    }
-
-    let text = '';
-    try {
-      // expo-file-system expects a file:// URI or absolute path.
-      const uri = path.startsWith('file://') ? path : `file://${path}`;
-      text = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.UTF8 });
-    } catch {
+    const payload = consumeCallTranscript();
+    if (!payload) {
       setErrorMsg(
-        `Could not read transcript file:\n${path}\n\nMake sure Termux wrote the file and TaskMind has storage permission.`
+        'No transcript was received.\n\nMake sure the Termux script ran after your call — see Settings → Call Transcription for setup.'
       );
       setState('error');
       return;
     }
 
-    if (!text.trim()) {
+    const text = payload.text.trim();
+    setCallMeta(formatCallMeta(payload.callTime, payload.callerLabel));
+
+    if (!text) {
       setState('empty');
       return;
     }
 
-    const extracted = await extractTasksFromTranscript(text);
+    const extracted = await extractTasksFromTranscript(text, {
+      referenceTime: payload.callTime,
+      callerLabel: payload.callerLabel,
+    });
     if (extracted.length === 0) {
       setState('empty');
       return;
@@ -171,6 +174,11 @@ export default function CallTranscriptScreen(): React.JSX.Element {
       <View style={[styles.center, { backgroundColor: theme.background }]}>
         <Text style={[styles.emptyIcon, { color: theme.onSurfaceVariant }]}>✓</Text>
         <Text style={[styles.emptyTitle, { color: theme.onSurface }]}>No action items found</Text>
+        {callMeta ? (
+          <Text style={[styles.callMetaCentered, { color: theme.onSurfaceVariant }]}>
+            {callMeta}
+          </Text>
+        ) : null}
         <Text style={[styles.emptyHint, { color: theme.onSurfaceVariant }]}>
           The AI found no commitments or tasks in this call transcript.
         </Text>
@@ -199,6 +207,9 @@ export default function CallTranscriptScreen(): React.JSX.Element {
         ]}
       >
         <Text style={[styles.headerTitle, { color: theme.onSurface }]}>Call Tasks</Text>
+        {callMeta ? (
+          <Text style={[styles.callMeta, { color: theme.onSurfaceVariant }]}>{callMeta}</Text>
+        ) : null}
         <Text style={[styles.headerSub, { color: theme.onSurfaceVariant }]}>
           {tasks.length} item{tasks.length !== 1 ? 's' : ''} found · {selectedCount} selected
         </Text>
@@ -325,6 +336,7 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 40 },
   emptyTitle: { fontSize: 16, fontWeight: '700' },
   emptyHint: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  callMetaCentered: { fontSize: 12, textAlign: 'center' },
   doneIcon: { fontSize: 48 },
   doneText: { fontSize: 18, fontWeight: '700' },
   header: {
@@ -334,6 +346,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
   },
   headerTitle: { fontSize: 20, fontWeight: '800' },
+  callMeta: { fontSize: 12, marginTop: 4 },
   headerSub: { fontSize: 13, marginTop: 2 },
   selectAllRow: { paddingHorizontal: 16, paddingVertical: 10 },
   selectAllText: { fontSize: 13, fontWeight: '700' },
