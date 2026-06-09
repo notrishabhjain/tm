@@ -63,10 +63,12 @@ export async function handleNotification(taskData: {
   initializeDatabase();
 
   // ── In-memory in-flight guard (synchronous, prevents race conditions) ────────
-  const contentSlice = (notification.bigText || notification.text || '').slice(0, 200);
+  // Key is notificationKey-only (no content slice) so that re-deliveries with
+  // updated content — e.g. WhatsApp updating a thread notification when a new
+  // message arrives — are blocked for 60 s, not just identical re-deliveries.
   const inFlightKey = notification.notificationKey
-    ? `${notification.notificationKey}:${contentSlice}`
-    : `${notification.packageName}:${notification.postTime}:${contentSlice}`;
+    ? notification.notificationKey
+    : `${notification.packageName}:${notification.postTime}`;
   if (_inFlight.has(inFlightKey)) return;
   _inFlight.add(inFlightKey);
 
@@ -79,17 +81,17 @@ export async function handleNotification(taskData: {
 }
 
 async function _handleNotification(notification: NotificationData): Promise<void> {
-  // ── Notification-key + content deduplication (DB-level) ─────────────────────
-  // Messaging apps (WhatsApp, Signal) reuse the same notificationKey for a whole
-  // conversation thread. We check both key AND content so that distinct messages
-  // on the same thread each pass through, while true re-deliveries are filtered.
+  // ── Notification-key deduplication (DB-level) ───────────────────────────────
+  // Pure key-only check: if we already created or discarded a task for this
+  // notification key (regardless of content), skip all further processing.
+  // Content-based matching was letting updated re-deliveries through — messaging
+  // apps routinely update the same notification with new message bundles.
   if (notification.notificationKey) {
     const taskRepo = new TaskRepository(db);
     const discardedRepo = new DiscardedLogRepository(db);
-    const currentText = (notification.bigText || notification.text || '').slice(0, 200);
     const [inTasks, inDiscarded] = await Promise.all([
-      taskRepo.existsByNotificationKeyAndContent(notification.notificationKey, currentText),
-      discardedRepo.existsByNotificationKeyAndContent(notification.notificationKey, currentText),
+      taskRepo.findByNotificationKey(notification.notificationKey),
+      discardedRepo.existsByNotificationKey(notification.notificationKey),
     ]);
     if (inTasks || inDiscarded) {
       logCapturedNotification(notification, 'FILTERED');
