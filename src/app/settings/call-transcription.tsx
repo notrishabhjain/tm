@@ -12,11 +12,12 @@ git clone https://github.com/ggerganov/whisper.cpp ~/whisper.cpp
 cd ~/whisper.cpp
 cmake -B build -DWHISPER_BUILD_EXAMPLES=ON
 cmake --build build -j$(nproc)
-bash models/download-ggml-model.sh base.en
+bash models/download-ggml-model.sh base
 mkdir -p ~/.termux
 echo "allow-external-apps=true" >> ~/.termux/termux.properties
 termux-reload-settings
-echo "✓ whisper.cpp ready — fully close and reopen Termux once to apply settings"`;
+grep -qF "termux-wake-lock" ~/.bashrc || echo "termux-wake-lock" >> ~/.bashrc
+echo "✓ Setup complete — close Termux fully, then reopen it once to activate the background service. After that, MacroDroid can reach Termux even when it is not visible on screen."`;
 
 const TRANSCRIBE_SCRIPT = `#!/data/data/com.termux/files/usr/bin/bash
 # transcribe_call.sh — paste into ~/transcribe_call.sh, then: chmod +x ~/transcribe_call.sh
@@ -53,8 +54,8 @@ CALLER=$(basename "$LATEST" | grep -oE '\\+?[0-9]{6,15}' | head -n 1)
 
 # 5. Convert to 16 kHz mono WAV and transcribe on-device
 ffmpeg -i "$LATEST" -ar 16000 -ac 1 "$WAV" -y -loglevel error
-~/whisper.cpp/build/bin/whisper-cli -m ~/whisper.cpp/models/ggml-base.en.bin \\
-  -f "$WAV" -otxt -of "$TXT_BASE" 2>/dev/null
+~/whisper.cpp/build/bin/whisper-cli -m ~/whisper.cpp/models/ggml-base.bin \\
+  -f "$WAV" -otxt -of "$TXT_BASE" -l auto -bs 1 -bo 1 2>/dev/null
 TRANSCRIPT=$(cat "$TXT_BASE.txt" 2>/dev/null || echo "")
 
 if [ -n "$TRANSCRIPT" ]; then
@@ -223,10 +224,13 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
       <Section title="Tips & Troubleshooting" theme={theme}>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
-          <Text style={styles.bold}>"Send Intent" greyed out / fails silently</Text>: make sure Step
-          1's <Text style={styles.mono}>allow-external-apps=true</Text> line ran and you fully
-          closed and reopened Termux afterwards — Android blocks external apps from launching Termux
-          commands until that's set.
+          <Text style={styles.bold}>"app is in background" / Send Intent fails</Text>: this means
+          Termux's background service was killed. The setup script already adds{' '}
+          <Text style={styles.mono}>termux-wake-lock</Text> to your Termux startup so it keeps the
+          service alive automatically — but you must open Termux at least once after each phone
+          reboot to activate it. After opening it, you can close it immediately; the service stays
+          running. You should also go to Settings → Apps → Termux → Battery → set to{' '}
+          <Text style={styles.bold}>Unrestricted</Text>, and do the same for MacroDroid.
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
@@ -237,9 +241,9 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
-          <Text style={styles.bold}>Battery optimisation</Text>: exclude both Termux and MacroDroid
-          from battery saver (Settings → Battery → App battery usage), otherwise Android may kill
-          the script mid-run.
+          <Text style={styles.bold}>Battery optimisation</Text>: set both Termux and MacroDroid to
+          Unrestricted in Settings → Apps → [app] → Battery. This prevents Android from killing
+          Termux mid-transcription and stops MacroDroid from being delayed by power saving.
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
@@ -248,10 +252,12 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
-          <Text style={styles.bold}>Model quality</Text>: the base.en model works well for clear
-          audio. For noisy calls, replace <Text style={styles.mono}>ggml-base.en.bin</Text> with{' '}
-          <Text style={styles.mono}>ggml-small.en.bin</Text> (slower, more accurate) in both the
-          setup and transcription scripts.
+          <Text style={styles.bold}>Non-English calls</Text>: the setup uses the multilingual{' '}
+          <Text style={styles.mono}>base</Text> model which supports Hindi, English, and 97 other
+          languages — it auto-detects the spoken language. If transcription is inaccurate, you can
+          pin the language by changing <Text style={styles.mono}>-l auto</Text> to a language code
+          (e.g. <Text style={styles.mono}>-l hi</Text> for Hindi,{' '}
+          <Text style={styles.mono}>-l en</Text> for English) in the transcription script.
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}

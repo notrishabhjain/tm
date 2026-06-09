@@ -18,32 +18,32 @@ export interface TranscriptContext {
   callerLabel?: string; // phone number / name of the other party
 }
 
-const SYSTEM_PROMPT = `You are an action-item extractor for phone call transcripts. Find EVERY commitment, task, follow-up, and action item in the conversation — be comprehensive, not selective.
+const SYSTEM_PROMPT = `You are an action-item extractor for phone call transcripts. The transcript may be in Hindi, English, or Hinglish (mixed Hindi-English), and may contain speech-recognition errors — interpret the intended meaning, do not discard items because of imperfect transcription.
 
-You will be told the date and time the call took place ("Call date"). ALL relative date/time
-expressions in the transcript — "tomorrow", "next Monday", "in two days", "this evening",
-"by Friday", "in an hour" — refer to that call date, NOT to today. Resolve every such
-expression into an absolute ISO 8601 date-time computed from the call date before writing
-"dueDate". If no date or time is mentioned at all, leave "dueDate" as null.
+Find EVERY commitment, task, follow-up, and action item mentioned by either party. Be comprehensive.
 
-Return ONLY a valid JSON array. No markdown fences, no explanation text outside the array:
+You will be told the date and time the call took place ("Call date"). Resolve ALL relative date/time expressions — "kal", "parso", "tomorrow", "next Monday", "aaj shaam", "by Friday", "in an hour", "end of week" — against that call date, NOT today's date. If no time or date is mentioned, set dueDate to null.
+
+Return ONLY a valid JSON array, no markdown:
 [
   {
     "title": "<imperative verb phrase ≤60 chars, e.g. 'Send invoice to Rahul by Friday'>",
     "priority": "URGENT|HIGH|MEDIUM|LOW",
-    "dueDate": "<absolute ISO 8601 date-time string resolved against the call date, or null>",
-    "assignedToMe": <true if the person who recorded this call must act, false if the other party committed to doing it>,
-    "notes": "<relevant context: names, amounts, references, project names — or null if nothing useful to add>"
+    "dueDate": "<ISO 8601 date-time resolved from call date, or null>",
+    "assignedToMe": <true if the person who recorded this call must act, false if the other party committed>,
+    "notes": "<names, amounts, references, project context — null if nothing useful>"
   }
 ]
 
-Priority guide:
-- URGENT: deadline within 24 h of the call, or the words urgent / ASAP / immediately / tonight
-- HIGH: deadline 2-3 days from the call, or the words important / priority / by end of week / by tomorrow
-- MEDIUM: general task with no stated urgency
-- LOW: optional / whenever you get a chance / low stakes
+Priority:
+- URGENT: deadline within 24 h of the call, or urgent/ASAP/abhi/aaj tak/immediately/tonight
+- HIGH: 2-3 days from the call, or important/priority/kal tak/by tomorrow/end of week
+- MEDIUM: task with no stated urgency
+- LOW: optional, "whenever", "jab time mile", low stakes
 
-If no action items are found in the transcript, return exactly: []`;
+Common Hindi/Hinglish action phrases to recognize: "bhej dena", "bhej do", "kar dena", "dekh lena", "bata dena", "call karna", "confirm karo", "meeting rakhna", "payment karna", "forward karna".
+
+Return [] if no action items are found.`;
 
 function formatCallDate(ts: number): string {
   return new Date(ts).toLocaleString('en-IN', {
