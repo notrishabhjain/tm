@@ -16,7 +16,8 @@ bash models/download-ggml-model.sh base
 mkdir -p ~/.termux
 echo "allow-external-apps=true" >> ~/.termux/termux.properties
 termux-reload-settings
-echo "✓ whisper.cpp ready — fully close and reopen Termux once to apply settings"`;
+grep -qF "termux-wake-lock" ~/.bashrc || echo "termux-wake-lock" >> ~/.bashrc
+echo "✓ Setup complete — close Termux fully, then reopen it once to activate the background service. After that, MacroDroid can reach Termux even when it is not visible on screen."`;
 
 const TRANSCRIBE_SCRIPT = `#!/data/data/com.termux/files/usr/bin/bash
 # transcribe_call.sh — paste into ~/transcribe_call.sh, then: chmod +x ~/transcribe_call.sh
@@ -223,10 +224,13 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
       <Section title="Tips & Troubleshooting" theme={theme}>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
-          <Text style={styles.bold}>"Send Intent" greyed out / fails silently</Text>: make sure Step
-          1's <Text style={styles.mono}>allow-external-apps=true</Text> line ran and you fully
-          closed and reopened Termux afterwards — Android blocks external apps from launching Termux
-          commands until that's set.
+          <Text style={styles.bold}>"app is in background" / Send Intent fails</Text>: this means
+          Termux's background service was killed. The setup script already adds{' '}
+          <Text style={styles.mono}>termux-wake-lock</Text> to your Termux startup so it keeps the
+          service alive automatically — but you must open Termux at least once after each phone
+          reboot to activate it. After opening it, you can close it immediately; the service stays
+          running. You should also go to Settings → Apps → Termux → Battery → set to{' '}
+          <Text style={styles.bold}>Unrestricted</Text>, and do the same for MacroDroid.
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
@@ -237,9 +241,9 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
-          <Text style={styles.bold}>Battery optimisation</Text>: exclude both Termux and MacroDroid
-          from battery saver (Settings → Battery → App battery usage), otherwise Android may kill
-          the script mid-run.
+          <Text style={styles.bold}>Battery optimisation</Text>: set both Termux and MacroDroid to
+          Unrestricted in Settings → Apps → [app] → Battery. This prevents Android from killing
+          Termux mid-transcription and stops MacroDroid from being delayed by power saving.
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}

@@ -23,59 +23,53 @@ export interface SenderContext {
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 const TIMEOUT_MS = 12_000;
 
-const SYSTEM_PROMPT = `You are a strict personal task filter for a productivity app. You receive Android notification text and must decide whether it requires the user to personally take a specific action.
+const SYSTEM_PROMPT = `You are a notification filter for a task manager used by an Indian professional. Decide whether an Android notification requires the recipient to personally take a specific action.
 
-The bar for isTask=true is HIGH. Ask yourself:
-1. Is someone ASKING THIS USER to do something specific?
-2. Is there an action verb the user must perform (reply, send, review, complete, call, attend, pay)?
-3. Would ignoring this notification have a real consequence for the user?
-4. Is it addressed TO this user personally (not a broadcast, not a status update)?
+Your threshold for isTask=true is HIGH — only clear, actionable personal requests create tasks.
 
-Respond ONLY with valid JSON — no markdown, no explanation outside the JSON:
+Respond with ONLY valid JSON, no markdown:
 {
   "isTask": true|false,
-  "title": "<≤60 char imperative title starting with a verb, or null if isTask=false>",
+  "title": "<imperative verb phrase ≤60 chars starting with a verb, null if isTask=false>",
   "priority": "URGENT|HIGH|MEDIUM|LOW",
   "certainty": "high|medium|low",
-  "dueDate": "<ISO 8601 date-time string or null>",
-  "howTo": "<brief 1-2 sentence description of HOW to complete this task, or null>",
-  "estimatedMinutes": <integer estimate of minutes needed, or null>,
-  "notes": "<any additional context from the notification that would help, or null>",
-  "reason": "<one sentence explaining the decision>"
+  "dueDate": "<ISO 8601 date-time string, or null>",
+  "howTo": "<one sentence on how to complete this task, null if obvious>",
+  "estimatedMinutes": <integer minutes estimate, or null>
 }
 
-ALWAYS isTask=false for:
+NEVER a task — always isTask=false:
 - OTPs, 2FA codes, login verification
-- Payment receipts, bank transaction alerts, balance updates
-- Delivery tracking ("your order is out for delivery", "package dispatched")
-- Promotional offers, sales, discounts, coupons, cashback
-- News, sports scores, trending topics
-- App update available notifications
-- Social media likes, story views, follower counts, post impressions
-- "Daily digest", "weekly summary", "your activity this week"
-- System status updates ("battery low", "storage full", "backup complete")
-- Automated reminders that don't need a reply (e.g. weather, step counts)
-- Marketing emails or newsletters
-- "Someone viewed your profile"
-- Streaming recommendations ("New episode available", "Top picks for you")
+- Payment receipts, UPI/bank transaction alerts, balance updates
+- Order or delivery status ("out for delivery", "dispatched", "delivered")
+- Promotional offers, discounts, cashback, sale announcements
+- News, cricket/sports scores, trending topics
+- Social media likes, views, story reactions, follower counts
+- System alerts (battery low, storage full, backup done)
+- App update available
+- Marketing emails, newsletters, weekly/daily digests
+- Automated reminders with no human asking (weather, step count, sleep summary)
 
-isTask=true ONLY when:
-- A specific named person is requesting something from the user ("Can you send me X?", "Please review Y", "Are you free at Z?")
-- A calendar event or meeting reminder where the user must attend or reschedule
-- An assigned task from a work tool (Jira, Asana, Trello, GitHub review request)
-- A direct message that ends with a question or request the user must answer
-- A deadline is explicitly named and the user must act before it
+ALWAYS a task — isTask=true when:
+- A specific person asks the user to do something: "please send", "can you review", "bhej do", "kar dena", "dekh lo", "bata do", "confirm kar"
+- A work tool assigns something: Jira ticket, GitHub review request, Asana task, Trello card
+- A calendar invite or meeting reminder the user must attend or respond to
+- A direct message ending with a question or request the user is expected to answer
+- A deadline is attached to an action the user must take
+- Hinglish requests: "send kar do", "review kar lo", "kal tak bhej", "aaj confirm karo"
 
-certainty levels:
-- high = clear unambiguous personal request or assigned task → auto-added to task list
-- medium = probably a request but context is thin or ambiguous → ask user to confirm
-- low = borderline case, could be informational → ask user to confirm
+Certainty:
+- high: unambiguous personal request or assigned task → auto-add without asking user
+- medium: probably a request but context is thin or sender is ambiguous → ask user to confirm
+- low: borderline — could be informational → ask user to confirm
 
 Priority:
-- URGENT = deadline within 24h, or words like "urgent/ASAP/immediately/critical"
-- HIGH = deadline 1-3 days, or words like "important/priority/soon"
-- MEDIUM = general task, no stated deadline
-- LOW = optional, "whenever you get a chance", low stakes`;
+- URGENT: deadline within 24 h, or words like urgent/ASAP/immediately/aaj tak/abhi/critical
+- HIGH: deadline 1-3 days, or important/priority/kal tak/soon/by tomorrow
+- MEDIUM: task with no stated urgency
+- LOW: optional, "whenever you get a chance", "jab time ho", low stakes
+
+dueDate: extract from "by tomorrow", "kal tak", "aaj shaam 5 baje", "by 3pm", "next Monday", "25 tarikh tak". Use today's date if only a clock time is given. Set null if no date or time is mentioned.`;
 
 function buildUserMessage(notification: NotificationData, senderCtx?: SenderContext): string {
   const appName = appDisplayName(notification.packageName);
@@ -153,7 +147,6 @@ function parseResult(raw: string): AIClassifierResult | null {
       typeof p.estimatedMinutes === 'number' && p.estimatedMinutes > 0
         ? Math.round(p.estimatedMinutes as number)
         : null;
-    const notes = typeof p.notes === 'string' && p.notes.length > 0 ? (p.notes as string) : null;
     return {
       isTask: Boolean(p.isTask),
       title: typeof p.title === 'string' && p.title.length > 0 ? (p.title as string) : null,
@@ -163,7 +156,7 @@ function parseResult(raw: string): AIClassifierResult | null {
       reason: typeof p.reason === 'string' ? (p.reason as string) : '',
       howTo,
       estimatedMinutes,
-      notes,
+      notes: null,
     };
   } catch {
     return null;
@@ -223,7 +216,7 @@ export async function classifyNotification(
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: buildUserMessage(notification, senderCtx) },
         ],
-        max_tokens: 250,
+        max_tokens: 400,
         temperature: 0.05,
       }),
     });
