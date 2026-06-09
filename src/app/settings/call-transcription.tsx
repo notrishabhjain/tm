@@ -12,7 +12,7 @@ git clone https://github.com/ggerganov/whisper.cpp ~/whisper.cpp
 cd ~/whisper.cpp
 cmake -B build -DWHISPER_BUILD_EXAMPLES=ON
 cmake --build build -j$(nproc)
-bash models/download-ggml-model.sh base.en
+bash models/download-ggml-model.sh base
 mkdir -p ~/.termux
 echo "allow-external-apps=true" >> ~/.termux/termux.properties
 termux-reload-settings
@@ -53,8 +53,8 @@ CALLER=$(basename "$LATEST" | grep -oE '\\+?[0-9]{6,15}' | head -n 1)
 
 # 5. Convert to 16 kHz mono WAV and transcribe on-device
 ffmpeg -i "$LATEST" -ar 16000 -ac 1 "$WAV" -y -loglevel error
-~/whisper.cpp/build/bin/whisper-cli -m ~/whisper.cpp/models/ggml-base.en.bin \\
-  -f "$WAV" -otxt -of "$TXT_BASE" 2>/dev/null
+~/whisper.cpp/build/bin/whisper-cli -m ~/whisper.cpp/models/ggml-base.bin \\
+  -f "$WAV" -otxt -of "$TXT_BASE" -l auto -bs 1 -bo 1 2>/dev/null
 TRANSCRIPT=$(cat "$TXT_BASE.txt" 2>/dev/null || echo "")
 
 if [ -n "$TRANSCRIPT" ]; then
@@ -248,10 +248,12 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
-          <Text style={styles.bold}>Model quality</Text>: the base.en model works well for clear
-          audio. For noisy calls, replace <Text style={styles.mono}>ggml-base.en.bin</Text> with{' '}
-          <Text style={styles.mono}>ggml-small.en.bin</Text> (slower, more accurate) in both the
-          setup and transcription scripts.
+          <Text style={styles.bold}>Non-English calls</Text>: the setup uses the multilingual{' '}
+          <Text style={styles.mono}>base</Text> model which supports Hindi, English, and 97 other
+          languages — it auto-detects the spoken language. If transcription is inaccurate, you can
+          pin the language by changing <Text style={styles.mono}>-l auto</Text> to a language code
+          (e.g. <Text style={styles.mono}>-l hi</Text> for Hindi,{' '}
+          <Text style={styles.mono}>-l en</Text> for English) in the transcription script.
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
