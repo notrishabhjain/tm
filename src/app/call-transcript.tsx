@@ -45,6 +45,7 @@ export default function CallTranscriptScreen(): React.JSX.Element {
   const [state, setState] = useState<ScreenState>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const [callMeta, setCallMeta] = useState('');
+  const [transcriptText, setTranscriptText] = useState('');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
@@ -73,6 +74,7 @@ export default function CallTranscriptScreen(): React.JSX.Element {
     }
 
     const text = payload.text.trim();
+    setTranscriptText(text);
     setCallMeta(formatCallMeta(payload.callTime, payload.callerLabel));
 
     if (!text) {
@@ -110,9 +112,12 @@ export default function CallTranscriptScreen(): React.JSX.Element {
     let created = 0;
     for (const t of selected) {
       try {
+        const taskBody = t.notes
+          ? `${t.notes}\n\n---\n${transcriptText}`
+          : transcriptText || undefined;
         const task = await taskRepo.createTask({
           title: t.title,
-          body: t.notes ?? undefined,
+          body: taskBody,
           sourceApp: 'call.transcript',
           priority: t.priority,
           confidence: 0.85,
@@ -124,7 +129,7 @@ export default function CallTranscriptScreen(): React.JSX.Element {
         if (getSetting('google_tasks_enabled')) {
           void createGoogleTask({
             title: task.title,
-            notes: t.notes ?? undefined,
+            notes: taskBody,
             dueDate: task.dueDate,
           })
             .then((googleTaskId) => {

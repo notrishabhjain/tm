@@ -68,7 +68,7 @@ function buildUserMessage(text: string, ctx?: TranscriptContext): string {
   return parts.join('\n');
 }
 
-function parseResult(raw: string): TranscriptTask[] {
+function parseResult(raw: string, referenceTime?: number): TranscriptTask[] {
   try {
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return [];
@@ -85,7 +85,16 @@ function parseResult(raw: string): TranscriptTask[] {
       let dueDate: number | null = null;
       if (typeof p['dueDate'] === 'string') {
         const d = new Date(p['dueDate']);
-        if (!isNaN(d.getTime())) dueDate = d.getTime();
+        if (!isNaN(d.getTime())) {
+          // Correct hallucinated past years: advance year until date is within 60 days before referenceTime
+          if (referenceTime) {
+            const floor = referenceTime - 60 * 86_400_000;
+            while (d.getTime() < floor) {
+              d.setFullYear(d.getFullYear() + 1);
+            }
+          }
+          dueDate = d.getTime();
+        }
       }
       const assignedToMe = p['assignedToMe'] !== false;
       const notes =
@@ -134,7 +143,7 @@ export async function extractTasksFromTranscript(
     const data = (await resp.json()) as any;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const content: string = data?.choices?.[0]?.message?.content ?? '';
-    return parseResult(content);
+    return parseResult(content, ctx?.referenceTime);
   } catch {
     return [];
   } finally {
