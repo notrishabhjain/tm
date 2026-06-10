@@ -1,5 +1,14 @@
-import React, { useCallback } from 'react';
-import { View, Text, ScrollView, Switch, Pressable, StyleSheet, Alert } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  Switch,
+  Pressable,
+  StyleSheet,
+  Modal,
+  TextInput,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
@@ -28,6 +37,9 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
   const theme = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
+  // Alert.prompt is iOS-only, so the custom-app input uses a Modal on Android.
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [newPackageName, setNewPackageName] = useState('');
 
   const { data: apps = [] } = useQuery({
     queryKey: ['monitored-apps'],
@@ -52,6 +64,8 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
       displayName: string;
     }) => {
       await repo.upsert(packageName, displayName);
+      const activeNames = await repo.getActivePackageNames();
+      await NotificationListener.setMonitoredApps(activeNames);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['monitored-apps'] }),
   });
@@ -179,29 +193,66 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
             pressed && styles.addBtnPressed,
             pressed && { backgroundColor: theme.pressHighlight },
           ]}
-          onPress={() =>
-            Alert.prompt(
-              'Add App',
-              'Enter the package name (e.g. com.example.app)',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Add',
-                  onPress: (pkg) => {
-                    const trimmed = pkg?.trim();
-                    if (trimmed)
-                      addAppMutation.mutate({ packageName: trimmed, displayName: trimmed });
-                  },
-                },
-              ],
-              'plain-text'
-            )
-          }
+          onPress={() => {
+            setNewPackageName('');
+            setAddModalVisible(true);
+          }}
           accessibilityRole="button"
         >
           <Text style={[styles.addBtnText, { color: theme.primary }]}>+ Add custom app</Text>
         </Pressable>
       </ScrollView>
+
+      <Modal
+        visible={addModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: theme.surface }]}>
+            <Text style={[styles.modalTitle, { color: theme.onSurface }]}>Add App</Text>
+            <Text style={[styles.modalHint, { color: theme.onSurfaceVariant }]}>
+              Enter the package name (e.g. com.example.app)
+            </Text>
+            <TextInput
+              style={[
+                styles.modalInput,
+                { color: theme.onSurface, borderColor: theme.outline },
+              ]}
+              value={newPackageName}
+              onChangeText={setNewPackageName}
+              placeholder="com.example.app"
+              placeholderTextColor={theme.onSurfaceVariant}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+            />
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={styles.modalBtn}
+                onPress={() => setAddModalVisible(false)}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.modalBtnText, { color: theme.onSurfaceVariant }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.modalBtn}
+                onPress={() => {
+                  const trimmed = newPackageName.trim();
+                  if (trimmed) {
+                    addAppMutation.mutate({ packageName: trimmed, displayName: trimmed });
+                  }
+                  setAddModalVisible(false);
+                }}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.modalBtnText, { color: theme.primary }]}>Add</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -265,4 +316,33 @@ const styles = StyleSheet.create({
   },
   addBtnPressed: {},
   addBtnText: { fontSize: 14, fontWeight: '700' },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: Colors.primary900,
+    padding: 20,
+  },
+  modalTitle: { fontSize: 17, fontWeight: '800', marginBottom: 4 },
+  modalHint: { fontSize: 13, marginBottom: 12 },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 16,
+  },
+  modalBtn: { paddingHorizontal: 16, paddingVertical: 10 },
+  modalBtnText: { fontSize: 14, fontWeight: '700' },
 });

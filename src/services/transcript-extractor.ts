@@ -68,12 +68,13 @@ function buildUserMessage(text: string, ctx?: TranscriptContext): string {
   return parts.join('\n');
 }
 
-function parseResult(raw: string, referenceTime?: number): TranscriptTask[] {
+// null = response unusable (model didn't return a JSON array) — treat as failure.
+function parseResult(raw: string, referenceTime?: number): TranscriptTask[] | null {
   try {
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
+    if (!jsonMatch) return null;
     const parsed = JSON.parse(jsonMatch[0]) as unknown[];
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) return null;
     return parsed.flatMap((item) => {
       if (typeof item !== 'object' || item === null) return [];
       const p = item as Record<string, unknown>;
@@ -102,17 +103,20 @@ function parseResult(raw: string, referenceTime?: number): TranscriptTask[] {
       return [{ title, priority, dueDate, assignedToMe, notes } satisfies TranscriptTask];
     });
   } catch {
-    return [];
+    return null;
   }
 }
 
+// Returns the extracted tasks ([] when the call genuinely has none) or null
+// when extraction FAILED (no key, network error, timeout, bad response) —
+// callers must offer a retry instead of reporting "no action items".
 export async function extractTasksFromTranscript(
   text: string,
   ctx?: TranscriptContext
-): Promise<TranscriptTask[]> {
+): Promise<TranscriptTask[] | null> {
   const key = getSetting('ai_api_key');
   const model = getSetting('ai_model');
-  if (!key) return [];
+  if (!key) return null;
 
   const truncated =
     text.length > MAX_CHARS ? text.slice(0, MAX_CHARS) + '\n[transcript truncated]' : text;
@@ -138,14 +142,15 @@ export async function extractTasksFromTranscript(
         temperature: 0.1,
       }),
     });
-    if (!resp.ok) return [];
+    if (!resp.ok) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = (await resp.json()) as any;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const content: string = data?.choices?.[0]?.message?.content ?? '';
+    if (!content) return null;
     return parseResult(content, ctx?.referenceTime);
   } catch {
-    return [];
+    return null;
   } finally {
     clearTimeout(timer);
   }

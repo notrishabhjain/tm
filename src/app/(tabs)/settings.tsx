@@ -25,7 +25,7 @@ export default function SettingsScreen(): React.JSX.Element {
   const [googleTasksConnected, setGoogleTasksConnected] = useState(
     getSetting('google_tasks_enabled')
   );
-  const nudgeFreq = getSetting('nudge_freq_minutes');
+  const [nudgeFreq, setNudgeFreq] = useState(getSetting('nudge_freq_minutes'));
 
   const { data: monitoredApps = [] } = useQuery({
     queryKey: ['monitored-apps'],
@@ -55,6 +55,7 @@ export default function SettingsScreen(): React.JSX.Element {
       void checkPermission();
       setAiEnabled(getSetting('ai_enabled'));
       setGoogleTasksConnected(getSetting('google_tasks_enabled'));
+      setNudgeFreq(getSetting('nudge_freq_minutes'));
     }, [checkPermission])
   );
 

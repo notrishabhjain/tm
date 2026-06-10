@@ -10,7 +10,7 @@ const DEFAULT_MONITORED_APPS = [
   { packageName: 'com.whatsapp.w4b', displayName: 'WhatsApp Business' },
   { packageName: 'com.google.android.gm', displayName: 'Gmail' },
   { packageName: 'com.microsoft.teams', displayName: 'Microsoft Teams' },
-  { packageName: 'com.slack', displayName: 'Slack' },
+  { packageName: 'com.Slack', displayName: 'Slack' }, // capital S is Slack's real package name
   { packageName: 'org.telegram.messenger', displayName: 'Telegram' },
 ];
 

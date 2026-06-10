@@ -157,6 +157,9 @@ export function initializeDatabase(): void {
     'ALTER TABLE tasks ADD COLUMN google_task_id TEXT;',
     'ALTER TABLE tasks ADD COLUMN how_to TEXT;',
     'ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER;',
+    // Data fix: the seeder shipped the wrong Slack package name (lowercase s),
+    // which made the exact-match app filter drop every Slack notification.
+    "UPDATE monitored_apps SET package_name = 'com.Slack' WHERE package_name = 'com.slack';",
   ];
   for (const sql of columnMigrations) {
     try {

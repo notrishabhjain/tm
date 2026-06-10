@@ -82,6 +82,7 @@ export default function HomeScreen(): React.JSX.Element {
   const {
     data: tasks = [],
     isLoading,
+    isRefetching,
     refetch,
   } = useQuery({
     queryKey: ['tasks', 'pending'],
@@ -291,7 +292,7 @@ export default function HomeScreen(): React.JSX.Element {
           }
           refreshControl={
             <RefreshControl
-              refreshing={isLoading}
+              refreshing={isRefetching}
               onRefresh={() => void refetch()}
               tintColor={Colors.primary500}
             />

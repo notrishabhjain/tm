@@ -58,7 +58,7 @@ const DEFAULTS: AppSettings = {
   quiet_hours_end: '07:00',
   urgent_override_quiet: true,
   rule_weight: 1.0,
-  model_weight: 0.0,
+  model_weight: 0.3,
   model_downloaded: false,
   model_version: '',
   model_url: '',

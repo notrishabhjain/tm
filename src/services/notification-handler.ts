@@ -74,26 +74,45 @@ export async function handleNotification(taskData: {
 
   try {
     await _handleNotification(notification);
-  } finally {
     // Keep the key for 60 s to absorb late re-deliveries, then clean up.
     setTimeout(() => _inFlight.delete(inFlightKey), 60_000);
+  } catch {
+    // Processing failed (transient DB/network error). Release the key immediately
+    // so an Android re-delivery can retry instead of being suppressed for 60 s.
+    _inFlight.delete(inFlightKey);
   }
+}
+
+// Newest MessagingStyle thread message timestamp, 0 if no thread data.
+function latestThreadTimestamp(notification: NotificationData): number {
+  if (!Array.isArray(notification.thread)) return 0;
+  let max = 0;
+  for (const m of notification.thread) {
+    const ts = typeof (m as { timestamp?: unknown }).timestamp === 'number' ? (m as { timestamp: number }).timestamp : 0;
+    if (ts > max) max = ts;
+  }
+  return max;
 }
 
 async function _handleNotification(notification: NotificationData): Promise<void> {
   // ── Notification-key deduplication (DB-level) ───────────────────────────────
-  // Pure key-only check: if we already created or discarded a task for this
-  // notification key (regardless of content), skip all further processing.
-  // Content-based matching was letting updated re-deliveries through — messaging
-  // apps routinely update the same notification with new message bundles.
+  // Key-only check: if we already created or discarded a task for this
+  // notification key, skip — UNLESS the notification carries a MessagingStyle
+  // thread whose newest message is newer than that record. Messaging apps reuse
+  // one notification key per conversation, so without the thread-timestamp
+  // escape hatch a single processed message would permanently mute the chat.
+  // Plain re-deliveries keep their old thread timestamps and stay blocked.
   if (notification.notificationKey) {
     const taskRepo = new TaskRepository(db);
     const discardedRepo = new DiscardedLogRepository(db);
-    const [inTasks, inDiscarded] = await Promise.all([
+    const [existingTask, existingDiscard] = await Promise.all([
       taskRepo.findByNotificationKey(notification.notificationKey),
-      discardedRepo.existsByNotificationKey(notification.notificationKey),
+      discardedRepo.findByNotificationKey(notification.notificationKey),
     ]);
-    if (inTasks || inDiscarded) {
+    const lastMsgTs = latestThreadTimestamp(notification);
+    const blockedByTask = existingTask !== null && lastMsgTs <= existingTask.createdAt;
+    const blockedByDiscard = existingDiscard !== null && lastMsgTs <= existingDiscard.createdAt;
+    if (blockedByTask || blockedByDiscard) {
       logCapturedNotification(notification, 'FILTERED');
       return;
     }
@@ -131,10 +150,12 @@ async function _handleNotification(notification: NotificationData): Promise<void
       const vipSenderKey = buildSenderKey(notification.packageName, notification.title ?? '');
       const vipSenderCtx = await senderStatsForVip.get(vipSenderKey);
       const aiResult = await classifyNotification(notification, vipSenderCtx ?? undefined);
-      if (aiResult !== null) {
+      // Only adopt AI refinements when it actually saw a task — an isTask=false
+      // result must not rewrite the VIP task's title or attach a due date.
+      if (aiResult !== null && aiResult.isTask) {
         if (aiResult.title) title = aiResult.title;
         // Keep VIP urgent unless AI is confident it's genuinely lower priority.
-        if (aiResult.isTask && aiResult.certainty === 'high') priority = aiResult.priority;
+        if (aiResult.certainty === 'high') priority = aiResult.priority;
         dueDate = aiResult.dueDate ?? null;
       }
     }
@@ -228,8 +249,9 @@ async function _handleNotification(notification: NotificationData): Promise<void
           decision: needsConfirmation ? 'CONFIRM' : 'CREATE',
           timestamp: Date.now(),
         });
-        // Sync to Google Tasks (non-blocking, fire-and-forget)
-        if (getSetting('google_tasks_enabled')) {
+        // Sync to Google Tasks (non-blocking, fire-and-forget). Tasks awaiting
+        // user confirmation are synced after the user confirms, not before.
+        if (!needsConfirmation && getSetting('google_tasks_enabled')) {
           const notesLines: string[] = [];
           if (aiResult.howTo) notesLines.push(`How to complete: ${aiResult.howTo}`);
           if (aiResult.estimatedMinutes)
@@ -356,8 +378,9 @@ async function _handleNotification(notification: NotificationData): Promise<void
     createdAt: notification.postTime || Date.now(),
   });
 
-  // Sync to Google Tasks (non-blocking, fire-and-forget)
-  if (getSetting('google_tasks_enabled')) {
+  // Sync to Google Tasks (non-blocking, fire-and-forget). Tasks awaiting
+  // user confirmation are synced after the user confirms, not before.
+  if (!needsConfirmation && getSetting('google_tasks_enabled')) {
     const notesLines: string[] = [];
     notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
     if (heuristicTask.body) notesLines.push(`\nContext:\n${heuristicTask.body.slice(0, 500)}`);

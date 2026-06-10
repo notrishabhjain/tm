@@ -5,7 +5,7 @@ const APP_NAMES: Record<string, string> = {
   'org.telegram.plus': 'Telegram',
   'com.google.android.gm': 'Gmail',
   'com.microsoft.teams': 'Microsoft Teams',
-  'com.slack': 'Slack',
+  'com.Slack': 'Slack', // Slack's Android package really does use a capital S
   'com.discord': 'Discord',
   'com.linkedin.android': 'LinkedIn',
   'com.facebook.katana': 'Facebook',

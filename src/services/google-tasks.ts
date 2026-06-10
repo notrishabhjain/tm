@@ -212,7 +212,19 @@ async function getValidAccessToken(): Promise<string | null> {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams(refreshParams).toString(),
     });
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      // A revoked/expired refresh token can never recover — clear the stored
+      // tokens so the settings screen shows "not connected" instead of silently
+      // no-opping on every sync forever.
+      const err = (await resp.json().catch(() => ({}))) as { error?: string };
+      if (err.error === 'invalid_grant') {
+        setSetting('google_tasks_access_token', '');
+        setSetting('google_tasks_refresh_token', '');
+        setSetting('google_tasks_token_expiry', 0);
+        setSetting('google_tasks_enabled', false);
+      }
+      return null;
+    }
     const tokens = (await resp.json()) as { access_token: string; expires_in: number };
     setSetting('google_tasks_access_token', tokens.access_token);
     setSetting('google_tasks_token_expiry', Date.now() + tokens.expires_in * 1000);
@@ -248,11 +260,15 @@ export async function createGoogleTask(task: GoogleTaskInput): Promise<string | 
     const listId = await getDefaultListId(token);
     const body: Record<string, string> = { title: task.title };
     if (task.notes) body['notes'] = task.notes;
-    // Always set a due date — use the extracted one or default to today midnight UTC.
+    // Always set a due date — use the extracted one or default to today.
+    // Google Tasks only honors the date portion and expects it encoded as UTC
+    // midnight, so take the LOCAL calendar date (an IST "by 3am" deadline must
+    // not slip to the previous day) and encode that as UTC midnight.
     const dueTs = task.dueDate ?? Date.now();
     const d = new Date(dueTs);
-    d.setUTCHours(0, 0, 0, 0);
-    body['due'] = d.toISOString();
+    body['due'] = new Date(
+      Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
+    ).toISOString();
     const resp = await fetch(`${TASKS_API}/lists/${listId}/tasks`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

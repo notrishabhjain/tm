@@ -6,6 +6,7 @@ import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
 import { db, initializeDatabase } from '@/data/db/client';
 import { MonitoredAppRepository } from '@/data/repositories/MonitoredAppRepository';
+import NotificationListener from '../../../modules/notification-listener/src';
 
 interface AppEntry {
   packageName: string;
@@ -100,6 +101,10 @@ export default function OnboardingAppsScreen(): React.JSX.Element {
           await repo.setActive(a.packageName, a.selected);
         })
       );
+      // Push the selection to the native listener filter too — otherwise it
+      // stays unsynced until the user touches a toggle in Settings.
+      const activeNames = await repo.getActivePackageNames();
+      await NotificationListener.setMonitoredApps(activeNames);
     } catch {
       /* non-fatal — configurable in Settings */
     }

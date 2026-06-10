@@ -863,8 +863,7 @@ function appScoreModifier(packageName: string, isGroup: boolean): number {
   const groupPenalty = isGroup ? -0.05 : 0;
   switch (packageName) {
     case 'com.google.android.gm': // Gmail — formal work email
-    case 'com.microsoft.outlook':
-    case 'com.microsoft.exchange.mowa': // Outlook mobile
+    case 'com.microsoft.office.outlook': // Outlook mobile
       return 0.08;
     case 'com.Slack': // Slack — work context
     case 'com.microsoft.teams':
@@ -961,20 +960,23 @@ export async function scoreNotification(notification: NotificationData): Promise
 
   // ── On-device intent model (optional second pass) ─────────────────────────
   // Seed model (bundled) is always available; model_weight defaults to 0.3.
-  const modelWeight = getSetting('model_weight') || 0.3;
+  // An explicit 0 disables the model pass — don't || it back to the default.
+  const modelWeight = getSetting('model_weight');
   let modelScore: number | null = null;
   let finalScore = rawScore;
 
-  try {
-    const model = await loadModel();
-    if (model.weights.length > 0) {
-      modelScore = runInference(latestMessage, model);
-      finalScore = rawScore * (1 - modelWeight) + modelScore * modelWeight;
-      finalScore = Math.max(0, Math.min(1, finalScore));
-      acc.signals.push(modelScore >= 0.5 ? 'model_positive' : 'model_negative');
+  if (modelWeight > 0) {
+    try {
+      const model = await loadModel();
+      if (model.weights.length > 0) {
+        modelScore = runInference(latestMessage, model);
+        finalScore = rawScore * (1 - modelWeight) + modelScore * modelWeight;
+        finalScore = Math.max(0, Math.min(1, finalScore));
+        acc.signals.push(modelScore >= 0.5 ? 'model_positive' : 'model_negative');
+      }
+    } catch {
+      /* model inference failed — rule-only fallback */
     }
-  } catch {
-    /* model inference failed — rule-only fallback */
   }
 
   const forceInbox = checkForceInbox(latestMessage, acc.signals, senderInfo.effectiveTrust);
