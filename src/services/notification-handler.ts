@@ -88,7 +88,10 @@ function latestThreadTimestamp(notification: NotificationData): number {
   if (!Array.isArray(notification.thread)) return 0;
   let max = 0;
   for (const m of notification.thread) {
-    const ts = typeof (m as { timestamp?: unknown }).timestamp === 'number' ? (m as { timestamp: number }).timestamp : 0;
+    const ts =
+      typeof (m as { timestamp?: unknown }).timestamp === 'number'
+        ? (m as { timestamp: number }).timestamp
+        : 0;
     if (ts > max) max = ts;
   }
   return max;

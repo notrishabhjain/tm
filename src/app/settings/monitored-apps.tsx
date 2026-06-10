@@ -216,10 +216,7 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
               Enter the package name (e.g. com.example.app)
             </Text>
             <TextInput
-              style={[
-                styles.modalInput,
-                { color: theme.onSurface, borderColor: theme.outline },
-              ]}
+              style={[styles.modalInput, { color: theme.onSurface, borderColor: theme.outline }]}
               value={newPackageName}
               onChangeText={setNewPackageName}
               placeholder="com.example.app"

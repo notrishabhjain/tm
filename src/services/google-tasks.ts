@@ -266,9 +266,7 @@ export async function createGoogleTask(task: GoogleTaskInput): Promise<string | 
     // not slip to the previous day) and encode that as UTC midnight.
     const dueTs = task.dueDate ?? Date.now();
     const d = new Date(dueTs);
-    body['due'] = new Date(
-      Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
-    ).toISOString();
+    body['due'] = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
     const resp = await fetch(`${TASKS_API}/lists/${listId}/tasks`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
