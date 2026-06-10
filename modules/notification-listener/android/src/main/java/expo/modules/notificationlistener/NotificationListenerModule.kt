@@ -81,14 +81,24 @@ class NotificationListenerModule : Module() {
                 putExtra("urgentCount", (params["urgentCount"] as? Number)?.toInt() ?: 0)
                 putStringArrayListExtra("taskTexts", ArrayList(taskTexts))
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (_: IllegalStateException) {
+                // App is backgrounded and the service is dead — restart it as a
+                // foreground service, which is always permitted for FGS-exempt flows.
+                context.startForegroundService(intent)
+            }
         }
 
         AsyncFunction("hidePersistentNotification") {
             val intent = Intent(context, TaskMindForegroundService::class.java).apply {
                 action = TaskMindForegroundService.ACTION_HIDE_NOTIFICATION
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (_: IllegalStateException) {
+                // Service already dead and app backgrounded — nothing to hide.
+            }
         }
 
         AsyncFunction("getPendingCapture") {

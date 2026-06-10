@@ -22,6 +22,7 @@ class TaskMindForegroundService : Service() {
     }
 
     private lateinit var notificationManager: NotificationManager
+    private var hasStartedForeground = false
 
     override fun onCreate() {
         super.onCreate()
@@ -37,13 +38,18 @@ class TaskMindForegroundService : Service() {
                 val urgentCount = intent.getIntExtra("urgentCount", 0)
                 val taskTexts = intent.getStringArrayListExtra("taskTexts") ?: arrayListOf()
                 val notification = buildNotification(pendingCount, urgentCount, taskTexts)
-                if (isRunning) {
+                if (hasStartedForeground) {
                     notificationManager.notify(NOTIFICATION_ID, notification)
                 } else {
                     startForeground(NOTIFICATION_ID, notification)
+                    hasStartedForeground = true
                 }
             }
             ACTION_HIDE_NOTIFICATION -> {
+                if (hasStartedForeground) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    hasStartedForeground = false
+                }
                 notificationManager.cancel(NOTIFICATION_ID)
                 stopSelf()
                 return START_NOT_STICKY
@@ -52,6 +58,7 @@ class TaskMindForegroundService : Service() {
                 // Initial start
                 val notification = buildNotification(0, 0, arrayListOf())
                 startForeground(NOTIFICATION_ID, notification)
+                hasStartedForeground = true
             }
         }
         return START_STICKY
