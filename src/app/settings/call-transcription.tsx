@@ -75,11 +75,19 @@ rm -f "$WAV" "$TXT_BASE.txt"`;
 function CodeBlock({ code, label }: { code: string; label: string }): React.JSX.Element {
   const theme = useTheme();
   const [copied, setCopied] = useState(false);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const copy = async (): Promise<void> => {
     await Clipboard.setStringAsync(code);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   return (

@@ -15,6 +15,8 @@ import java.io.File
 
 data class WidgetTask(val title: String, val priority: String)
 
+data class WidgetData(val tasks: List<WidgetTask>, val totalPending: Int)
+
 class TaskWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(
@@ -22,9 +24,9 @@ class TaskWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        val tasks = readPendingTasks(context)
+        val data = readPendingTasks(context)
         for (widgetId in appWidgetIds) {
-            updateWidget(context, appWidgetManager, widgetId, tasks)
+            updateWidget(context, appWidgetManager, widgetId, data)
         }
     }
 
@@ -39,9 +41,9 @@ class TaskWidgetProvider : AppWidgetProvider() {
                 ComponentName(context, TaskWidgetProvider::class.java)
             )
             if (ids.isEmpty()) return
-            val tasks = readPendingTasks(context)
+            val data = readPendingTasks(context)
             for (id in ids) {
-                updateWidget(context, manager, id, tasks)
+                updateWidget(context, manager, id, data)
             }
         }
 
@@ -56,9 +58,10 @@ class TaskWidgetProvider : AppWidgetProvider() {
             context: Context,
             manager: AppWidgetManager,
             widgetId: Int,
-            tasks: List<WidgetTask>
+            data: WidgetData
         ) {
             val pkg = context.packageName
+            val tasks = data.tasks
 
             val views = RemoteViews(pkg, R.layout.task_widget)
 
@@ -70,8 +73,8 @@ class TaskWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
 
-            // Count badge
-            val count = tasks.size
+            // Count badge — total pending, not just the rows shown
+            val count = data.totalPending
             views.setTextViewText(R.id.widget_count_badge, "$count pending")
 
             // Task rows
@@ -101,7 +104,7 @@ class TaskWidgetProvider : AppWidgetProvider() {
 
             // Footer with overflow hint
             val footerText = when {
-                count > 3 -> "+${count - 3} more · tap to open"
+                count > tasks.size -> "+${count - tasks.size} more · tap to open"
                 else -> "Tap to open TaskMind"
             }
             views.setTextViewText(R.id.widget_footer, footerText)
@@ -109,17 +112,26 @@ class TaskWidgetProvider : AppWidgetProvider() {
             manager.updateAppWidget(widgetId, views)
         }
 
-        fun readPendingTasks(context: Context): List<WidgetTask> {
+        fun readPendingTasks(context: Context): WidgetData {
             // expo-sqlite v15 stores databases in filesDir/SQLite/, not the standard databases/ dir
             val dbPath = File(context.filesDir, "SQLite/taskmind.db").absolutePath
             return try {
                 SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
-                    val cursor = db.rawQuery(
-                        """
-                        SELECT title, priority FROM tasks
+                    val whereClause = """
                         WHERE status = 'PENDING'
                           AND needs_confirmation = 0
                           AND deleted_at IS NULL
+                    """.trimIndent()
+
+                    var total = 0
+                    db.rawQuery("SELECT COUNT(*) FROM tasks $whereClause", null).use {
+                        if (it.moveToFirst()) total = it.getInt(0)
+                    }
+
+                    val cursor = db.rawQuery(
+                        """
+                        SELECT title, priority FROM tasks
+                        $whereClause
                         ORDER BY
                           CASE priority
                             WHEN 'URGENT' THEN 0
@@ -143,12 +155,12 @@ class TaskWidgetProvider : AppWidgetProvider() {
                             )
                         }
                     }
-                    result
+                    WidgetData(result, total)
                 }
             } catch (_: SQLiteException) {
-                emptyList()
+                WidgetData(emptyList(), 0)
             } catch (_: Exception) {
-                emptyList()
+                WidgetData(emptyList(), 0)
             }
         }
     }

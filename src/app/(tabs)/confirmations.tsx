@@ -12,6 +12,10 @@ import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogReposito
 import { LearnedKeywordRepository } from '@/data/repositories/LearnedKeywordRepository';
 import { db } from '@/data/db/client';
 import { extractNgrams, languageForText } from '@/services/ngram-extractor';
+import { buildSenderKey } from '@/services/signal-scorer';
+import { createGoogleTask } from '@/services/google-tasks';
+import { appDisplayName } from '@/services/app-name-map';
+import { getSetting } from '@/data/storage/settings';
 import type { Task } from '@/domain/types';
 
 const taskRepo = new TaskRepository(db);
@@ -32,7 +36,8 @@ export default function ConfirmationsScreen(): React.JSX.Element {
   const confirmMutation = useMutation({
     mutationFn: async (task: Task) => {
       await taskRepo.confirmTask(task.id);
-      const senderKey = task.sender ?? task.sourceApp;
+      // Must match the key format used by the scorer/AI readers (app::sender)
+      const senderKey = buildSenderKey(task.sourceApp, task.sender ?? '');
       await senderStatsRepo.incrementConfirm(senderKey);
       const text = task.body ?? task.title;
       const ngrams = extractNgrams(text, 'EN');
@@ -42,6 +47,23 @@ export default function ConfirmationsScreen(): React.JSX.Element {
         } catch {
           // Non-fatal
         }
+      }
+      // Confirmation-queue tasks are deliberately not synced at creation time —
+      // sync now that the user has accepted it.
+      if (getSetting('google_tasks_enabled') && !task.googleTaskId) {
+        const notesLines: string[] = [`Source: ${appDisplayName(task.sourceApp)}`];
+        if (task.body) notesLines.push(`\nContext:\n${task.body.slice(0, 500)}`);
+        void createGoogleTask({
+          title: task.title,
+          notes: notesLines.join('\n'),
+          dueDate: task.dueDate,
+        })
+          .then((googleTaskId) => {
+            if (googleTaskId) void taskRepo.setGoogleTaskId(task.id, googleTaskId);
+          })
+          .catch(() => {
+            /* non-fatal */
+          });
       }
     },
     onMutate: async (task: Task) => {
@@ -65,9 +87,11 @@ export default function ConfirmationsScreen(): React.JSX.Element {
 
   const rejectMutation = useMutation({
     mutationFn: async (task: Task) => {
+      // Carry the notification key into the discard log so a sticky/re-posted
+      // notification can't recreate the task the user just rejected.
       await discardedRepo.insert({
         notificationId: task.id,
-        notificationKey: null,
+        notificationKey: task.notificationKey,
         sourceApp: task.sourceApp,
         sender: task.sender ?? null,
         bodyPreview: task.body ?? task.title,
@@ -75,7 +99,7 @@ export default function ConfirmationsScreen(): React.JSX.Element {
         confidence: task.confidence,
         createdAt: Date.now(),
       });
-      const senderKey = task.sender ?? task.sourceApp;
+      const senderKey = buildSenderKey(task.sourceApp, task.sender ?? '');
       await senderStatsRepo.incrementReject(senderKey);
       await taskRepo.deleteTask(task.id);
     },

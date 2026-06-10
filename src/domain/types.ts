@@ -27,6 +27,7 @@ export interface Task {
   needsConfirmation: boolean;
   dueDate: number | null;
   screenshotPath: string | null;
+  notificationKey: string | null;
   googleTaskId: string | null;
   howTo: string | null;
   estimatedMinutes: number | null;

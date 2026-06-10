@@ -71,9 +71,23 @@ Priority:
 
 dueDate: extract from "by tomorrow", "kal tak", "aaj shaam 5 baje", "by 3pm", "next Monday", "25 tarikh tak". Use today's date if only a clock time is given. Set null if no date or time is mentioned.`;
 
+function formatNow(): string {
+  return new Date().toLocaleString('en-IN', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function buildUserMessage(notification: NotificationData, senderCtx?: SenderContext): string {
   const appName = appDisplayName(notification.packageName);
-  const parts: string[] = [`App: ${appName}`];
+  const parts: string[] = [
+    `Current date: ${formatNow()} — resolve every relative date/time against this moment.`,
+    `App: ${appName}`,
+  ];
 
   if (notification.title) parts.push(`Sender: ${notification.title}`);
 
@@ -140,7 +154,14 @@ function parseResult(raw: string): AIClassifierResult | null {
     let dueDate: number | null = null;
     if (p.dueDate && typeof p.dueDate === 'string') {
       const d = new Date(p.dueDate as string);
-      if (!isNaN(d.getTime())) dueDate = d.getTime();
+      if (!isNaN(d.getTime())) {
+        // Correct hallucinated past years: advance until within 60 days before now
+        const floor = Date.now() - 60 * 86_400_000;
+        while (d.getTime() < floor) {
+          d.setFullYear(d.getFullYear() + 1);
+        }
+        dueDate = d.getTime();
+      }
     }
     const howTo = typeof p.howTo === 'string' && p.howTo.length > 0 ? (p.howTo as string) : null;
     const estimatedMinutes =

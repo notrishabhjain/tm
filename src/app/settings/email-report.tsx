@@ -1,5 +1,13 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+  ScrollView,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -117,9 +125,14 @@ export default function EmailReportScreen(): React.JSX.Element {
           dialogTitle: 'Share TaskMind Report',
           UTI: format === 'csv' ? 'public.comma-separated-values-text' : 'public.json',
         });
+      } else {
+        Alert.alert('Sharing unavailable', `Report saved to:\n${path}`);
       }
-    } catch {
-      /* non-fatal */
+    } catch (e) {
+      Alert.alert(
+        'Export failed',
+        e instanceof Error ? e.message : 'Could not generate the report. Please try again.'
+      );
     } finally {
       setLoading(false);
     }

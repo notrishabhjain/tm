@@ -1,5 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, FlatList } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  ActivityIndicator,
+  StyleSheet,
+  FlatList,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
@@ -10,6 +18,7 @@ import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { createGoogleTask } from '@/services/google-tasks';
 import { getSetting } from '@/data/storage/settings';
 import { consumeCallTranscript } from '@/services/call-transcript-stash';
+import type { CallTranscriptPayload } from '@/services/call-transcript-stash';
 import { extractTasksFromTranscript } from '@/services/transcript-extractor';
 import type { TranscriptTask } from '@/services/transcript-extractor';
 
@@ -44,34 +53,46 @@ export default function CallTranscriptScreen(): React.JSX.Element {
 
   const [state, setState] = useState<ScreenState>('loading');
   const [errorMsg, setErrorMsg] = useState('');
+  const [canRetry, setCanRetry] = useState(false);
   const [callMeta, setCallMeta] = useState('');
   const [transcriptText, setTranscriptText] = useState('');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
+  // The stash is one-shot; keep the payload here so extraction can be retried
+  // after a network/AI failure without losing the transcript.
+  const payloadRef = useRef<CallTranscriptPayload | null>(null);
+  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void run();
+    return () => {
+      if (navTimerRef.current) clearTimeout(navTimerRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const run = async (): Promise<void> => {
+    setState('loading');
     if (!getSetting('ai_enabled') || !getSetting('ai_api_key')) {
       setErrorMsg(
         'Cloud AI is required to analyse call transcripts.\n\nEnable it in Settings → Intelligence → Cloud AI.'
       );
+      setCanRetry(false);
       setState('error');
       return;
     }
 
-    const payload = consumeCallTranscript();
+    const payload = consumeCallTranscript() ?? payloadRef.current;
     if (!payload) {
       setErrorMsg(
         'No transcript was received.\n\nMake sure the Termux script ran after your call — see Settings → Call Transcription for setup.'
       );
+      setCanRetry(false);
       setState('error');
       return;
     }
+    payloadRef.current = payload;
 
     const text = payload.text.trim();
     setTranscriptText(text);
@@ -86,6 +107,14 @@ export default function CallTranscriptScreen(): React.JSX.Element {
       referenceTime: payload.callTime,
       callerLabel: payload.callerLabel,
     });
+    if (extracted === null) {
+      setErrorMsg(
+        'The AI could not analyse the transcript (network or service error).\n\nYour transcript is safe — tap Retry.'
+      );
+      setCanRetry(true);
+      setState('error');
+      return;
+    }
     if (extracted.length === 0) {
       setState('empty');
       return;
@@ -142,10 +171,14 @@ export default function CallTranscriptScreen(): React.JSX.Element {
         /* non-fatal — keep creating the rest */
       }
     }
-    setSavedCount(created);
     setSaving(false);
+    if (created === 0) {
+      Alert.alert('Could not save', 'No tasks could be created. Please try again.');
+      return;
+    }
+    setSavedCount(created);
     // Brief confirmation then navigate home
-    setTimeout(() => router.replace('/(tabs)/'), 1_500);
+    navTimerRef.current = setTimeout(() => router.replace('/(tabs)/'), 1_500);
   };
 
   const selectedCount = tasks.filter((t) => t.selected).length;
@@ -169,6 +202,7 @@ export default function CallTranscriptScreen(): React.JSX.Element {
       <View style={[styles.center, { backgroundColor: theme.background }]}>
         <Text style={styles.errorIcon}>⚠</Text>
         <Text style={[styles.errorText, { color: theme.onSurface }]}>{errorMsg}</Text>
+        {canRetry && <Button label="Retry" onPress={() => void run()} />}
         <Button label="Go to Home" variant="secondary" onPress={() => router.replace('/(tabs)/')} />
       </View>
     );
@@ -264,7 +298,9 @@ export default function CallTranscriptScreen(): React.JSX.Element {
         <Button
           label="Dismiss"
           variant="secondary"
-          onPress={() => router.replace('/(tabs)/')}
+          onPress={() => {
+            if (!saving) router.replace('/(tabs)/');
+          }}
           fullWidth
         />
       </View>

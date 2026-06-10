@@ -7,7 +7,7 @@ const APP_SHORT_NAMES: Record<string, string> = {
   'com.whatsapp.w4b': 'WA Biz',
   'com.google.android.gm': 'Gmail',
   'com.microsoft.teams': 'Teams',
-  'com.slack': 'Slack',
+  'com.Slack': 'Slack',
   'org.telegram.messenger': 'TG',
 };
 

@@ -41,6 +41,7 @@ function mapRow(row: typeof tasks.$inferSelect): Task {
     needsConfirmation: row.needsConfirmation ?? false,
     dueDate: row.dueDate ?? null,
     screenshotPath: row.screenshotPath ?? null,
+    notificationKey: row.notificationKey ?? null,
     googleTaskId: row.googleTaskId ?? null,
     howTo: row.howTo ?? null,
     estimatedMinutes: row.estimatedMinutes ?? null,
@@ -210,6 +211,7 @@ export class TaskRepository {
       .select()
       .from(tasks)
       .where(and(eq(tasks.notificationKey, notificationKey), isNull(tasks.deletedAt)))
+      .orderBy(desc(tasks.createdAt))
       .limit(1);
     return result[0] ? mapRow(result[0]) : null;
   }

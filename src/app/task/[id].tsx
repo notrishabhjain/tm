@@ -107,10 +107,23 @@ export default function TaskDetailScreen(): React.JSX.Element {
     ]);
   };
 
-  if (isLoading || !task) {
+  if (isLoading) {
     return (
       <View style={[styles.loading, { backgroundColor: theme.background }]}>
         <Text style={[styles.loadingText, { color: theme.onSurfaceVariant }]}>Loading…</Text>
+      </View>
+    );
+  }
+
+  if (!task) {
+    return (
+      <View style={[styles.loading, { backgroundColor: theme.background }]}>
+        <Text style={[styles.loadingText, { color: theme.onSurfaceVariant }]}>
+          Task not found — it may have been deleted.
+        </Text>
+        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
       </View>
     );
   }

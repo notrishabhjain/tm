@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
@@ -15,7 +16,7 @@ import { Button } from '@/ui/components/Button';
 import { PriorityChip } from '@/ui/components/PriorityChip';
 import { db } from '@/data/db/client';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
-import NotificationListener from '../../modules/notification-listener/src';
+import { consumeShare } from '@/services/share-stash';
 import { runExtractionPipeline } from '@/domain/extraction';
 import type { PipelineConfig } from '@/domain/extraction';
 import type { Keyword } from '@/domain/extraction/ruleEngine';
@@ -102,7 +103,9 @@ export default function ShareScreen(): React.JSX.Element {
 
   const loadShare = async (): Promise<void> => {
     try {
-      const intent = await NotificationListener.peekShareIntent();
+      // The intent itself was cleared in _layout before navigating here;
+      // the payload arrives via the in-memory stash.
+      const intent = consumeShare();
 
       if (!intent?.text) {
         setError('Nothing was shared. Please use the Android share menu to share a message.');
@@ -153,16 +156,16 @@ export default function ShareScreen(): React.JSX.Element {
         language: 'EN',
         dueDate,
       });
-      await NotificationListener.clearShareIntent().catch(() => null);
       router.replace('/(tabs)/');
     } catch {
-      setError('Failed to create task. Please try again.');
+      // Keep the form mounted so the user's edits aren't lost — the full-screen
+      // error state is only for load failures.
       setSaving(false);
+      Alert.alert('Could not save', 'Failed to create the task. Please try again.');
     }
   };
 
-  const handleDiscard = async (): Promise<void> => {
-    await NotificationListener.clearShareIntent().catch(() => null);
+  const handleDiscard = (): void => {
     router.replace('/(tabs)/');
   };
 
@@ -181,7 +184,7 @@ export default function ShareScreen(): React.JSX.Element {
     return (
       <View style={[styles.center, { backgroundColor: theme.background }]}>
         <Text style={styles.errorText}>{error}</Text>
-        <Button label="Go to Home" onPress={() => void handleDiscard()} variant="secondary" />
+        <Button label="Go to Home" onPress={handleDiscard} variant="secondary" />
       </View>
     );
   }
@@ -201,13 +204,15 @@ export default function ShareScreen(): React.JSX.Element {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {parsed?.sender ? (
+        {parsed?.sender || dueDate ? (
           <View style={[styles.metaCard, { backgroundColor: theme.surface }]}>
-            <View style={styles.metaRow}>
-              <Text style={[styles.metaLabel, { color: theme.onSurfaceVariant }]}>From</Text>
-              <Text style={[styles.metaValue, { color: theme.onSurface }]}>{parsed.sender}</Text>
-            </View>
-            {parsed.timestamp ? (
+            {parsed?.sender ? (
+              <View style={styles.metaRow}>
+                <Text style={[styles.metaLabel, { color: theme.onSurfaceVariant }]}>From</Text>
+                <Text style={[styles.metaValue, { color: theme.onSurface }]}>{parsed.sender}</Text>
+              </View>
+            ) : null}
+            {parsed?.sender && parsed.timestamp ? (
               <View style={styles.metaRow}>
                 <Text style={[styles.metaLabel, { color: theme.onSurfaceVariant }]}>Time</Text>
                 <Text style={[styles.metaValue, { color: theme.onSurface }]}>

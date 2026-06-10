@@ -14,6 +14,7 @@ import { restoreNudgeFromSettings } from '@/services/nudge-scheduler';
 import { runDailyDigestIfNeeded } from '@/services/ai-digest';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { stashCallTranscript } from '@/services/call-transcript-stash';
+import { stashShare } from '@/services/share-stash';
 import NotificationListener from '../../modules/notification-listener/src';
 
 // Subject marker the Termux hand-off script stamps on the share intent:
@@ -177,6 +178,38 @@ export default function RootLayout(): React.JSX.Element {
     return () => sub.remove();
   }, []);
 
+  // Persistent notification "Done ✓" quick action — complete the top pending task.
+  useEffect(() => {
+    const sub = NotificationListener.addQuickActionDoneTopListener(() => {
+      void (async () => {
+        try {
+          const taskRepo = new TaskRepository(db);
+          const pending = await taskRepo.getPendingTasks();
+          const order: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+          const top = [...pending].sort(
+            (a, b) => (order[a.priority] ?? 3) - (order[b.priority] ?? 3)
+          )[0];
+          if (!top) return;
+          await taskRepo.completeTask(top.id);
+          await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          const remaining = await taskRepo.getPendingTasks();
+          const urgent = remaining.filter((t) => t.priority === 'URGENT');
+          const sorted = [...remaining].sort(
+            (a, b) => (order[a.priority] ?? 3) - (order[b.priority] ?? 3)
+          );
+          await NotificationListener.updatePersistentNotification({
+            pendingCount: remaining.length,
+            urgentCount: urgent.length,
+            taskTexts: sorted.slice(0, 5).map((t) => t.title),
+          });
+        } catch {
+          /* non-fatal */
+        }
+      })();
+    });
+    return () => sub.remove();
+  }, []);
+
   // Share intent: open share screen when app is brought to foreground with a shared text.
   // Call transcripts arrive the same way (Termux hand-off, see
   // settings/call-transcription.tsx) tagged with a TASKMIND_CALL_TRANSCRIPT subject —
@@ -197,6 +230,11 @@ export default function RootLayout(): React.JSX.Element {
             return;
           }
 
+          // Clear the native intent BEFORE navigating — otherwise every
+          // background→foreground cycle re-reads it and stacks another /share
+          // modal (and backing out of the screen re-opened it forever).
+          stashShare({ text: intent.text, subject: intent.subject ?? null });
+          await NotificationListener.clearShareIntent().catch(() => null);
           router.push('/share');
         } catch {
           // Native module unavailable

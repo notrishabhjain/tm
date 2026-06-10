@@ -23,13 +23,16 @@ export default function GoogleTasksScreen(): React.JSX.Element {
     }, [])
   );
 
-  // Listen for the OAuth callback URL while the flow is in progress.
-  // The redirect uses the reversed-client-ID scheme (e.g. com.googleusercontent.apps.xxx:/)
-  // which Android delivers via onNewIntent → Linking event without navigating Expo Router.
+  // Listen for the OAuth callback URL. Registered unconditionally (NOT gated on
+  // `connecting`): Android may kill the app while the user is in the browser, in
+  // which case the redirect cold-starts the app with `connecting` reset to false
+  // — the callback must still be handled. getInitialURL covers the cold-start
+  // delivery itself; lastHandledUrl dedupes the two paths.
   useEffect(() => {
-    if (!connecting) return;
-    const sub = Linking.addEventListener('url', ({ url }) => {
-      if (!url.includes('code=')) return;
+    let lastHandledUrl = '';
+    const processUrl = (url: string): void => {
+      if (!url.includes('code=') || url === lastHandledUrl) return;
+      lastHandledUrl = url;
       void handleOAuthCallback(url).then((ok) => {
         setConnecting(false);
         if (ok) {
@@ -41,9 +44,13 @@ export default function GoogleTasksScreen(): React.JSX.Element {
           );
         }
       });
+    };
+    const sub = Linking.addEventListener('url', ({ url }) => processUrl(url));
+    void Linking.getInitialURL().then((url) => {
+      if (url) processUrl(url);
     });
     return () => sub.remove();
-  }, [connecting]);
+  }, []);
 
   const handleConnect = async (): Promise<void> => {
     setConnecting(true);
