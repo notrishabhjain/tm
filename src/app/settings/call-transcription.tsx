@@ -12,7 +12,7 @@ git clone https://github.com/ggerganov/whisper.cpp ~/whisper.cpp
 cd ~/whisper.cpp
 cmake -B build -DWHISPER_BUILD_EXAMPLES=ON
 cmake --build build -j$(nproc)
-bash models/download-ggml-model.sh base
+bash models/download-ggml-model.sh small-q5_1
 mkdir -p ~/.termux
 echo "allow-external-apps=true" >> ~/.termux/termux.properties
 termux-reload-settings
@@ -52,10 +52,18 @@ AGE=$(( $(date +%s) - MTIME ))
 CALLER=$(basename "$LATEST" | grep -oE '\\+?[0-9]{6,15}' | head -n 1)
 [ -z "$CALLER" ] && CALLER="Unknown"
 
-# 5. Convert to 16 kHz mono WAV and transcribe on-device
-ffmpeg -i "$LATEST" -ar 16000 -ac 1 "$WAV" -y -loglevel error
-~/whisper.cpp/build/bin/whisper-cli -m ~/whisper.cpp/models/ggml-base.bin \\
-  -f "$WAV" -otxt -of "$TXT_BASE" -l auto -bs 1 -bo 1 2>/dev/null
+# 5. Convert to 16 kHz mono WAV and transcribe on-device.
+#    The audio filter cleans up noisy phone-call audio before transcription:
+#    a 200-3400 Hz band-pass (the telephony speech band) strips hum/hiss, and
+#    dynaudnorm evens out quiet vs loud speakers — both improve accuracy.
+ffmpeg -i "$LATEST" -ar 16000 -ac 1 \\
+  -af "highpass=f=200,lowpass=f=3400,dynaudnorm=f=150:g=15" \\
+  "$WAV" -y -loglevel error
+# small-q5_1: multilingual "small" model, quantized so it stays fast on a phone —
+# far more accurate on Hindi/Hinglish than "base". -t $(nproc) uses every CPU
+# core (whisper defaults to just 4), and -bs 5 enables beam search for accuracy.
+~/whisper.cpp/build/bin/whisper-cli -m ~/whisper.cpp/models/ggml-small-q5_1.bin \\
+  -f "$WAV" -otxt -of "$TXT_BASE" -l auto -t $(nproc) -bs 5 -bo 5 2>/dev/null
 TRANSCRIPT=$(cat "$TXT_BASE.txt" 2>/dev/null || echo "")
 
 if [ -n "$TRANSCRIPT" ]; then
@@ -168,8 +176,9 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
         <Text style={[styles.body, { color: theme.onSurface }]}>
           Open Termux and paste this script. It installs dependencies, grants Termux access to
           shared storage (accept the permission prompt), clones and compiles whisper.cpp, downloads
-          the base English model (~75 MB), and enables external apps (needed for MacroDroid to
-          trigger Termux in Step 3). Takes ~15 min.
+          the multilingual <Text style={styles.mono}>small-q5_1</Text> model (~190 MB — much more
+          accurate on Hindi/Hinglish than the older base model), and enables external apps (needed
+          for MacroDroid to trigger Termux in Step 3). Takes ~15 min.
         </Text>
         <CodeBlock code={TERMUX_SETUP_SCRIPT} label="Termux setup (run once)" />
       </Section>
@@ -261,11 +270,25 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
           <Text style={styles.bold}>Non-English calls</Text>: the setup uses the multilingual{' '}
-          <Text style={styles.mono}>base</Text> model which supports Hindi, English, and 97 other
-          languages — it auto-detects the spoken language. If transcription is inaccurate, you can
-          pin the language by changing <Text style={styles.mono}>-l auto</Text> to a language code
-          (e.g. <Text style={styles.mono}>-l hi</Text> for Hindi,{' '}
-          <Text style={styles.mono}>-l en</Text> for English) in the transcription script.
+          <Text style={styles.mono}>small-q5_1</Text> model, which supports Hindi, English, and 97
+          other languages and auto-detects the spoken language. If your calls are almost always one
+          language, pinning it improves accuracy further — change{' '}
+          <Text style={styles.mono}>-l auto</Text> to a language code (e.g.{' '}
+          <Text style={styles.mono}>-l hi</Text> for Hindi, <Text style={styles.mono}>-l en</Text>{' '}
+          for English) in the transcription script. Leave it on{' '}
+          <Text style={styles.mono}>auto</Text> for mixed Hindi-English (Hinglish) calls.
+        </Text>
+        <Text style={[styles.body, { color: theme.onSurface }]}>
+          {'• '}
+          <Text style={styles.bold}>Too slow / phone heats up</Text>: the{' '}
+          <Text style={styles.mono}>small-q5_1</Text> model with all CPU cores transcribes a few
+          minutes of audio in roughly its own length on a mid-range phone. If that is too slow, drop
+          to a lighter model — run{' '}
+          <Text style={styles.mono}>bash models/download-ggml-model.sh base-q5_1</Text> in{' '}
+          <Text style={styles.mono}>~/whisper.cpp</Text> and point{' '}
+          <Text style={styles.mono}>-m</Text> at <Text style={styles.mono}>ggml-base-q5_1.bin</Text>{' '}
+          (faster, less accurate). You can also lower <Text style={styles.mono}>-bs 5</Text> to{' '}
+          <Text style={styles.mono}>-bs 3</Text> to trade a little accuracy for speed.
         </Text>
         <Text style={[styles.body, { color: theme.onSurface }]}>
           {'• '}
