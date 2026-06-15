@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import expo.modules.interfaces.permissions.Permissions
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -262,16 +263,12 @@ class NotificationListenerModule : Module() {
         }
 
         AsyncFunction("requestCallTranscriptionPermissions") { promise: Promise ->
-            val manager = appContext.permissions
-            if (manager == null) {
-                promise.resolve(false)
-            } else {
-                manager.askForPermissionsWithPromise(
-                    promise,
-                    android.Manifest.permission.READ_PHONE_STATE,
-                    android.Manifest.permission.READ_CALL_LOG
-                )
-            }
+            Permissions.askForPermissionsWithPermissionsManager(
+                appContext.permissions,
+                promise,
+                android.Manifest.permission.READ_PHONE_STATE,
+                android.Manifest.permission.READ_CALL_LOG
+            )
         }
 
         AsyncFunction("openAllFilesAccessSettings") {

@@ -48,8 +48,7 @@ function withNotificationListenerManifest(config) {
 
     // CallTranscriptionService
     const ctsExists = application.service.some(
-      (s) =>
-        s.$?.['android:name'] === 'expo.modules.notificationlistener.CallTranscriptionService'
+      (s) => s.$?.['android:name'] === 'expo.modules.notificationlistener.CallTranscriptionService'
     );
     if (!ctsExists) {
       application.service.push({
