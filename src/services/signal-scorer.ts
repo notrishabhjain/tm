@@ -152,6 +152,31 @@ async function hasRecentThreadTask(sender: string, sourceApp: string): Promise<b
 
 // ── Deadline extraction ───────────────────────────────────────────────────────
 
+function lastDayOfMonth(yr: number, month: number): number {
+  return new Date(yr, month + 1, 0).getDate();
+}
+
+// Builds an end-of-day deadline for `day` in the current month, clamped to the
+// month's actual length. If that date has already passed, rolls over to the
+// next month (and year, if needed), re-clamping `day` to that month's length —
+// this avoids e.g. "by 31st" in a 30-day month overflowing into the month after next.
+function dayOfMonthDeadline(now: Date, nowMs: number, day: number): number {
+  let yr = now.getFullYear();
+  let month = now.getMonth();
+  let clampedDay = Math.min(day, lastDayOfMonth(yr, month));
+  let d = new Date(yr, month, clampedDay, 23, 59, 59, 999);
+  if (d.getTime() <= nowMs) {
+    month += 1;
+    if (month > 11) {
+      month = 0;
+      yr += 1;
+    }
+    clampedDay = Math.min(day, lastDayOfMonth(yr, month));
+    d = new Date(yr, month, clampedDay, 23, 59, 59, 999);
+  }
+  return d.getTime();
+}
+
 function extractDeadline(text: string): number | null {
   const lower = text.toLowerCase();
   const now = new Date();
@@ -204,7 +229,7 @@ function extractDeadline(text: string): number | null {
   if (/\bthis\s+week\b/.test(lower)) deadlines.push(nextWeekday(5));
   if (/\bnext\s+week\b/.test(lower)) {
     const d = new Date(now);
-    const toFri = (5 - d.getDay() + 7) % 7 || 7;
+    const toFri = (5 - d.getDay() + 7) % 7;
     d.setDate(d.getDate() + toFri + 7);
     deadlines.push(eod(d));
   }
@@ -296,9 +321,7 @@ function extractDeadline(text: string): number | null {
     if (domMatch) {
       const day = parseInt(domMatch[1], 10);
       if (day >= 1 && day <= 31) {
-        const d = new Date(now.getFullYear(), now.getMonth(), day, 23, 59, 59, 999);
-        if (d.getTime() <= nowMs) d.setMonth(d.getMonth() + 1);
-        deadlines.push(d.getTime());
+        deadlines.push(dayOfMonthDeadline(now, nowMs, day));
       }
     }
   }
@@ -322,9 +345,7 @@ function extractDeadline(text: string): number | null {
   if (hindiMatch) {
     const day = parseInt(hindiMatch[1], 10);
     if (day >= 1 && day <= 31) {
-      const d = new Date(now.getFullYear(), now.getMonth(), day, 23, 59, 59, 999);
-      if (d.getTime() <= nowMs) d.setMonth(d.getMonth() + 1);
-      deadlines.push(d.getTime());
+      deadlines.push(dayOfMonthDeadline(now, nowMs, day));
     }
   }
 
@@ -937,12 +958,13 @@ export async function scoreNotification(notification: NotificationData): Promise
   const threadText = (notification.thread ?? []).map((m) => m.text).join(' ');
   const fullText = `${latestMessage} ${threadText}`;
 
+  const hasTitle = !!notification.title && notification.title.trim().length > 0;
   const senderKey = buildSenderKey(notification.packageName, notification.title ?? '');
 
   const [senderInfo, activeKws, hasThreadCtx] = await Promise.all([
-    loadSenderInfo(senderKey),
+    hasTitle ? loadSenderInfo(senderKey) : Promise.resolve(unknownSender()),
     loadActiveKeywords(),
-    hasRecentThreadTask(notification.title ?? '', notification.packageName),
+    hasTitle ? hasRecentThreadTask(notification.title ?? '', notification.packageName) : false,
   ]);
 
   const acc: SignalAccumulator = { score: 0, signals: [] };

@@ -16,8 +16,10 @@ function todayKey(): string {
 function isPastDigestTime(): boolean {
   try {
     const [h, m] = getSetting('ai_digest_time').split(':').map(Number);
+    const validH = Number.isFinite(h) ? h : 9;
+    const validM = Number.isFinite(m) ? m : 0;
     const now = new Date();
-    return now.getHours() * 60 + now.getMinutes() >= h * 60 + m;
+    return now.getHours() * 60 + now.getMinutes() >= validH * 60 + validM;
   } catch {
     return false;
   }

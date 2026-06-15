@@ -54,6 +54,7 @@ export function initializeDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
     CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks (priority);
     CREATE INDEX IF NOT EXISTS idx_tasks_needs_confirmation ON tasks (needs_confirmation);
+    CREATE INDEX IF NOT EXISTS idx_tasks_deleted_at ON tasks (deleted_at);
 
     CREATE TABLE IF NOT EXISTS vip_contacts (
       id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,

@@ -48,6 +48,11 @@ export class MonitoredAppRepository {
         isActive: true,
         createdAt: Date.now(),
       });
+    } else {
+      await this.db
+        .update(monitoredApps)
+        .set({ displayName, isActive: true })
+        .where(eq(monitoredApps.packageName, packageName));
     }
   }
 

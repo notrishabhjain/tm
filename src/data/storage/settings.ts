@@ -20,6 +20,7 @@ export interface AppSettings {
   urgent_override_quiet: boolean;
   rule_weight: number;
   model_weight: number;
+  model_weight_user_set: boolean;
   model_downloaded: boolean;
   model_version: string;
   model_url: string;
@@ -59,6 +60,7 @@ const DEFAULTS: AppSettings = {
   urgent_override_quiet: true,
   rule_weight: 1.0,
   model_weight: 0.3,
+  model_weight_user_set: false,
   model_downloaded: false,
   model_version: '',
   model_url: '',

@@ -4,6 +4,8 @@ import type {
   PersistentNotificationParams,
   PermissionStatus,
   FocusState,
+  CallTranscriptionStatus,
+  CallTranscriptReadyEvent,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -167,6 +169,69 @@ const NotificationListenerModule = {
     if (!emitter) return { remove: () => undefined };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (emitter as any).addListener('onQuickActionOpen', listener) as { remove: () => void };
+  },
+
+  // ── In-app call transcription (replaces Termux + MacroDroid) ─────────────
+
+  getCallTranscriptionStatus(): Promise<CallTranscriptionStatus> {
+    if (!NativeModule) {
+      return Promise.resolve({
+        enabled: false,
+        hasPhoneStatePermission: false,
+        hasCallLogPermission: false,
+        hasAllFilesAccess: false,
+        modelDownloaded: false,
+        engineBuilt: false,
+        modelName: 'ggml-medium-q5_0.bin',
+      });
+    }
+    return NativeModule.getCallTranscriptionStatus() as Promise<CallTranscriptionStatus>;
+  },
+
+  setCallTranscriptionEnabled(enabled: boolean): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setCallTranscriptionEnabled(enabled) as Promise<void>;
+  },
+
+  setCallRecordingsDir(dir: string | null): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setCallRecordingsDir(dir) as Promise<void>;
+  },
+
+  requestCallTranscriptionPermissions(): Promise<boolean> {
+    if (!NativeModule) return Promise.resolve(false);
+    return NativeModule.requestCallTranscriptionPermissions() as Promise<boolean>;
+  },
+
+  openAllFilesAccessSettings(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.openAllFilesAccessSettings() as Promise<void>;
+  },
+
+  downloadWhisperModel(): Promise<boolean> {
+    if (!NativeModule) return Promise.resolve(false);
+    return NativeModule.downloadWhisperModel() as Promise<boolean>;
+  },
+
+  deleteWhisperModel(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.deleteWhisperModel() as Promise<void>;
+  },
+
+  addCallTranscriptReadyListener(listener: (data: CallTranscriptReadyEvent) => void) {
+    if (!emitter) return { remove: () => undefined };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (emitter as any).addListener('onCallTranscriptReady', listener) as {
+      remove: () => void;
+    };
+  },
+
+  addModelDownloadProgressListener(listener: (data: { progress: number }) => void) {
+    if (!emitter) return { remove: () => undefined };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (emitter as any).addListener('onModelDownloadProgress', listener) as {
+      remove: () => void;
+    };
   },
 };
 

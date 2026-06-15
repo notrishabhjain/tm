@@ -11,6 +11,9 @@ export default function GoogleOAuthCallback(): React.JSX.Element {
   const [errorHint, setErrorHint] = useState('');
 
   useEffect(() => {
+    let redirectTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
     const query = new URLSearchParams(params as Record<string, string>).toString();
     const fullUrl = `taskmind://oauth/google?${query}`;
     if (!params.code) {
@@ -18,23 +21,30 @@ export default function GoogleOAuthCallback(): React.JSX.Element {
         'No authorization code received. Check that your Client ID is a Desktop app credential.'
       );
       setStatus('error');
-      setTimeout(() => router.replace('/settings/google-tasks'), 3000);
-      return;
+      redirectTimer = setTimeout(() => router.replace('/settings/google-tasks'), 3000);
+      return () => {
+        if (redirectTimer) clearTimeout(redirectTimer);
+      };
     }
     void handleOAuthCallback(fullUrl).then((ok) => {
+      if (cancelled) return;
       setStatus(ok ? 'success' : 'error');
       if (!ok) {
         setErrorHint(
           'Token exchange failed. Make sure you pasted both Client ID and Client Secret correctly.'
         );
       }
-      setTimeout(
+      redirectTimer = setTimeout(
         () => {
           router.replace('/settings/google-tasks');
         },
         ok ? 1200 : 3000
       );
     });
+    return () => {
+      cancelled = true;
+      if (redirectTimer) clearTimeout(redirectTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

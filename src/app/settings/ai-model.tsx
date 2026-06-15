@@ -76,6 +76,7 @@ export default function AiModelScreen(): React.JSX.Element {
   const toggleModel = useCallback(() => {
     const next = modelWeight > 0 ? 0 : 0.3;
     setSetting('model_weight', next);
+    setSetting('model_weight_user_set', true);
     setModelWeightState(next);
   }, [modelWeight]);
 

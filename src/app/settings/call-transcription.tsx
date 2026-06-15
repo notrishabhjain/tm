@@ -138,12 +138,30 @@ export default function CallTranscriptionScreen(): React.JSX.Element {
         <Text style={[styles.back, { color: theme.primary }]}>‹ Settings</Text>
       </Pressable>
 
-      <Text style={[styles.title, { color: theme.onSurface }]}>Call Transcription Setup</Text>
+      <Text style={[styles.title, { color: theme.onSurface }]}>
+        Call Transcription Setup (legacy)
+      </Text>
+
+      <Pressable
+        style={[styles.banner, { borderColor: theme.primary, backgroundColor: theme.surface }]}
+        onPress={() => router.push('/settings/in-app-transcription')}
+      >
+        <Text style={[styles.bannerTitle, { color: theme.primary }]}>
+          New: In-App Call Transcription
+        </Text>
+        <Text style={[styles.bannerBody, { color: theme.onSurface }]}>
+          TaskMind can now detect call-end, transcribe, and review tasks entirely on-device —
+          without Termux or MacroDroid, which Android keeps killing in the background. Tap to set it
+          up →
+        </Text>
+      </Pressable>
+
       <Text style={[styles.intro, { color: theme.onSurfaceVariant }]}>
-        Turn your recorded calls into tasks automatically: when a call ends, MacroDroid runs a
-        Termux script that transcribes the recording on-device with whisper.cpp and sends the
+        This page documents the older Termux + MacroDroid pipeline: when a call ends, MacroDroid
+        runs a Termux script that transcribes the recording on-device with whisper.cpp and sends the
         transcript straight to TaskMind, where AI extracts action items with correct dates. Setup
-        takes about 20 minutes and only needs to be done once.
+        takes about 20 minutes. Use this only if the in-app option above isn't available on your
+        build yet.
       </Text>
 
       {/* Prerequisites */}
@@ -345,6 +363,9 @@ const styles = StyleSheet.create({
   backRow: { marginBottom: 4 },
   back: { fontSize: 16, fontWeight: '600' },
   title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  banner: { borderWidth: 2, borderRadius: 2, padding: 14, gap: 6 },
+  bannerTitle: { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  bannerBody: { fontSize: 14, lineHeight: 20 },
   intro: { fontSize: 14, lineHeight: 22 },
   section: {
     borderWidth: 2,

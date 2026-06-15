@@ -171,17 +171,14 @@ export class TaskRepository {
   async getTodayCompletedCount(): Promise<number> {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    const rows = await this.db
-      .select()
-      .from(tasks)
-      .where(
-        and(
-          eq(tasks.status, 'COMPLETE'),
-          isNull(tasks.deletedAt),
-          gte(tasks.completedAt, startOfDay.getTime())
-        )
-      );
-    return rows.length;
+    return this.db.$count(
+      tasks,
+      and(
+        eq(tasks.status, 'COMPLETE'),
+        isNull(tasks.deletedAt),
+        gte(tasks.completedAt, startOfDay.getTime())
+      )
+    );
   }
 
   async getRecentBySenderAndApp(
@@ -214,15 +211,6 @@ export class TaskRepository {
       .orderBy(desc(tasks.createdAt))
       .limit(1);
     return result[0] ? mapRow(result[0]) : null;
-  }
-
-  async existsByNotificationKeyAndContent(key: string, bodyPrefix: string): Promise<boolean> {
-    const rows = await this.db
-      .select({ body: tasks.body })
-      .from(tasks)
-      .where(and(eq(tasks.notificationKey, key), isNull(tasks.deletedAt)))
-      .limit(20);
-    return rows.some((r) => (r.body ?? '').slice(0, 200) === bodyPrefix);
   }
 
   async countByStatus(): Promise<Record<string, number>> {

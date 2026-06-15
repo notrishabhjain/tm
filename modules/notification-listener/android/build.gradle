@@ -11,6 +11,28 @@ useDefaultAndroidSdkVersions()
 
 android {
   namespace "expo.modules.notificationlistener"
+
+  defaultConfig {
+    def archProperty = findProperty("reactNativeArchitectures")
+    def archs = archProperty ? archProperty.toString().split(",") : ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+    externalNativeBuild {
+      cmake {
+        abiFilters (*archs)
+      }
+    }
+  }
+
+  // Builds the on-device whisper.cpp JNI bridge used for in-app call
+  // transcription. If src/main/cpp/whisper.cpp (a checkout of
+  // https://github.com/ggerganov/whisper.cpp) is not present, CMake builds a
+  // stub library instead — see src/main/cpp/CMakeLists.txt and the "Call
+  // Transcription" settings screen for setup instructions.
+  externalNativeBuild {
+    cmake {
+      path "src/main/cpp/CMakeLists.txt"
+      version "3.22.1"
+    }
+  }
 }
 
 dependencies {

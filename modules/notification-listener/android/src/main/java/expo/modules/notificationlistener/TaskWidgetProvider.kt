@@ -67,6 +67,10 @@ class TaskWidgetProvider : AppWidgetProvider() {
 
             // Tap entire widget → open app
             val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
+                ?: Intent(Intent.ACTION_MAIN).apply {
+                    setPackage(pkg)
+                    addCategory(Intent.CATEGORY_LAUNCHER)
+                }
             val pendingIntent = PendingIntent.getActivity(
                 context, 0, launchIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

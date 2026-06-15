@@ -38,6 +38,11 @@ yarn-error.log*
 # Coverage
 coverage/
 
+# whisper.cpp checkout for in-app call transcription (see
+# modules/notification-listener/android/src/main/cpp/CMakeLists.txt)
+modules/notification-listener/android/src/main/cpp/whisper.cpp/
+modules/notification-listener/android/.cxx/
+
 # Build outputs
 *.apk
 *.aab

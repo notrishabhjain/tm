@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 
@@ -29,6 +30,7 @@ class TaskMindForegroundService : Service() {
         notificationManager = getSystemService(NotificationManager::class.java)
         createNotificationChannel()
         isRunning = true
+        CallStateMonitor.start(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -37,6 +39,7 @@ class TaskMindForegroundService : Service() {
                 val pendingCount = intent.getIntExtra("pendingCount", 0)
                 val urgentCount = intent.getIntExtra("urgentCount", 0)
                 val taskTexts = intent.getStringArrayListExtra("taskTexts") ?: arrayListOf()
+                saveLastState(pendingCount, urgentCount, taskTexts)
                 val notification = buildNotification(pendingCount, urgentCount, taskTexts)
                 if (hasStartedForeground) {
                     notificationManager.notify(NOTIFICATION_ID, notification)
@@ -55,13 +58,32 @@ class TaskMindForegroundService : Service() {
                 return START_NOT_STICKY
             }
             else -> {
-                // Initial start
-                val notification = buildNotification(0, 0, arrayListOf())
+                // Initial start, or system redelivery after process restart
+                // (intent == null under START_STICKY) — restore the last known
+                // counts instead of wiping the notification back to "0 pending".
+                val (pendingCount, urgentCount, taskTexts) = loadLastState()
+                val notification = buildNotification(pendingCount, urgentCount, taskTexts)
                 startForeground(NOTIFICATION_ID, notification)
                 hasStartedForeground = true
             }
         }
         return START_STICKY
+    }
+
+    private fun saveLastState(pendingCount: Int, urgentCount: Int, taskTexts: List<String>) {
+        getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE).edit()
+            .putInt("last_pending_count", pendingCount)
+            .putInt("last_urgent_count", urgentCount)
+            .putStringSet("last_task_texts", taskTexts.toSet())
+            .apply()
+    }
+
+    private fun loadLastState(): Triple<Int, Int, ArrayList<String>> {
+        val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+        val pendingCount = prefs.getInt("last_pending_count", 0)
+        val urgentCount = prefs.getInt("last_urgent_count", 0)
+        val taskTexts = ArrayList(prefs.getStringSet("last_task_texts", emptySet()) ?: emptySet())
+        return Triple(pendingCount, urgentCount, taskTexts)
     }
 
     private fun buildNotification(
@@ -70,6 +92,10 @@ class TaskMindForegroundService : Service() {
         taskTexts: List<String>
     ): Notification {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            ?: Intent(Intent.ACTION_MAIN).apply {
+                setPackage(packageName)
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
         val launchPI = PendingIntent.getActivity(
             this, 0, launchIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -137,5 +163,6 @@ class TaskMindForegroundService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        CallStateMonitor.stop()
     }
 }

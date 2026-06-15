@@ -135,7 +135,9 @@ export async function downloadModel(opts: DownloadOptions = {}): Promise<void> {
 
   setSetting('model_downloaded', true);
   setSetting('model_version', parsed.version);
-  if (getSetting('model_weight') === 0) setSetting('model_weight', 0.3);
+  if (!getSetting('model_weight_user_set') && getSetting('model_weight') === 0) {
+    setSetting('model_weight', 0.3);
+  }
   invalidateModelCache();
 }
 
@@ -148,5 +150,6 @@ export async function deleteModel(): Promise<void> {
   setSetting('model_downloaded', false);
   setSetting('model_version', '');
   setSetting('model_weight', 0);
+  setSetting('model_weight_user_set', true);
   invalidateModelCache();
 }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, Pressable, Switch, StyleSheet, ScrollView } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
@@ -46,6 +46,15 @@ export default function FocusLockScreen(): React.JSX.Element {
       refresh();
     }, [refresh])
   );
+
+  // Force a re-render every 30s so the "X min left" countdown stays current
+  // while a focus session is active.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!state || state.sessionEndsAt <= Date.now()) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(interval);
+  }, [state]);
 
   const sessionActive = state != null && state.sessionEndsAt > Date.now();
 

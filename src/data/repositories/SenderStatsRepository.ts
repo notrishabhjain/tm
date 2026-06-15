@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { senderStats } from '../db/schema';
 import type { SenderStats } from '@/domain/types';
@@ -28,51 +28,37 @@ export class SenderStatsRepository {
     return rows[0] ? mapRow(rows[0]) : null;
   }
 
-  private async getOrCreate(senderKey: string): Promise<typeof senderStats.$inferSelect> {
-    const existing = await this.db
-      .select()
-      .from(senderStats)
-      .where(eq(senderStats.senderKey, senderKey))
-      .limit(1);
-
-    if (existing[0]) return existing[0];
-
-    const result = await this.db
-      .insert(senderStats)
-      .values({
-        senderKey,
-        confirmCount: 0,
-        rejectCount: 0,
-        autoAcceptCount: 0,
-        lastSeenAt: Date.now(),
-      })
-      .returning();
-    if (!result[0]) throw new Error(`Failed to create sender stats for ${senderKey}`);
-    return result[0];
-  }
-
   async incrementConfirm(senderKey: string): Promise<void> {
-    const row = await this.getOrCreate(senderKey);
+    const now = Date.now();
     await this.db
-      .update(senderStats)
-      .set({ confirmCount: row.confirmCount + 1, lastSeenAt: Date.now() })
-      .where(eq(senderStats.senderKey, senderKey));
+      .insert(senderStats)
+      .values({ senderKey, confirmCount: 1, rejectCount: 0, autoAcceptCount: 0, lastSeenAt: now })
+      .onConflictDoUpdate({
+        target: senderStats.senderKey,
+        set: { confirmCount: sql`${senderStats.confirmCount} + 1`, lastSeenAt: now },
+      });
   }
 
   async incrementReject(senderKey: string): Promise<void> {
-    const row = await this.getOrCreate(senderKey);
+    const now = Date.now();
     await this.db
-      .update(senderStats)
-      .set({ rejectCount: row.rejectCount + 1, lastSeenAt: Date.now() })
-      .where(eq(senderStats.senderKey, senderKey));
+      .insert(senderStats)
+      .values({ senderKey, confirmCount: 0, rejectCount: 1, autoAcceptCount: 0, lastSeenAt: now })
+      .onConflictDoUpdate({
+        target: senderStats.senderKey,
+        set: { rejectCount: sql`${senderStats.rejectCount} + 1`, lastSeenAt: now },
+      });
   }
 
   async incrementAutoAccept(senderKey: string): Promise<void> {
-    const row = await this.getOrCreate(senderKey);
+    const now = Date.now();
     await this.db
-      .update(senderStats)
-      .set({ autoAcceptCount: row.autoAcceptCount + 1, lastSeenAt: Date.now() })
-      .where(eq(senderStats.senderKey, senderKey));
+      .insert(senderStats)
+      .values({ senderKey, confirmCount: 0, rejectCount: 0, autoAcceptCount: 1, lastSeenAt: now })
+      .onConflictDoUpdate({
+        target: senderStats.senderKey,
+        set: { autoAcceptCount: sql`${senderStats.autoAcceptCount} + 1`, lastSeenAt: now },
+      });
   }
 
   async getConfidenceAdjustment(senderKey: string): Promise<number> {

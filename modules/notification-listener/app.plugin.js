@@ -46,6 +46,21 @@ function withNotificationListenerManifest(config) {
       });
     }
 
+    // CallTranscriptionService
+    const ctsExists = application.service.some(
+      (s) =>
+        s.$?.['android:name'] === 'expo.modules.notificationlistener.CallTranscriptionService'
+    );
+    if (!ctsExists) {
+      application.service.push({
+        $: {
+          'android:name': 'expo.modules.notificationlistener.CallTranscriptionService',
+          'android:foregroundServiceType': 'dataSync',
+          'android:exported': 'false',
+        },
+      });
+    }
+
     // BootReceiver
     const bootExists = application.receiver.some(
       (r) => r.$?.['android:name'] === 'expo.modules.notificationlistener.BootReceiver'
