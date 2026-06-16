@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, SafeAreaView } from 'react-native';
 import { SwipeNavigator } from '@/ui/components/SwipeNavigator';
 import { useQuery } from '@tanstack/react-query';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
@@ -12,7 +12,6 @@ import type { Task, Priority } from '@/domain/types';
 const taskRepo = new TaskRepository(db);
 
 type FilterPeriod = 'TODAY' | 'WEEK' | 'ALL';
-const DEPTH = 4;
 
 const FILTER_LABELS: Record<FilterPeriod, string> = {
   TODAY: 'Today',
@@ -63,32 +62,43 @@ export default function HistoryScreen(): React.JSX.Element {
 
   return (
     <SwipeNavigator tabIndex={2}>
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* Filter strip */}
-        <View style={styles.filterRow}>
-          {(Object.keys(FILTER_LABELS) as FilterPeriod[]).map((f) => (
-            <Pressable
-              key={f}
-              style={[styles.chip, filter === f && styles.chipActive]}
-              onPress={() => setFilter(f)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  filter === f && styles.chipTextActive,
-                  filter === f && { color: theme.primary },
-                ]}
-              >
-                {FILTER_LABELS[f]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
+          {/* Header */}
+          <View
+            style={[
+              styles.header,
+              { backgroundColor: theme.surface, borderBottomColor: theme.outline },
+            ]}
+          >
+            <Text style={[styles.headerTitle, { color: theme.onSurface }]}>History</Text>
 
-        {/* Stats card */}
-        {tasks.length > 0 && (
-          <View style={[styles.statsWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-            <View style={styles.statsShadow} />
+            {/* Filter chips inline */}
+            <View style={styles.filterRow}>
+              {(Object.keys(FILTER_LABELS) as FilterPeriod[]).map((f) => (
+                <Pressable
+                  key={f}
+                  style={[styles.filterChip, filter === f && styles.filterChipActive]}
+                  onPress={() => setFilter(f)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: filter === f }}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: theme.onSurfaceVariant },
+                      filter === f && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {FILTER_LABELS[f]}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {/* Stats summary */}
+          {tasks.length > 0 && (
             <View style={[styles.statsCard, { backgroundColor: theme.surface }]}>
               <Text style={[styles.statsTotal, { color: theme.onSurface }]}>
                 {tasks.length} task{tasks.length !== 1 ? 's' : ''} completed
@@ -102,166 +112,156 @@ export default function HistoryScreen(): React.JSX.Element {
                         style={[styles.breakdownDot, { backgroundColor: getPriorityColor(p) }]}
                       />
                       <Text style={[styles.breakdownLabel, { color: theme.onSurfaceVariant }]}>
-                        {p.charAt(0) + p.slice(1).toLowerCase()} {priorityBreakdown[p]}
+                        {p.charAt(0) + p.slice(1).toLowerCase()} · {priorityBreakdown[p]}
                       </Text>
                     </View>
                   ))}
               </View>
             </View>
-          </View>
-        )}
-
-        <FlatList
-          data={tasks}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <HistoryTaskRow
-              task={item}
-              surfaceColor={theme.surface}
-              onSurfaceVariantColor={theme.onSurfaceVariant}
-            />
           )}
-          contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
-          ListEmptyComponent={
-            isLoading ? null : (
-              <EmptyState
-                title={filter === 'ALL' ? 'No history yet' : 'Nothing in this period'}
-                description={
-                  filter === 'ALL'
-                    ? 'Completed tasks will appear here.'
-                    : 'Try selecting a wider time range.'
-                }
-              />
-            )
-          }
-        />
-      </View>
+
+          <FlatList
+            data={tasks}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => <HistoryTaskRow task={item} />}
+            contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
+            ListEmptyComponent={
+              isLoading ? null : (
+                <EmptyState
+                  title={filter === 'ALL' ? 'No history yet' : 'Nothing in this period'}
+                  description={
+                    filter === 'ALL'
+                      ? 'Completed tasks will appear here.'
+                      : 'Try selecting a wider time range.'
+                  }
+                />
+              )
+            }
+          />
+        </View>
+      </SafeAreaView>
     </SwipeNavigator>
   );
 }
 
-function HistoryTaskRow({
-  task,
-  surfaceColor,
-  onSurfaceVariantColor,
-}: {
-  task: Task;
-  surfaceColor: string;
-  onSurfaceVariantColor: string;
-}): React.JSX.Element {
+function HistoryTaskRow({ task }: { task: Task }): React.JSX.Element {
+  const theme = useTheme();
   const priorityColor = getPriorityColor(task.priority);
+  const sourceLabel = task.sourceApp.split('.').pop() ?? task.sourceApp;
 
   return (
-    <View style={[styles.rowWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-      <View style={[styles.rowShadow, { backgroundColor: priorityColor + '55' }]} />
-      <View style={[styles.row, { borderColor: priorityColor, backgroundColor: surfaceColor }]}>
-        <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
-        <View style={styles.rowContent}>
-          <Text style={[styles.taskTitle, { color: onSurfaceVariantColor }]} numberOfLines={1}>
-            {task.title}
-          </Text>
-          <Text style={[styles.rowMeta, { color: onSurfaceVariantColor }]}>
-            {task.completedAt ? formatDate(task.completedAt) : 'Unknown'} ·{' '}
-            {task.sourceApp.split('.').pop()}
-          </Text>
-        </View>
-        <View style={styles.doneBadge}>
-          <Text style={styles.doneText}>DONE</Text>
-        </View>
+    <View style={[styles.row, { backgroundColor: theme.surface }]}>
+      <View style={[styles.rowAccent, { backgroundColor: priorityColor }]} />
+      <View style={styles.rowContent}>
+        <Text style={[styles.rowTitle, { color: theme.onSurfaceVariant }]} numberOfLines={1}>
+          {task.title}
+        </Text>
+        <Text style={[styles.rowMeta, { color: theme.onSurfaceVariant }]}>
+          {task.completedAt ? formatDate(task.completedAt) : 'Unknown'} · {sourceLabel}
+        </Text>
+      </View>
+      <View
+        style={[
+          styles.donePill,
+          { borderColor: Colors.success + '60', backgroundColor: Colors.successBg },
+        ]}
+      >
+        <Text style={styles.doneText}>✓ Done</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
   container: { flex: 1 },
+
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
   filterRow: {
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
   },
-  chip: {
+  filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 2,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderRadius: 15,
   },
-  chipActive: {
-    backgroundColor: Colors.white,
-    borderColor: Colors.white,
+  filterChipActive: {
+    backgroundColor: Colors.primary900,
   },
-  chipText: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.7)' },
-  chipTextActive: {},
-  statsWrapper: {
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: Colors.white,
+    fontWeight: '600',
+  },
+
+  statsCard: {
     marginHorizontal: 16,
     marginTop: 12,
-    position: 'relative',
-  },
-  statsShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
-  statsCard: {
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
+    marginBottom: 4,
+    borderRadius: 12,
     padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
   },
   statsTotal: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     marginBottom: 8,
-    letterSpacing: 0.2,
   },
   breakdownRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   breakdownItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  breakdownDot: { width: 8, height: 8, borderRadius: 2 },
+  breakdownDot: { width: 8, height: 8, borderRadius: 4 },
   breakdownLabel: { fontSize: 12, fontWeight: '500' },
-  list: { paddingTop: 8, paddingBottom: 16 },
+
+  list: { paddingTop: 8, paddingBottom: 24 },
   emptyContainer: { flex: 1 },
-  rowWrapper: { marginHorizontal: 16, marginVertical: 4, position: 'relative' },
-  rowShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
-  },
+
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderRadius: 2,
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 12,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  priorityBar: { width: 4, alignSelf: 'stretch' },
-  rowContent: { flex: 1, paddingHorizontal: 12, paddingVertical: 10 },
-  taskTitle: {
+  rowAccent: { width: 4, alignSelf: 'stretch' },
+  rowContent: { flex: 1, paddingHorizontal: 12, paddingVertical: 12 },
+  rowTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     textDecorationLine: 'line-through',
     marginBottom: 2,
   },
-  rowMeta: { fontSize: 11 },
-  doneBadge: {
+  rowMeta: { fontSize: 11, fontWeight: '400' },
+  donePill: {
     marginRight: 12,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 2,
-    borderWidth: 1.5,
-    borderColor: Colors.success,
-    backgroundColor: Colors.successBg,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
   },
-  doneText: { fontSize: 10, fontWeight: '800', color: Colors.success, letterSpacing: 0.5 },
+  doneText: { fontSize: 11, fontWeight: '600', color: Colors.success },
 });

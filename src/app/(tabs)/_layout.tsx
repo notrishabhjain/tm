@@ -7,13 +7,18 @@ export default function TabLayout(): React.JSX.Element {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: Colors.primary900 },
-        headerTintColor: Colors.white,
-        headerTitleStyle: { fontWeight: '700' },
-        tabBarStyle: { backgroundColor: Colors.primary900, borderTopColor: Colors.primary700 },
-        tabBarActiveTintColor: Colors.white,
-        tabBarInactiveTintColor: Colors.primary300,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: Colors.white,
+          borderTopWidth: 1,
+          borderTopColor: Colors.outlineLight,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarActiveTintColor: Colors.primary900,
+        tabBarInactiveTintColor: '#94A3B8',
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
       <Tabs.Screen
@@ -30,7 +35,7 @@ export default function TabLayout(): React.JSX.Element {
         name="confirmations"
         options={{
           title: 'Confirm',
-          tabBarLabel: 'Confirm',
+          tabBarLabel: 'Review',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="checkmark-circle-outline" size={size} color={color} />
           ),

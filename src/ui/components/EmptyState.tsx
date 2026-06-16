@@ -20,19 +20,14 @@ export function EmptyState({
   const theme = useTheme();
   return (
     <View style={styles.container}>
-      <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-        <View style={styles.dot} />
-        <Text style={[styles.title, { color: theme.onSurface }]}>{title}</Text>
-        <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>{description}</Text>
-        {actionLabel && onAction && (
-          <Button
-            label={actionLabel}
-            onPress={onAction}
-            variant="secondary"
-            style={styles.button}
-          />
-        )}
+      <View style={styles.iconCircle}>
+        <Text style={styles.iconText}>✓</Text>
       </View>
+      <Text style={[styles.title, { color: theme.onSurface }]}>{title}</Text>
+      <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>{description}</Text>
+      {actionLabel && onAction && (
+        <Button label={actionLabel} onPress={onAction} variant="secondary" style={styles.button} />
+      )}
     </View>
   );
 }
@@ -42,39 +37,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 40,
   },
-  card: {
-    width: '100%',
-    padding: 28,
-    borderWidth: 2,
-    borderRadius: 2,
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary50,
+    borderWidth: 1.5,
+    borderColor: Colors.primary100,
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  dot: {
-    width: 32,
-    height: 32,
-    borderRadius: 2,
-    backgroundColor: Colors.primary100,
-    borderWidth: 2,
-    borderColor: Colors.primary300,
     marginBottom: 16,
   },
+  iconText: {
+    fontSize: 22,
+    color: Colors.primary500,
+    fontWeight: '700',
+  },
   title: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
-    letterSpacing: 0.2,
   },
   description: {
-    fontSize: 13,
+    fontSize: 14,
     textAlign: 'center',
     maxWidth: 280,
-    lineHeight: 20,
+    lineHeight: 21,
     marginBottom: 8,
   },
   button: {
-    marginTop: 16,
+    marginTop: 20,
   },
 });
