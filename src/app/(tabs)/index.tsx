@@ -9,6 +9,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -24,7 +25,7 @@ import { useTaskStore } from '@/state/taskStore';
 import { SwipeNavigator } from '@/ui/components/SwipeNavigator';
 
 const taskRepo = new TaskRepository(db);
-const DEPTH = 4;
+
 const PRIORITY_ORDER: Record<Priority, number> = {
   URGENT: 0,
   HIGH: 1,
@@ -63,10 +64,10 @@ function groupTasks(tasks: Task[]): Section[] {
   }
 
   const sections: Section[] = [];
-  if (today.length > 0) sections.push({ title: 'TODAY', count: today.length, data: today });
+  if (today.length > 0) sections.push({ title: 'Today', count: today.length, data: today });
   if (thisWeek.length > 0)
-    sections.push({ title: 'THIS WEEK', count: thisWeek.length, data: thisWeek });
-  if (older.length > 0) sections.push({ title: 'OLDER', count: older.length, data: older });
+    sections.push({ title: 'This Week', count: thisWeek.length, data: thisWeek });
+  if (older.length > 0) sections.push({ title: 'Older', count: older.length, data: older });
   return sections;
 }
 
@@ -194,132 +195,151 @@ export default function HomeScreen(): React.JSX.Element {
 
   return (
     <SwipeNavigator tabIndex={0}>
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* Stats strip — CRED bold numeric display */}
-        <View style={styles.statsStrip}>
-          <StatItem label="PENDING" value={tasks.length} />
-          <View style={styles.statDivider} />
-          <StatItem label="URGENT" value={urgentCount} valueColor={Colors.urgentFg} />
-          <View style={styles.statDivider} />
-          <StatItem label="DONE TODAY" value={todayCount} valueColor={Colors.success} />
-
-          {/* Scan icon */}
-          <Pressable
-            onPress={() => void handleScan()}
-            style={styles.searchToggle}
-            accessibilityRole="button"
-            accessibilityLabel="Scan notifications"
-            disabled={scanning}
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
+          {/* Header */}
+          <View
+            style={[
+              styles.header,
+              { backgroundColor: theme.surface, borderBottomColor: theme.outline },
+            ]}
           >
-            {scanning ? (
-              <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
-            ) : (
-              <Text style={styles.searchIcon}>↺</Text>
-            )}
-          </Pressable>
-
-          {/* Search icon */}
-          <Pressable onPress={toggleSearch} style={styles.searchToggle} accessibilityRole="button">
-            <Text style={styles.searchIcon}>{searchVisible ? '✕' : '⌕'}</Text>
-          </Pressable>
-        </View>
-
-        {/* Search bar */}
-        {searchVisible && (
-          <View style={styles.searchBar}>
-            <TextInput
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search tasks, senders, apps…"
-              placeholderTextColor={theme.onSurfaceVariant}
-              autoFocus
-              returnKeyType="search"
-            />
-          </View>
-        )}
-
-        {/* Filter chips */}
-        <View
-          style={[
-            styles.filterRow,
-            { backgroundColor: theme.surface, borderBottomColor: theme.outline },
-          ]}
-        >
-          {FILTERS.map((f) => (
-            <FilterChip
-              key={f.value}
-              label={f.label}
-              active={activeFilter === f.value}
-              onPress={() => setActiveFilter(f.value)}
-              outlineColor={theme.outline}
-              textColor={theme.onSurfaceVariant}
-            />
-          ))}
-        </View>
-
-        {/* Task list with sections */}
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TaskCard
-              task={item}
-              onPress={handlePress}
-              onComplete={handleComplete}
-              onDelete={handleDelete}
-            />
-          )}
-          renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: theme.isDark ? Colors.primary300 : Colors.primary900 },
-                ]}
-              >
-                {section.title}
-              </Text>
-              <View
-                style={[
-                  styles.sectionBadge,
-                  { backgroundColor: theme.isDark ? Colors.primary700 : Colors.primary900 },
-                ]}
-              >
-                <Text style={styles.sectionCount}>{section.count}</Text>
+            <View style={styles.headerTop}>
+              <Text style={[styles.appTitle, { color: theme.onSurface }]}>TaskMind</Text>
+              <View style={styles.headerActions}>
+                <Pressable
+                  onPress={() => void handleScan()}
+                  style={styles.iconBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Scan notifications"
+                  disabled={scanning}
+                  hitSlop={8}
+                >
+                  {scanning ? (
+                    <ActivityIndicator size="small" color={Colors.primary500} />
+                  ) : (
+                    <Text style={[styles.iconBtnText, { color: theme.onSurfaceVariant }]}>↺</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={toggleSearch}
+                  style={styles.iconBtn}
+                  accessibilityRole="button"
+                  hitSlop={8}
+                >
+                  <Text style={[styles.iconBtnText, { color: theme.onSurfaceVariant }]}>
+                    {searchVisible ? '✕' : '⌕'}
+                  </Text>
+                </Pressable>
               </View>
             </View>
-          )}
-          contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.list}
-          ListEmptyComponent={
-            isLoading ? null : (
-              <EmptyState
-                title={searchQuery ? 'No results' : 'All clear'}
-                description={
-                  searchQuery
-                    ? 'No tasks match your search.'
-                    : 'No pending tasks. Notifications from your monitored apps will appear here automatically.'
-                }
-              />
-            )
-          }
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={() => void refetch()}
-              tintColor={Colors.primary500}
-            />
-          }
-          stickySectionHeadersEnabled={false}
-        />
 
-        {/* FAB — create task manually */}
-        <View style={[styles.fabWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.fabShadow} />
+            {/* Stats row */}
+            <View style={styles.statsRow}>
+              <StatPill label="Pending" value={tasks.length} color={Colors.primary900} />
+              <StatPill label="Urgent" value={urgentCount} color={Colors.urgentFg} />
+              <StatPill label="Done today" value={todayCount} color={Colors.success} />
+            </View>
+
+            {/* Search bar */}
+            {searchVisible && (
+              <View style={[styles.searchBar, { borderTopColor: theme.outline }]}>
+                <TextInput
+                  style={[
+                    styles.searchInput,
+                    { color: theme.onSurface, borderColor: theme.outline },
+                  ]}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search tasks, senders, apps…"
+                  placeholderTextColor={theme.onSurfaceVariant}
+                  autoFocus
+                  returnKeyType="search"
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Filter chips */}
+          <View
+            style={[
+              styles.filterRow,
+              { backgroundColor: theme.surface, borderBottomColor: theme.outline },
+            ]}
+          >
+            {FILTERS.map((f) => (
+              <Pressable
+                key={f.value}
+                style={[styles.filterChip, activeFilter === f.value && styles.filterChipActive]}
+                onPress={() => setActiveFilter(f.value)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: activeFilter === f.value }}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    { color: theme.onSurfaceVariant },
+                    activeFilter === f.value && styles.filterChipTextActive,
+                  ]}
+                >
+                  {f.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Task list */}
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TaskCard
+                task={item}
+                onPress={handlePress}
+                onComplete={handleComplete}
+                onDelete={handleDelete}
+              />
+            )}
+            renderSectionHeader={({ section }) => (
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: theme.onSurfaceVariant }]}>
+                  {section.title}
+                </Text>
+                <View style={[styles.sectionBadge, { backgroundColor: theme.surfaceVariant }]}>
+                  <Text style={[styles.sectionCount, { color: theme.onSurfaceVariant }]}>
+                    {section.count}
+                  </Text>
+                </View>
+              </View>
+            )}
+            contentContainerStyle={sections.length === 0 ? styles.emptyContainer : styles.list}
+            ListEmptyComponent={
+              isLoading ? null : (
+                <EmptyState
+                  title={searchQuery ? 'No results' : 'All clear'}
+                  description={
+                    searchQuery
+                      ? 'No tasks match your search.'
+                      : 'No pending tasks. Notifications from your monitored apps will appear here automatically.'
+                  }
+                />
+              )
+            }
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={() => void refetch()}
+                tintColor={Colors.primary500}
+              />
+            }
+            stickySectionHeadersEnabled={false}
+          />
+
+          {/* FAB */}
           <Pressable
             style={({ pressed }) => [
               styles.fab,
-              pressed && { transform: [{ translateX: DEPTH }, { translateY: DEPTH }] },
+              pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
             ]}
             onPress={() => router.push('/task/create')}
             accessibilityRole="button"
@@ -327,190 +347,185 @@ export default function HomeScreen(): React.JSX.Element {
           >
             <Text style={styles.fabIcon}>+</Text>
           </Pressable>
-        </View>
 
-        {/* DEBUG watermark */}
-        {__DEV__ && (
-          <View style={styles.debugBadge} pointerEvents="none">
-            <Text style={styles.debugText}>DEBUG</Text>
-          </View>
-        )}
-      </View>
+          {__DEV__ && (
+            <View style={styles.debugBadge} pointerEvents="none">
+              <Text style={styles.debugText}>DEV</Text>
+            </View>
+          )}
+        </View>
+      </SafeAreaView>
     </SwipeNavigator>
   );
 }
 
-function StatItem({
+function StatPill({
   label,
   value,
-  valueColor = Colors.white,
+  color,
 }: {
   label: string;
   value: number;
-  valueColor?: string;
+  color: string;
 }): React.JSX.Element {
+  const theme = useTheme();
   return (
-    <View style={styles.statItem}>
-      <Text style={[styles.statValue, { color: valueColor }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={[styles.statPill, { backgroundColor: theme.surfaceVariant }]}>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: theme.onSurfaceVariant }]}>{label}</Text>
     </View>
   );
 }
 
-function FilterChip({
-  label,
-  active,
-  onPress,
-  outlineColor,
-  textColor,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  outlineColor: string;
-  textColor: string;
-}): React.JSX.Element {
-  return (
-    <Pressable
-      style={[styles.filterChip, { borderColor: outlineColor }, active && styles.filterChipActive]}
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-    >
-      <Text
-        style={[styles.filterChipText, { color: textColor }, active && styles.filterChipTextActive]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
   container: { flex: 1 },
-  statsStrip: {
+
+  header: {
+    borderBottomWidth: 1,
+    paddingBottom: 12,
+  },
+  headerTop: {
     flexDirection: 'row',
-    backgroundColor: Colors.primary900,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
-  statItem: { flex: 1, alignItems: 'center' },
-  statDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.15)' },
-  statValue: { fontSize: 36, fontWeight: '800', color: Colors.white, lineHeight: 42 },
-  statLabel: {
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.55)',
-    marginTop: 1,
+  appTitle: {
+    fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 1.0,
+    letterSpacing: -0.3,
   },
-  searchToggle: {
-    width: 36,
-    height: 36,
+  headerActions: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  iconBtn: {
+    width: 38,
+    height: 38,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
   },
-  searchIcon: { fontSize: 22, color: 'rgba(255,255,255,0.7)' },
-  searchBar: {
-    backgroundColor: Colors.primary900,
+  iconBtnText: {
+    fontSize: 22,
+  },
+
+  statsRow: {
+    flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
+    gap: 8,
+  },
+  statPill: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+  },
+  statValue: {
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 32,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 1,
+    letterSpacing: 0.2,
+  },
+
+  searchBar: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    marginTop: 12,
   },
   searchInput: {
     height: 42,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 2,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
     paddingHorizontal: 14,
-    color: Colors.white,
     fontSize: 14,
-    fontWeight: '500',
   },
+
   filterRow: {
     flexDirection: 'row',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    gap: 8,
-    borderBottomWidth: 2,
+    gap: 6,
+    borderBottomWidth: 1,
   },
   filterChip: {
     height: 30,
     paddingHorizontal: 12,
-    borderRadius: 2,
-    borderWidth: 2,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  filterChipActive: { backgroundColor: Colors.primary900, borderColor: Colors.primary900 },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+  filterChipActive: {
+    backgroundColor: Colors.primary900,
   },
-  filterChipTextActive: { color: Colors.white },
-  list: { paddingTop: 4, paddingBottom: 100 },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: Colors.white,
+    fontWeight: '600',
+  },
+
+  list: { paddingTop: 8, paddingBottom: 100 },
   emptyContainer: { flex: 1 },
+
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 6,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 8,
     gap: 8,
   },
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.4,
   },
   sectionBadge: {
-    borderRadius: 2,
+    borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  sectionCount: { fontSize: 10, fontWeight: '800', color: Colors.white },
-  fabWrapper: {
+  sectionCount: { fontSize: 11, fontWeight: '600' },
+
+  fab: {
     position: 'absolute',
     bottom: 24,
     right: 20,
-  },
-  fabShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
-  fab: {
     width: 56,
     height: 56,
     backgroundColor: Colors.primary900,
-    borderWidth: 2,
-    borderColor: Colors.black,
-    borderRadius: 2,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: Colors.primary900,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
   },
   fabIcon: { fontSize: 28, color: Colors.white, fontWeight: '300', lineHeight: 34 },
+
   debugBadge: {
     position: 'absolute',
     bottom: 16,
     left: 16,
     backgroundColor: Colors.urgentFg,
-    borderRadius: 2,
-    borderWidth: 1.5,
-    borderColor: Colors.neoShadowUrgent,
+    borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  debugText: { color: Colors.white, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  debugText: { color: Colors.white, fontSize: 10, fontWeight: '700', letterSpacing: 1.0 },
 });

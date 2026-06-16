@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, View, StyleSheet, ActivityIndicator, type ViewStyle } from 'react-native';
+import { Pressable, Text, StyleSheet, ActivityIndicator, type ViewStyle } from 'react-native';
 import { Colors } from '../theme/colors';
 import { useTheme } from '../theme';
 
@@ -12,8 +12,6 @@ interface ButtonProps {
   disabled?: boolean;
   onPress?: () => void;
 }
-
-const DEPTH = 4;
 
 export function Button({
   variant = 'primary',
@@ -30,89 +28,71 @@ export function Button({
   const VARIANT_STYLES = {
     primary: {
       bg: Colors.primary900,
-      shadow: Colors.neoShadowDefault,
-      border: Colors.neoShadowDefault,
       text: Colors.white,
+      border: Colors.primary900,
     },
     secondary: {
       bg: theme.surface,
-      shadow: theme.primary,
-      border: theme.primary,
       text: theme.primary,
+      border: theme.primary,
     },
     destructive: {
       bg: Colors.urgentFg,
-      shadow: Colors.neoShadowUrgent,
-      border: Colors.neoShadowUrgent,
       text: Colors.white,
+      border: Colors.urgentFg,
     },
   };
 
   const v = VARIANT_STYLES[variant];
 
   return (
-    <View
-      style={[
-        styles.wrapper,
-        { paddingRight: DEPTH, paddingBottom: DEPTH },
+    <Pressable
+      onPress={isDisabled ? undefined : onPress}
+      style={({ pressed }) => [
+        styles.button,
+        { backgroundColor: v.bg, borderColor: v.border },
         fullWidth && styles.fullWidth,
+        isDisabled && styles.disabled,
+        pressed && !isDisabled && { opacity: 0.82 },
         style,
       ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled }}
     >
-      <View style={[styles.shadow, { backgroundColor: v.shadow }]} />
-
-      <Pressable
-        onPress={isDisabled ? undefined : onPress}
-        style={({ pressed }) => [
-          styles.button,
-          { backgroundColor: v.bg, borderColor: v.border },
-          isDisabled && styles.disabled,
-          pressed && !isDisabled && { transform: [{ translateX: DEPTH }, { translateY: DEPTH }] },
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled: isDisabled }}
-      >
-        {loading ? (
-          <ActivityIndicator color={v.text} size="small" />
-        ) : (
-          <Text style={[styles.label, { color: v.text }]}>{label}</Text>
-        )}
-      </Pressable>
-    </View>
+      {loading ? (
+        <ActivityIndicator color={v.text} size="small" />
+      ) : (
+        <Text style={[styles.label, { color: v.text }]}>{label}</Text>
+      )}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    position: 'relative',
-  },
-  fullWidth: {
-    alignSelf: 'stretch',
-  },
-  shadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
-  },
   button: {
-    height: 48,
+    height: 50,
     paddingHorizontal: 24,
-    borderRadius: 2,
-    borderWidth: 2,
+    borderRadius: 12,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
     minWidth: 80,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  fullWidth: {
+    alignSelf: 'stretch',
   },
   disabled: {
     opacity: 0.45,
   },
   label: {
     fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });

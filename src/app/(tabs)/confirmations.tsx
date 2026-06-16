@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable, SafeAreaView } from 'react-native';
 import { SwipeNavigator } from '@/ui/components/SwipeNavigator';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
@@ -36,7 +36,6 @@ export default function ConfirmationsScreen(): React.JSX.Element {
   const confirmMutation = useMutation({
     mutationFn: async (task: Task) => {
       await taskRepo.confirmTask(task.id);
-      // Must match the key format used by the scorer/AI readers (app::sender)
       const senderKey = buildSenderKey(task.sourceApp, task.sender ?? '');
       await senderStatsRepo.incrementConfirm(senderKey);
       const text = task.body ?? task.title;
@@ -48,8 +47,6 @@ export default function ConfirmationsScreen(): React.JSX.Element {
           // Non-fatal
         }
       }
-      // Confirmation-queue tasks are deliberately not synced at creation time —
-      // sync now that the user has accepted it.
       if (getSetting('google_tasks_enabled') && !task.googleTaskId) {
         const notesLines: string[] = [`Source: ${appDisplayName(task.sourceApp)}`];
         if (task.body) notesLines.push(`\nContext:\n${task.body.slice(0, 500)}`);
@@ -87,8 +84,6 @@ export default function ConfirmationsScreen(): React.JSX.Element {
 
   const rejectMutation = useMutation({
     mutationFn: async (task: Task) => {
-      // Carry the notification key into the discard log so a sticky/re-posted
-      // notification can't recreate the task the user just rejected.
       await discardedRepo.insert({
         notificationId: task.id,
         notificationKey: task.notificationKey,
@@ -125,39 +120,51 @@ export default function ConfirmationsScreen(): React.JSX.Element {
 
   return (
     <SwipeNavigator tabIndex={1}>
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {tasks.length > 0 && (
-          <View style={styles.header}>
-            <Text style={styles.headerText}>
-              {tasks.length} notification{tasks.length !== 1 ? 's' : ''} need your input
-            </Text>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
+          {/* Header */}
+          <View
+            style={[
+              styles.header,
+              { backgroundColor: theme.surface, borderBottomColor: theme.outline },
+            ]}
+          >
+            <Text style={[styles.headerTitle, { color: theme.onSurface }]}>Review</Text>
+            {tasks.length > 0 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{tasks.length}</Text>
+              </View>
+            )}
           </View>
-        )}
 
-        <FlatList
-          data={tasks}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ConfirmationCard
-              task={item}
-              onConfirm={(t) => confirmMutation.mutate(t)}
-              onReject={(t) => rejectMutation.mutate(t)}
-              surfaceColor={theme.surface}
-              onSurfaceColor={theme.onSurface}
-              onSurfaceVariantColor={theme.onSurfaceVariant}
-            />
+          {tasks.length > 0 && (
+            <Text style={[styles.subtitle, { color: theme.onSurfaceVariant }]}>
+              {tasks.length} notification{tasks.length !== 1 ? 's' : ''} waiting for your input
+            </Text>
           )}
-          contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
-          ListEmptyComponent={
-            isLoading ? null : (
-              <EmptyState
-                title="Nothing to confirm"
-                description="Notifications that need your input will appear here. High-confidence tasks are added automatically."
+
+          <FlatList
+            data={tasks}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ConfirmationCard
+                task={item}
+                onConfirm={(t) => confirmMutation.mutate(t)}
+                onReject={(t) => rejectMutation.mutate(t)}
               />
-            )
-          }
-        />
-      </View>
+            )}
+            contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
+            ListEmptyComponent={
+              isLoading ? null : (
+                <EmptyState
+                  title="Nothing to review"
+                  description="Notifications that need your input will appear here. High-confidence tasks are added automatically."
+                />
+              )
+            }
+          />
+        </View>
+      </SafeAreaView>
     </SwipeNavigator>
   );
 }
@@ -166,203 +173,200 @@ function ConfirmationCard({
   task,
   onConfirm,
   onReject,
-  surfaceColor,
-  onSurfaceColor,
-  onSurfaceVariantColor,
 }: {
   task: Task;
   onConfirm: (task: Task) => void;
   onReject: (task: Task) => void;
-  surfaceColor: string;
-  onSurfaceColor: string;
-  onSurfaceVariantColor: string;
 }): React.JSX.Element {
+  const theme = useTheme();
   const priorityColor = getPriorityColor(task.priority);
-  const DEPTH = 4;
+  const confidencePct = Math.round(task.confidence * 100);
+  const sourceLabel = task.sourceApp.split('.').pop() ?? task.sourceApp;
 
   return (
-    <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-      <View style={[styles.cardShadow, { backgroundColor: priorityColor }]} />
-      <View style={[styles.card, { borderColor: priorityColor, backgroundColor: surfaceColor }]}>
-        <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
-        <View style={styles.cardContent}>
-          <Text style={[styles.taskText, { color: onSurfaceColor }]}>{task.title}</Text>
-          {task.body != null && task.body !== task.title && (
-            <Text style={[styles.taskBody, { color: onSurfaceVariantColor }]} numberOfLines={3}>
-              {task.body}
-            </Text>
-          )}
-          <View style={styles.metaRow}>
-            <Text style={[styles.sourceMeta, { color: onSurfaceVariantColor }]}>
-              {task.sender ? `${task.sender} · ` : ''}
-              {task.sourceApp.split('.').pop() ?? task.sourceApp}
-            </Text>
-            <Text style={[styles.confidence, { color: onSurfaceVariantColor }]}>
-              {Math.round(task.confidence * 100)}% conf
-            </Text>
+    <View style={[styles.card, { backgroundColor: theme.surface }]}>
+      {/* Priority accent */}
+      <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
+
+      <View style={styles.cardContent}>
+        {/* Source + confidence */}
+        <View style={styles.cardMeta}>
+          <Text style={[styles.sourceMeta, { color: theme.onSurfaceVariant }]}>
+            {task.sender ? `${task.sender} · ` : ''}
+            {sourceLabel}
+          </Text>
+          <View
+            style={[
+              styles.confidencePill,
+              { borderColor: priorityColor + '40', backgroundColor: priorityColor + '12' },
+            ]}
+          >
+            <Text style={[styles.confidenceText, { color: priorityColor }]}>{confidencePct}%</Text>
           </View>
-          <View style={styles.buttonRow}>
-            <NeoButton
-              label="Add task"
-              onPress={() => onConfirm(task)}
-              bgColor={Colors.primary900}
-              shadowColor={Colors.black}
-              textColor={Colors.white}
-              style={styles.confirmButton}
-            />
-            <NeoButton
-              label="Skip"
-              onPress={() => onReject(task)}
-              bgColor={Colors.urgentFg}
-              shadowColor="#8B1C1C"
-              textColor={Colors.white}
-              style={styles.rejectButton}
-            />
-          </View>
+        </View>
+
+        {/* Title */}
+        <Text style={[styles.taskTitle, { color: theme.onSurface }]}>{task.title}</Text>
+
+        {/* Body preview */}
+        {task.body != null && task.body !== task.title && (
+          <Text style={[styles.taskBody, { color: theme.onSurfaceVariant }]} numberOfLines={2}>
+            {task.body}
+          </Text>
+        )}
+
+        {/* Action buttons */}
+        <View style={styles.buttonRow}>
+          <Pressable
+            onPress={() => onConfirm(task)}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              styles.confirmBtn,
+              pressed && { opacity: 0.82 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Add as task"
+          >
+            <Text style={styles.confirmBtnText}>Add task</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => onReject(task)}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              styles.rejectBtn,
+              { borderColor: theme.outline },
+              pressed && { opacity: 0.82 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Skip notification"
+          >
+            <Text style={[styles.rejectBtnText, { color: theme.onSurfaceVariant }]}>Skip</Text>
+          </Pressable>
         </View>
       </View>
     </View>
   );
 }
 
-function NeoButton({
-  label,
-  onPress,
-  bgColor,
-  shadowColor,
-  textColor,
-  style,
-}: {
-  label: string;
-  onPress: () => void;
-  bgColor: string;
-  shadowColor: string;
-  textColor: string;
-  style?: object;
-}): React.JSX.Element {
-  const DEPTH = 3;
-  return (
-    <View style={[styles.neoButtonWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }, style]}>
-      <View style={[styles.neoButtonShadow, { backgroundColor: shadowColor }]} />
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.neoButton,
-          { backgroundColor: bgColor, borderColor: shadowColor },
-          pressed && { transform: [{ translateX: DEPTH }, { translateY: DEPTH }] },
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-      >
-        <Text style={[styles.neoButtonText, { color: textColor }]}>{label}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
+  container: { flex: 1 },
+
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    gap: 10,
   },
-  headerText: {
-    fontSize: 13,
-    color: Colors.white,
+  headerTitle: {
+    fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: -0.3,
   },
-  list: {
-    paddingVertical: 8,
+  countBadge: {
+    backgroundColor: Colors.urgentFg,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
   },
-  emptyContainer: {
-    flex: 1,
+  countBadgeText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
-  cardWrapper: {
-    marginHorizontal: 16,
-    marginVertical: 6,
-    position: 'relative',
+  subtitle: {
+    fontSize: 13,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
-  cardShadow: {
-    position: 'absolute',
-    top: 4,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
-  },
+
+  list: { paddingTop: 4, paddingBottom: 24 },
+  emptyContainer: { flex: 1 },
+
   card: {
     flexDirection: 'row',
-    borderWidth: 2,
-    borderRadius: 2,
+    marginHorizontal: 16,
+    marginVertical: 6,
+    borderRadius: 14,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    elevation: 2,
   },
   priorityBar: {
     width: 4,
+    alignSelf: 'stretch',
   },
   cardContent: {
     flex: 1,
     padding: 14,
   },
-  taskText: {
+  cardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sourceMeta: {
+    fontSize: 12,
+    flex: 1,
+  },
+  confidencePill: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  confidenceText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  taskTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 21,
-    marginBottom: 4,
+    fontWeight: '600',
+    lineHeight: 22,
+    marginBottom: 6,
   },
   taskBody: {
     fontSize: 13,
     lineHeight: 19,
-    marginBottom: 8,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 12,
-  },
-  sourceMeta: {
-    fontSize: 12,
-  },
-  confidence: {
-    fontSize: 12,
-    fontStyle: 'italic',
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
+    marginTop: 4,
   },
-  confirmButton: {
+  actionBtn: {
     flex: 1,
-  },
-  rejectButton: {
-    flex: 1,
-  },
-  neoButtonWrapper: {
-    position: 'relative',
-  },
-  neoButtonShadow: {
-    position: 'absolute',
-    top: 3,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
-  },
-  neoButton: {
     height: 40,
-    borderWidth: 2,
-    borderRadius: 2,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  neoButtonText: {
+  confirmBtn: {
+    backgroundColor: Colors.primary900,
+  },
+  confirmBtnText: {
+    color: Colors.white,
     fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '600',
+  },
+  rejectBtn: {
+    borderWidth: 1.5,
+    backgroundColor: 'transparent',
+  },
+  rejectBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

@@ -10,10 +10,10 @@ interface PriorityChipProps {
 }
 
 const LABELS: Record<Priority, string> = {
-  URGENT: 'URGENT',
-  HIGH: 'HIGH',
-  MEDIUM: 'MED',
-  LOW: 'LOW',
+  URGENT: 'Urgent',
+  HIGH: 'High',
+  MEDIUM: 'Med',
+  LOW: 'Low',
 };
 
 export function PriorityChip({
@@ -35,10 +35,11 @@ export function PriorityChip({
       style={[
         styles.chip,
         variant === 'filled'
-          ? { backgroundColor: bgColor, borderColor: color }
-          : { borderColor: color, backgroundColor: 'transparent' },
+          ? { backgroundColor: bgColor }
+          : { borderWidth: 1, borderColor: color, backgroundColor: 'transparent' },
       ]}
     >
+      <View style={[styles.dot, { backgroundColor: color }]} />
       <Text style={[styles.label, { color }]}>{LABELS[priority]}</Text>
     </View>
   );
@@ -46,16 +47,22 @@ export function PriorityChip({
 
 const styles = StyleSheet.create({
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     height: 22,
     paddingHorizontal: 8,
-    borderRadius: 2,
-    borderWidth: 1.5,
+    borderRadius: 6,
     justifyContent: 'center',
-    alignItems: 'center',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   label: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.6,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.1,
   },
 });
