@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -78,6 +78,13 @@ export default function HomeScreen(): React.JSX.Element {
   const [searchVisible, setSearchVisible] = useState(false);
   const [scanning, setScanning] = useState(false);
   const theme = useTheme();
+
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const {
     data: tasks = [],
@@ -171,11 +178,17 @@ export default function HomeScreen(): React.JSX.Element {
     try {
       await NotificationListener.scanActiveNotifications();
       await new Promise((r) => setTimeout(r, 1200));
+      if (!mountedRef.current) return;
       await refetch();
     } catch {
-      Alert.alert('Scan failed', 'Could not scan notifications. Make sure the service is running.');
+      if (mountedRef.current) {
+        Alert.alert(
+          'Scan failed',
+          'Could not scan notifications. Make sure the service is running.'
+        );
+      }
     } finally {
-      setScanning(false);
+      if (mountedRef.current) setScanning(false);
     }
   };
 

@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { db, initializeDatabase } from '@/data/db/client';
 import { seedKeywords, monitoredApps, senderStats } from '@/data/db/schema';
 import { getSetting, setSetting } from '@/data/storage/settings';
@@ -83,12 +84,19 @@ export async function seedDatabaseIfNeeded(): Promise<void> {
   }
 
   for (const app of DEFAULT_MONITORED_APPS) {
-    await db.insert(monitoredApps).values({
-      packageName: app.packageName,
-      displayName: app.displayName,
-      isActive: true,
-      createdAt: now,
-    });
+    const existing = await db
+      .select()
+      .from(monitoredApps)
+      .where(eq(monitoredApps.packageName, app.packageName))
+      .limit(1);
+    if (existing.length === 0) {
+      await db.insert(monitoredApps).values({
+        packageName: app.packageName,
+        displayName: app.displayName,
+        isActive: true,
+        createdAt: now,
+      });
+    }
   }
 
   for (const s of SEED_SENDER_STATS) {

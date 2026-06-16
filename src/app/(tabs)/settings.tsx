@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -45,10 +45,6 @@ export default function SettingsScreen(): React.JSX.Element {
       setPermissionStatus('unknown');
     }
   }, []);
-
-  useEffect(() => {
-    void checkPermission();
-  }, [checkPermission]);
 
   useFocusEffect(
     useCallback(() => {
@@ -177,8 +173,13 @@ export default function SettingsScreen(): React.JSX.Element {
             onPress={() => void router.push('/settings/google-tasks')}
           />
           <NavRow
-            label="Call Transcription"
-            subtitle="Auto-extract tasks from call recordings"
+            label="In-App Call Transcription"
+            subtitle="On-device, no Termux or MacroDroid needed"
+            onPress={() => void router.push('/settings/in-app-transcription')}
+          />
+          <NavRow
+            label="Call Transcription (legacy)"
+            subtitle="Termux + MacroDroid setup guide"
             onPress={() => void router.push('/settings/call-transcription')}
           />
         </Section>

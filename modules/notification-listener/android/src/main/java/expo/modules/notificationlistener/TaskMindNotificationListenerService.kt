@@ -225,11 +225,20 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
             .extractMessagingStyleFromNotification(sbn.notification)
             ?: return emptyList()
 
+        val userPerson = style.user
         return style.messages
             .takeLast(MAX_THREAD_MESSAGES)
             .map { message ->
+                // The user's own outgoing replies share the conversation's "user" Person
+                // (and often have no/empty sender name) — tag them explicitly so the AI
+                // extractor can tell self-authored messages apart from the contact's.
+                val isSelf = message.person != null && message.person == userPerson
+                val senderName = when {
+                    isSelf -> "You"
+                    else -> message.person?.name?.toString() ?: ""
+                }
                 mapOf(
-                    "sender" to (message.person?.name?.toString() ?: ""),
+                    "sender" to senderName,
                     "text" to (message.text?.toString() ?: ""),
                     "timestamp" to message.timestamp
                 )

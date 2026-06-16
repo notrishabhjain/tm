@@ -150,6 +150,7 @@ export default function TranscriptImportScreen(): React.JSX.Element {
         });
       }
       const target = selected.some((c) => c.score < 0.75) ? '/(tabs)/confirmations' : '/(tabs)';
+      setSaving(false);
       Alert.alert(
         'Tasks saved',
         `${selected.length} task${selected.length !== 1 ? 's' : ''} created.`,

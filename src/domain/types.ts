@@ -61,13 +61,6 @@ export interface ExtractionResult {
   discardReason?: DiscardReason;
 }
 
-export interface PersistentNotificationParams {
-  pendingCount: number;
-  urgentCount: number;
-  topTaskText: string;
-  secondTaskText: string | null;
-}
-
 export interface VipContact {
   id: string;
   identifier: string;

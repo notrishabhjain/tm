@@ -118,7 +118,7 @@ function buildUserMessage(notification: NotificationData, senderCtx?: SenderCont
 
   // Sender history hint
   if (senderCtx) {
-    const total = senderCtx.confirmCount + senderCtx.rejectCount;
+    const total = senderCtx.confirmCount + senderCtx.rejectCount + senderCtx.autoAcceptCount;
     if (total >= 3) {
       const rejectRate = Math.round((senderCtx.rejectCount / total) * 100);
       const confirmRate = 100 - rejectRate;

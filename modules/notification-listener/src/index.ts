@@ -5,4 +5,6 @@ export type {
   PermissionStatus,
   NotificationEvent,
   FocusState,
+  CallTranscriptionStatus,
+  CallTranscriptReadyEvent,
 } from './types';

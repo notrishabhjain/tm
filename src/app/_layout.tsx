@@ -178,6 +178,22 @@ export default function RootLayout(): React.JSX.Element {
     return () => sub.remove();
   }, []);
 
+  // In-app call transcription: the native CallTranscriptionService emits
+  // this once whisper.cpp finishes transcribing the latest call recording —
+  // no Termux/MacroDroid hand-off needed. Routes to the same review screen.
+  useEffect(() => {
+    const sub = NotificationListener.addCallTranscriptReadyListener((data) => {
+      stashCallTranscript({
+        text: data.text,
+        callTime: data.callTime,
+        callerLabel: data.callerLabel,
+      });
+      router.push('/call-transcript');
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Persistent notification "Done ✓" quick action — complete the top pending task.
   useEffect(() => {
     const sub = NotificationListener.addQuickActionDoneTopListener(() => {

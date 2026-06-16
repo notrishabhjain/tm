@@ -4,7 +4,14 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.provider.Settings
+import androidx.core.content.ContextCompat
+import expo.modules.interfaces.permissions.Permissions
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import org.json.JSONObject
@@ -17,7 +24,14 @@ class NotificationListenerModule : Module() {
     override fun definition() = ModuleDefinition {
         Name("NotificationListener")
 
-        Events("onNotification", "onQuickActionDoneTop", "onQuickActionOpen", "onManualTrigger")
+        Events(
+            "onNotification",
+            "onQuickActionDoneTop",
+            "onQuickActionOpen",
+            "onManualTrigger",
+            "onCallTranscriptReady",
+            "onModelDownloadProgress"
+        )
 
         OnCreate {
             instance = this@NotificationListenerModule
@@ -223,7 +237,80 @@ class NotificationListenerModule : Module() {
             } catch (_: Exception) {
             }
         }
+
+        // ── In-app call transcription (replaces Termux + MacroDroid) ───────────
+
+        AsyncFunction("getCallTranscriptionStatus") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            mapOf(
+                "enabled" to prefs.getBoolean("call_transcription_enabled", false),
+                "hasPhoneStatePermission" to hasPermission(android.Manifest.permission.READ_PHONE_STATE),
+                "hasCallLogPermission" to hasPermission(android.Manifest.permission.READ_CALL_LOG),
+                "hasAllFilesAccess" to hasAllFilesAccess(),
+                "modelDownloaded" to WhisperModelManager.isModelDownloaded(context),
+                "engineBuilt" to (WhisperJNI.ensureLoaded() && WhisperJNI.isReal()),
+                "modelName" to WhisperModelManager.MODEL_FILENAME,
+            )
+        }
+
+        AsyncFunction("setCallTranscriptionEnabled") { enabled: Boolean ->
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("call_transcription_enabled", enabled).apply()
+        }
+
+        AsyncFunction("setCallRecordingsDir") { dir: String? ->
+            CallRecordingFinder.setCustomDir(context, dir?.takeIf { it.isNotBlank() })
+        }
+
+        AsyncFunction("requestCallTranscriptionPermissions") { promise: Promise ->
+            Permissions.askForPermissionsWithPermissionsManager(
+                appContext.permissions,
+                promise,
+                android.Manifest.permission.READ_PHONE_STATE,
+                android.Manifest.permission.READ_CALL_LOG
+            )
+        }
+
+        AsyncFunction("openAllFilesAccessSettings") {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    val intent = Intent(
+                        Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        Uri.parse("package:${context.packageName}")
+                    ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                    context.startActivity(intent)
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        AsyncFunction("downloadWhisperModel") { promise: Promise ->
+            Thread {
+                try {
+                    WhisperModelManager.downloadModel(context) { pct ->
+                        instance?.sendEvent("onModelDownloadProgress", mapOf("progress" to pct))
+                    }
+                    promise.resolve(true)
+                } catch (e: Exception) {
+                    promise.reject("download_failed", e.message ?: "Download failed", e)
+                }
+            }.start()
+        }
+
+        AsyncFunction("deleteWhisperModel") {
+            WhisperModelManager.deleteModel(context)
+        }
     }
+
+    private fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    private fun hasAllFilesAccess(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            hasPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
 
     private fun isAccessibilityEnabled(): Boolean {
         val cn = ComponentName(context, TaskMindAccessibilityService::class.java)
@@ -284,6 +371,17 @@ class NotificationListenerModule : Module() {
                     "extractedText" to extractedText,
                     "sender" to sender,
                     "screenshotPath" to (screenshotPath ?: ""),
+                )
+            )
+        }
+
+        fun sendCallTranscriptReady(text: String, callTimeMs: Long, callerLabel: String) {
+            instance?.sendEvent(
+                "onCallTranscriptReady",
+                mapOf(
+                    "text" to text,
+                    "callTime" to callTimeMs.toDouble(),
+                    "callerLabel" to callerLabel,
                 )
             )
         }

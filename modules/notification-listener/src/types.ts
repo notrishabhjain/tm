@@ -41,3 +41,19 @@ export interface FocusState {
 }
 
 export type NotificationEvent = 'onNotification' | 'onQuickActionDoneTop' | 'onQuickActionOpen';
+
+export interface CallTranscriptionStatus {
+  enabled: boolean;
+  hasPhoneStatePermission: boolean;
+  hasCallLogPermission: boolean;
+  hasAllFilesAccess: boolean;
+  modelDownloaded: boolean;
+  engineBuilt: boolean;
+  modelName: string;
+}
+
+export interface CallTranscriptReadyEvent {
+  text: string;
+  callTime: number;
+  callerLabel: string;
+}
