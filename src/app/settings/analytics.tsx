@@ -1,15 +1,15 @@
 import React, { useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { gt, sql, eq } from 'drizzle-orm';
 import { Colors } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { db } from '@/data/db/client';
 import { trainingLog, discardedLog, tasks, senderStats, learnedKeywords } from '@/data/db/schema';
 
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-const DEPTH = 4;
 
 async function fetchDecisionStats() {
   const cutoff = Date.now() - SEVEN_DAYS;
@@ -134,24 +134,18 @@ export default function AnalyticsScreen(): React.JSX.Element {
   }, [feedback]);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Analytics</Text>
-        <View style={{ width: 56 }} />
-      </View>
+    <Screen>
+      <LargeHeader title="Analytics" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* ── 7-day summary ── */}
-        <Text style={[styles.sectionLabel, { color: theme.primary }]}>LAST 7 DAYS</Text>
+        <Text style={[styles.sectionLabel, { color: theme.onSurfaceVariant }]}>Last 7 days</Text>
         <View style={styles.statsGrid}>
-          <NeoStatCard label="PROCESSED" value={String(total)} />
-          <NeoStatCard label="AUTO-CREATED" value={total > 0 ? `${autoCreatePct}%` : '—'} />
-          <NeoStatCard label="DISCARDED" value={total > 0 ? `${discardPct}%` : '—'} />
-          <NeoStatCard
-            label="PRECISION"
+          <StatCard label="Processed" value={String(total)} />
+          <StatCard label="Auto-created" value={total > 0 ? `${autoCreatePct}%` : '—'} />
+          <StatCard label="Discarded" value={total > 0 ? `${discardPct}%` : '—'} />
+          <StatCard
+            label="Precision"
             value={precision !== null ? `${precision}%` : '—'}
             hint="confirm inbox"
           />
@@ -160,24 +154,24 @@ export default function AnalyticsScreen(): React.JSX.Element {
         {/* ── Decision breakdown ── */}
         {total > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
-              DECISION BREAKDOWN
+            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.onSurfaceVariant }]}>
+              Decision breakdown
             </Text>
-            <NeoCard>
-              <BreakdownBar label="AUTO-CREATE" pct={autoCreatePct} color={Colors.success} />
-              <BreakdownBar label="CONFIRM" pct={confirmPct} color={Colors.highFg} />
-              <BreakdownBar label="DISCARD" pct={discardPct} color={theme.onSurfaceVariant} />
-            </NeoCard>
+            <Card>
+              <BreakdownBar label="Auto-create" pct={autoCreatePct} color={Colors.success} />
+              <BreakdownBar label="Confirm" pct={confirmPct} color={Colors.highFg} />
+              <BreakdownBar label="Discard" pct={discardPct} color={theme.onSurfaceVariant} />
+            </Card>
           </>
         )}
 
         {/* ── User feedback ── */}
         {(feedback?.confirmed ?? 0) + (feedback?.rejected ?? 0) > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
-              USER FEEDBACK
+            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.onSurfaceVariant }]}>
+              User feedback
             </Text>
-            <NeoCard>
+            <Card>
               <FeedbackRow
                 label="Confirmed"
                 value={feedback?.confirmed ?? 0}
@@ -193,17 +187,17 @@ export default function AnalyticsScreen(): React.JSX.Element {
                 value={feedback?.completed ?? 0}
                 color={Colors.primary500}
               />
-            </NeoCard>
+            </Card>
           </>
         )}
 
         {/* ── Discard reasons ── */}
         {discardReasons.length > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
-              DISCARD REASONS
+            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.onSurfaceVariant }]}>
+              Discard reasons
             </Text>
-            <NeoCard>
+            <Card>
               {discardReasons.map((r: { reason: string; count: number }, i: number) => (
                 <FeedbackRow
                   key={r.reason}
@@ -213,17 +207,17 @@ export default function AnalyticsScreen(): React.JSX.Element {
                   border={i > 0}
                 />
               ))}
-            </NeoCard>
+            </Card>
           </>
         )}
 
         {/* ── Sender trust tiers ── */}
         {tiers.length > 0 && (
           <>
-            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
-              SENDER TRUST TIERS
+            <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.onSurfaceVariant }]}>
+              Sender trust tiers
             </Text>
-            <NeoCard>
+            <Card>
               {tiers.map((t: { tier: string; count: number }, i: number) => (
                 <FeedbackRow
                   key={t.tier}
@@ -233,17 +227,17 @@ export default function AnalyticsScreen(): React.JSX.Element {
                   border={i > 0}
                 />
               ))}
-            </NeoCard>
+            </Card>
           </>
         )}
 
         {/* ── Vocabulary ── */}
-        <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.primary }]}>
-          LEARNED VOCABULARY
+        <Text style={[styles.sectionLabel, { marginTop: 20, color: theme.onSurfaceVariant }]}>
+          Learned vocabulary
         </Text>
-        <NeoCard>
+        <Card>
           <FeedbackRow label="Active n-grams" value={vocabSize} color={Colors.success} />
-        </NeoCard>
+        </Card>
 
         {/* Empty state */}
         {total === 0 && (
@@ -261,21 +255,20 @@ export default function AnalyticsScreen(): React.JSX.Element {
           </View>
         )}
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
-function NeoCard({ children }: { children: React.ReactNode }): React.JSX.Element {
+function Card({ children }: { children: React.ReactNode }): React.JSX.Element {
   const theme = useTheme();
   return (
-    <View style={[styles.neoCardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-      <View style={styles.neoCardShadow} />
-      <View style={[styles.neoCard, { backgroundColor: theme.surface }]}>{children}</View>
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+      {children}
     </View>
   );
 }
 
-function NeoStatCard({
+function StatCard({
   label,
   value,
   hint,
@@ -286,13 +279,10 @@ function NeoStatCard({
 }): React.JSX.Element {
   const theme = useTheme();
   return (
-    <View style={[styles.statWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-      <View style={styles.statShadow} />
-      <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
-        <Text style={[styles.statValue, { color: theme.onSurface }]}>{value}</Text>
-        <Text style={[styles.statLabel, { color: theme.onSurfaceVariant }]}>{label}</Text>
-        {hint && <Text style={[styles.statHint, { color: theme.onSurfaceVariant }]}>{hint}</Text>}
-      </View>
+    <View style={[styles.statCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+      <Text style={[styles.statValue, { color: theme.onSurface }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: theme.onSurfaceVariant }]}>{label}</Text>
+      {hint && <Text style={[styles.statHint, { color: theme.onSurfaceVariant }]}>{hint}</Text>}
     </View>
   );
 }
@@ -336,7 +326,12 @@ function FeedbackRow({
     <View
       style={[
         styles.feedbackRow,
-        border && { borderTopWidth: 1, borderTopColor: theme.outline, paddingTop: 8, marginTop: 4 },
+        border && {
+          borderTopWidth: 0.5,
+          borderTopColor: theme.outline,
+          paddingTop: 8,
+          marginTop: 4,
+        },
       ]}
     >
       <Text style={[styles.feedbackLabel, { color: theme.onSurface }]}>{label}</Text>
@@ -346,87 +341,49 @@ function FeedbackRow({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
-  },
-  backBtn: { padding: 4, minWidth: 56 },
-  backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
-  title: { fontSize: 17, fontWeight: '800', color: Colors.white, letterSpacing: 0.3 },
   content: { padding: 16, paddingBottom: 40 },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    fontSize: 13,
+    fontWeight: '600',
     marginBottom: 8,
-    textTransform: 'uppercase',
   },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  statWrapper: { width: '47%', position: 'relative' },
-  statShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
   statCard: {
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
-    padding: 12,
+    width: '47%',
+    borderWidth: 0.5,
+    borderRadius: 16,
+    padding: 16,
     alignItems: 'center',
   },
-  statValue: { fontSize: 22, fontWeight: '800' },
+  statValue: { fontSize: 24, fontWeight: '700' },
   statLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 4,
     textAlign: 'center',
-    letterSpacing: 0.6,
   },
-  statHint: { fontSize: 9, marginTop: 1, textAlign: 'center' },
-  neoCardWrapper: { position: 'relative', marginBottom: 4 },
-  neoCardShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
-  neoCard: {
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
-    padding: 14,
+  statHint: { fontSize: 10, marginTop: 1, textAlign: 'center' },
+  card: {
+    borderWidth: 0.5,
+    borderRadius: 16,
+    padding: 16,
     gap: 10,
+    marginBottom: 4,
   },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   breakdownLabel: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '500',
     width: 88,
-    letterSpacing: 0.4,
   },
   breakdownTrack: {
     flex: 1,
     height: 6,
-    borderRadius: 1,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   breakdownFill: { height: '100%' },
-  breakdownPct: { fontSize: 12, fontWeight: '700', width: 36, textAlign: 'right' },
+  breakdownPct: { fontSize: 12, fontWeight: '600', width: 36, textAlign: 'right' },
   feedbackRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -434,15 +391,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   feedbackLabel: { fontSize: 13, fontWeight: '500' },
-  feedbackValue: { fontSize: 16, fontWeight: '800' },
+  feedbackValue: { fontSize: 16, fontWeight: '700' },
   emptyState: {
     marginTop: 32,
     padding: 24,
-    borderWidth: 2,
-    borderRadius: 2,
+    borderWidth: 0.5,
+    borderRadius: 16,
     alignItems: 'center',
   },
-  emptyTitle: { fontSize: 15, fontWeight: '700', marginBottom: 8 },
+  emptyTitle: { fontSize: 15, fontWeight: '600', marginBottom: 8 },
   emptyDesc: {
     fontSize: 13,
     textAlign: 'center',

@@ -174,7 +174,12 @@ export default function TaskDetailScreen(): React.JSX.Element {
               theme={theme}
             />
           )}
-          <InfoRow label="Confidence" value={`${Math.round(task.confidence * 100)}%`} last theme={theme} />
+          <InfoRow
+            label="Confidence"
+            value={`${Math.round(task.confidence * 100)}%`}
+            last
+            theme={theme}
+          />
         </View>
 
         {/* Calendar button */}
@@ -211,9 +216,7 @@ export default function TaskDetailScreen(): React.JSX.Element {
             <Text style={[styles.originalLabel, { color: theme.onSurfaceVariant }]}>
               Original message
             </Text>
-            <View
-              style={[styles.messageCard, { backgroundColor: theme.surfaceVariant }]}
-            >
+            <View style={[styles.messageCard, { backgroundColor: theme.surfaceVariant }]}>
               <Text style={[styles.originalText, { color: theme.onSurface }]} selectable>
                 {task.body}
               </Text>
@@ -223,7 +226,12 @@ export default function TaskDetailScreen(): React.JSX.Element {
       </ScrollView>
 
       {/* Action bar */}
-      <View style={[styles.actionBar, { borderTopColor: theme.outline, backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.actionBar,
+          { borderTopColor: theme.outline, backgroundColor: theme.background },
+        ]}
+      >
         <Button
           label="Mark complete"
           variant="primary"
@@ -257,7 +265,10 @@ function InfoRow({
 }): React.JSX.Element {
   return (
     <View
-      style={[styles.infoRow, !last && { borderBottomWidth: 0.5, borderBottomColor: theme.outline }]}
+      style={[
+        styles.infoRow,
+        !last && { borderBottomWidth: 0.5, borderBottomColor: theme.outline },
+      ]}
     >
       <Text style={[styles.infoLabel, { color: theme.onSurfaceVariant }]}>{label}</Text>
       <Text style={[styles.infoValue, { color: theme.onSurface }]}>{value}</Text>

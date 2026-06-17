@@ -75,10 +75,15 @@ export default function CreateTaskScreen(): React.JSX.Element {
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {/* Title input */}
-          <Text style={[styles.label, { color: theme.onSurfaceVariant }]}>What needs to be done</Text>
+          <Text style={[styles.label, { color: theme.onSurfaceVariant }]}>
+            What needs to be done
+          </Text>
           <TextInput
             ref={inputRef}
-            style={[styles.titleInput, { backgroundColor: theme.surfaceVariant, color: theme.onSurface }]}
+            style={[
+              styles.titleInput,
+              { backgroundColor: theme.surfaceVariant, color: theme.onSurface },
+            ]}
             value={title}
             onChangeText={setTitle}
             placeholder="Describe the task clearly…"
@@ -90,7 +95,9 @@ export default function CreateTaskScreen(): React.JSX.Element {
           />
 
           {/* Priority selector */}
-          <Text style={[styles.label, { color: theme.onSurfaceVariant, marginTop: 24 }]}>Priority</Text>
+          <Text style={[styles.label, { color: theme.onSurfaceVariant, marginTop: 24 }]}>
+            Priority
+          </Text>
           <View style={styles.priorityGrid}>
             {PRIORITIES.map((p) => {
               const color = getPriorityColor(p.value);
@@ -133,7 +140,12 @@ export default function CreateTaskScreen(): React.JSX.Element {
         </ScrollView>
 
         {/* Footer */}
-        <View style={[styles.footer, { backgroundColor: theme.background, borderTopColor: theme.outline }]}>
+        <View
+          style={[
+            styles.footer,
+            { backgroundColor: theme.background, borderTopColor: theme.outline },
+          ]}
+        >
           <Button
             label="Create task"
             variant="primary"

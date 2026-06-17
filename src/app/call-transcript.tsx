@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { PriorityChip } from '@/ui/components/PriorityChip';
 import { Button } from '@/ui/components/Button';
 import { db } from '@/data/db/client';
@@ -238,21 +239,17 @@ export default function CallTranscriptScreen(): React.JSX.Element {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: theme.surface, borderBottomColor: theme.outline },
-        ]}
-      >
-        <Text style={[styles.headerTitle, { color: theme.onSurface }]}>Call Tasks</Text>
-        {callMeta ? (
-          <Text style={[styles.callMeta, { color: theme.onSurfaceVariant }]}>{callMeta}</Text>
-        ) : null}
-        <Text style={[styles.headerSub, { color: theme.onSurfaceVariant }]}>
-          {tasks.length} item{tasks.length !== 1 ? 's' : ''} found · {selectedCount} selected
-        </Text>
-      </View>
+    <Screen>
+      <LargeHeader
+        title="Call Transcript"
+        subtitle={callMeta || undefined}
+        onBack={() => {
+          if (!saving) router.replace('/(tabs)/');
+        }}
+      />
+      <Text style={[styles.headerSub, { color: theme.onSurfaceVariant }]}>
+        {tasks.length} item{tasks.length !== 1 ? 's' : ''} found · {selectedCount} selected
+      </Text>
 
       <FlatList
         data={tasks}
@@ -277,10 +274,11 @@ export default function CallTranscriptScreen(): React.JSX.Element {
         style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.outline }]}
       >
         <Pressable
-          style={[
+          style={({ pressed }) => [
             styles.createBtn,
-            { backgroundColor: Colors.primary900 },
+            { backgroundColor: Colors.primary500 },
             (saving || selectedCount === 0) && styles.createBtnDisabled,
+            pressed && !(saving || selectedCount === 0) && { opacity: 0.7 },
           ]}
           onPress={() => void handleCreate()}
           disabled={saving || selectedCount === 0}
@@ -304,7 +302,7 @@ export default function CallTranscriptScreen(): React.JSX.Element {
           fullWidth
         />
       </View>
-    </View>
+    </Screen>
   );
 }
 
@@ -314,20 +312,21 @@ function TaskRow({ task, onToggle }: { task: TaskItem; onToggle: () => void }): 
 
   return (
     <Pressable
-      style={[
+      style={({ pressed }) => [
         styles.taskRow,
         {
           backgroundColor: theme.surface,
-          borderColor: task.selected ? Colors.primary900 : theme.outline,
+          borderColor: task.selected ? Colors.primary500 : theme.outline,
         },
+        pressed && { opacity: 0.7 },
       ]}
       onPress={onToggle}
     >
       <View
         style={[
           styles.checkbox,
-          { borderColor: task.selected ? Colors.primary900 : theme.outline },
-          task.selected && { backgroundColor: Colors.primary900 },
+          { borderColor: task.selected ? Colors.primary500 : theme.outline },
+          task.selected && { backgroundColor: Colors.primary500 },
         ]}
       >
         {task.selected && <View style={styles.checkFill} />}
@@ -380,22 +379,14 @@ const styles = StyleSheet.create({
   callMetaCentered: { fontSize: 12, textAlign: 'center' },
   doneIcon: { fontSize: 48 },
   doneText: { fontSize: 18, fontWeight: '700' },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 14,
-    borderBottomWidth: 2,
-  },
-  headerTitle: { fontSize: 20, fontWeight: '800' },
-  callMeta: { fontSize: 12, marginTop: 4 },
-  headerSub: { fontSize: 13, marginTop: 2 },
+  headerSub: { fontSize: 13, paddingHorizontal: 20, paddingBottom: 8 },
   selectAllRow: { paddingHorizontal: 16, paddingVertical: 10 },
-  selectAllText: { fontSize: 13, fontWeight: '700' },
+  selectAllText: { fontSize: 13, fontWeight: '600' },
   list: { paddingHorizontal: 12, paddingBottom: 8, gap: 8 },
   taskRow: {
     flexDirection: 'row',
-    borderRadius: 2,
-    borderWidth: 2,
+    borderRadius: 16,
+    borderWidth: 0.5,
     padding: 12,
     gap: 12,
     alignItems: 'flex-start',
@@ -403,14 +394,14 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 20,
     height: 20,
-    borderRadius: 2,
-    borderWidth: 2,
+    borderRadius: 6,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 2,
     flexShrink: 0,
   },
-  checkFill: { width: 8, height: 8, borderRadius: 1, backgroundColor: '#fff' },
+  checkFill: { width: 8, height: 8, borderRadius: 2, backgroundColor: '#fff' },
   taskContent: { flex: 1, gap: 6 },
   taskTitle: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
   taskMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
@@ -418,15 +409,15 @@ const styles = StyleSheet.create({
   theirBadge: {
     fontSize: 11,
     fontWeight: '600',
-    borderWidth: 1,
-    borderRadius: 2,
-    paddingHorizontal: 5,
+    borderWidth: 0.5,
+    borderRadius: 8,
+    paddingHorizontal: 6,
     paddingVertical: 1,
   },
   taskNotes: { fontSize: 12, lineHeight: 18 },
-  footer: { padding: 16, gap: 10, borderTopWidth: 2 },
+  footer: { padding: 16, gap: 10, borderTopWidth: 0.5 },
   createBtn: {
-    borderRadius: 2,
+    borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
