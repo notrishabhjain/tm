@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import * as Calendar from 'expo-calendar';
 import { Colors, getPriorityColor } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
 import { PriorityChip } from '@/ui/components/PriorityChip';
 import { Button } from '@/ui/components/Button';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
 
 const taskRepo = new TaskRepository(db);
-const DEPTH = 4;
 
 async function addToCalendar(
   title: string,
@@ -109,173 +110,122 @@ export default function TaskDetailScreen(): React.JSX.Element {
 
   if (isLoading) {
     return (
-      <View style={[styles.loading, { backgroundColor: theme.background }]}>
-        <Text style={[styles.loadingText, { color: theme.onSurfaceVariant }]}>Loading…</Text>
-      </View>
+      <Screen>
+        <View style={styles.loading}>
+          <Text style={[styles.loadingText, { color: theme.onSurfaceVariant }]}>Loading…</Text>
+        </View>
+      </Screen>
     );
   }
 
   if (!task) {
     return (
-      <View style={[styles.loading, { backgroundColor: theme.background }]}>
-        <Text style={[styles.loadingText, { color: theme.onSurfaceVariant }]}>
-          Task not found — it may have been deleted.
-        </Text>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-      </View>
+      <Screen>
+        <LargeHeader title="Task" onBack={() => router.back()} />
+        <View style={styles.loading}>
+          <Text style={[styles.loadingText, { color: theme.onSurfaceVariant }]}>
+            Task not found — it may have been deleted.
+          </Text>
+        </View>
+      </Screen>
     );
   }
 
   const priorityColor = getPriorityColor(task.priority);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: priorityColor }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-        <PriorityChip priority={task.priority} />
-      </View>
+    <Screen>
+      <LargeHeader
+        title="Task"
+        onBack={() => router.back()}
+        right={<PriorityChip priority={task.priority} />}
+      />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        {/* Task title */}
-        <Text style={[styles.taskTitle, { color: theme.onSurface }]} selectable>
-          {task.title}
-        </Text>
+        {/* Title with priority accent */}
+        <View style={styles.titleRow}>
+          <View style={[styles.accent, { backgroundColor: priorityColor }]} />
+          <Text style={[styles.taskTitle, { color: theme.onSurface }]} selectable>
+            {task.title}
+          </Text>
+        </View>
 
-        {/* Source info card */}
-        <View style={[styles.neoCardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={[styles.neoCardShadow, { backgroundColor: priorityColor }]} />
-          <View
-            style={[styles.neoCard, { borderColor: priorityColor, backgroundColor: theme.surface }]}
-          >
+        {/* Details card */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          <InfoRow
+            label="Source"
+            value={task.sourceApp.split('.').pop() ?? task.sourceApp}
+            theme={theme}
+          />
+          {task.sender && <InfoRow label="From" value={task.sender} theme={theme} />}
+          <InfoRow
+            label="Captured"
+            value={new Date(task.createdAt).toLocaleString('en-IN')}
+            theme={theme}
+          />
+          {task.dueDate && (
             <InfoRow
-              label="Source"
-              value={task.sourceApp.split('.').pop() ?? task.sourceApp}
-              onSurfaceColor={theme.onSurface}
-              onSurfaceVariantColor={theme.onSurfaceVariant}
-              outlineColor={theme.outline}
+              label="Due"
+              value={new Date(task.dueDate).toLocaleDateString('en-IN', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              })}
+              theme={theme}
             />
-            {task.sender && (
-              <InfoRow
-                label="From"
-                value={task.sender}
-                onSurfaceColor={theme.onSurface}
-                onSurfaceVariantColor={theme.onSurfaceVariant}
-                outlineColor={theme.outline}
-              />
-            )}
-            <InfoRow
-              label="Captured"
-              value={new Date(task.createdAt).toLocaleString('en-IN')}
-              onSurfaceColor={theme.onSurface}
-              onSurfaceVariantColor={theme.onSurfaceVariant}
-              outlineColor={theme.outline}
-            />
-            {task.dueDate && (
-              <InfoRow
-                label="Due"
-                value={new Date(task.dueDate).toLocaleDateString('en-IN', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                })}
-                onSurfaceColor={theme.onSurface}
-                onSurfaceVariantColor={theme.onSurfaceVariant}
-                outlineColor={theme.outline}
-              />
-            )}
-            <InfoRow
-              label="Confidence"
-              value={`${Math.round(task.confidence * 100)}%`}
-              last
-              onSurfaceColor={theme.onSurface}
-              onSurfaceVariantColor={theme.onSurfaceVariant}
-              outlineColor={theme.outline}
-            />
-          </View>
+          )}
+          <InfoRow label="Confidence" value={`${Math.round(task.confidence * 100)}%`} last theme={theme} />
         </View>
 
         {/* Calendar button */}
-        <View style={[styles.neoCardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View
-            style={[
-              styles.neoCardShadow,
-              { backgroundColor: calendarAdded ? Colors.neoShadowMedium : Colors.neoShadowDefault },
-            ]}
+        <Pressable
+          style={({ pressed }) => [
+            styles.calendarBtn,
+            {
+              backgroundColor: calendarAdded ? Colors.successBg : theme.surfaceVariant,
+            },
+            pressed && !calendarAdded && { opacity: 0.7 },
+          ]}
+          onPress={handleAddToCalendar}
+          disabled={calendarAdded}
+          accessibilityRole="button"
+        >
+          <Ionicons
+            name={calendarAdded ? 'checkmark-circle' : 'calendar-outline'}
+            size={18}
+            color={calendarAdded ? Colors.success : theme.onSurface}
           />
-          <Pressable
-            style={({ pressed }) => [
-              styles.calendarBtn,
-              {
-                borderColor: calendarAdded
-                  ? Colors.success
-                  : theme.isDark
-                    ? Colors.primary300
-                    : Colors.primary900,
-                backgroundColor: calendarAdded ? Colors.successBg : theme.surface,
-              },
-              pressed &&
-                !calendarAdded && {
-                  transform: [{ translateX: DEPTH }, { translateY: DEPTH }],
-                },
+          <Text
+            style={[
+              styles.calendarBtnText,
+              { color: calendarAdded ? Colors.success : theme.onSurface },
             ]}
-            onPress={handleAddToCalendar}
-            disabled={calendarAdded}
-            accessibilityRole="button"
           >
-            <Text
-              style={[
-                styles.calendarBtnText,
-                {
-                  color: calendarAdded
-                    ? Colors.success
-                    : theme.isDark
-                      ? Colors.primary300
-                      : Colors.primary900,
-                },
-              ]}
-            >
-              {calendarAdded ? 'Added to Calendar' : 'Add to Calendar'}
-            </Text>
-          </Pressable>
-        </View>
+            {calendarAdded ? 'Added to calendar' : 'Add to calendar'}
+          </Text>
+        </Pressable>
 
         {/* Original message */}
         {task.body && (
           <>
-            <Text
-              style={[
-                styles.originalLabel,
-                { color: theme.isDark ? Colors.primary300 : Colors.primary900 },
-              ]}
-            >
-              ORIGINAL MESSAGE
+            <Text style={[styles.originalLabel, { color: theme.onSurfaceVariant }]}>
+              Original message
             </Text>
-            <View style={[styles.neoCardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-              <View style={[styles.neoCardShadow, { backgroundColor: Colors.neoShadowLow }]} />
-              <View
-                style={[
-                  styles.neoCard,
-                  { borderColor: Colors.lowFg, backgroundColor: theme.surface },
-                ]}
-              >
-                <Text style={[styles.originalText, { color: theme.onSurface }]} selectable>
-                  {task.body}
-                </Text>
-              </View>
+            <View
+              style={[styles.messageCard, { backgroundColor: theme.surfaceVariant }]}
+            >
+              <Text style={[styles.originalText, { color: theme.onSurface }]} selectable>
+                {task.body}
+              </Text>
             </View>
           </>
         )}
       </ScrollView>
 
       {/* Action bar */}
-      <View style={styles.actionBar}>
+      <View style={[styles.actionBar, { borderTopColor: theme.outline, backgroundColor: theme.background }]}>
         <Button
-          label="Mark Complete"
+          label="Mark complete"
           variant="primary"
           onPress={() => completeMutation.mutate()}
           loading={completeMutation.isPending}
@@ -290,7 +240,7 @@ export default function TaskDetailScreen(): React.JSX.Element {
           fullWidth={false}
         />
       </View>
-    </View>
+    </Screen>
   );
 }
 
@@ -298,107 +248,53 @@ function InfoRow({
   label,
   value,
   last = false,
-  onSurfaceColor,
-  onSurfaceVariantColor,
-  outlineColor,
+  theme,
 }: {
   label: string;
   value: string;
   last?: boolean;
-  onSurfaceColor: string;
-  onSurfaceVariantColor: string;
-  outlineColor: string;
+  theme: ReturnType<typeof useTheme>;
 }): React.JSX.Element {
   return (
     <View
-      style={[styles.infoRow, !last && { borderBottomWidth: 1, borderBottomColor: outlineColor }]}
+      style={[styles.infoRow, !last && { borderBottomWidth: 0.5, borderBottomColor: theme.outline }]}
     >
-      <Text style={[styles.infoLabel, { color: onSurfaceVariantColor }]}>{label}</Text>
-      <Text style={[styles.infoValue, { color: onSurfaceColor }]}>{value}</Text>
+      <Text style={[styles.infoLabel, { color: theme.onSurfaceVariant }]}>{label}</Text>
+      <Text style={[styles.infoValue, { color: theme.onSurface }]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { fontSize: 15 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 4,
-  },
-  backBtn: { padding: 4 },
-  backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
+  loading: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  loadingText: { fontSize: 15, textAlign: 'center' },
   body: { flex: 1 },
-  bodyContent: { padding: 16, gap: 12, paddingBottom: 24 },
-  taskTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    lineHeight: 28,
-    marginBottom: 4,
-  },
-  neoCardWrapper: { position: 'relative' },
-  neoCardShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
-  },
-  neoCard: {
-    borderWidth: 2,
-    borderRadius: 2,
-    padding: 12,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 7,
-  },
-  infoLabel: { fontSize: 13, fontWeight: '600' },
-  infoValue: {
-    fontSize: 13,
-    flex: 1,
-    textAlign: 'right',
-    fontWeight: '500',
-  },
+  bodyContent: { paddingHorizontal: 20, gap: 16, paddingBottom: 24, paddingTop: 4 },
+
+  titleRow: { flexDirection: 'row', gap: 12 },
+  accent: { width: 4, borderRadius: 2, alignSelf: 'stretch' },
+  taskTitle: { fontSize: 22, fontWeight: '700', lineHeight: 30, flex: 1, letterSpacing: -0.3 },
+
+  card: { borderRadius: 16, borderWidth: 0.5, paddingHorizontal: 16 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 13 },
+  infoLabel: { fontSize: 14 },
+  infoValue: { fontSize: 14, flex: 1, textAlign: 'right', fontWeight: '500', marginLeft: 12 },
+
   calendarBtn: {
-    height: 48,
-    borderWidth: 2,
-    borderRadius: 2,
+    height: 50,
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  calendarBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  originalLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  originalText: {
-    fontSize: 13,
-    lineHeight: 20,
-    fontFamily: 'JetBrainsMono-Regular',
-  },
-  actionBar: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-    backgroundColor: Colors.primary900,
-    borderTopWidth: 2,
-    borderTopColor: Colors.black,
-  },
+  calendarBtnText: { fontSize: 15, fontWeight: '600' },
+
+  originalLabel: { fontSize: 13, fontWeight: '600', marginBottom: -4, marginLeft: 4 },
+  messageCard: { borderRadius: 16, padding: 16 },
+  originalText: { fontSize: 14, lineHeight: 21, fontFamily: 'JetBrainsMono-Regular' },
+
+  actionBar: { flexDirection: 'row', padding: 16, gap: 12, borderTopWidth: 0.5 },
   completeButton: { flex: 1 },
-  deleteButton: { minWidth: 110 },
+  deleteButton: { minWidth: 100 },
 });

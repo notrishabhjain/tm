@@ -12,21 +12,21 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { Colors, getPriorityColor } from '@/ui/theme/colors';
+import { getPriorityColor } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
 import type { Priority } from '@/domain/types';
 
 const taskRepo = new TaskRepository(db);
-const DEPTH = 4;
 
 const PRIORITIES: Array<{ value: Priority; label: string; desc: string }> = [
-  { value: 'URGENT', label: 'URGENT', desc: 'Needs immediate attention' },
-  { value: 'HIGH', label: 'HIGH', desc: 'Important, act soon' },
-  { value: 'MEDIUM', label: 'MEDIUM', desc: 'Standard priority' },
-  { value: 'LOW', label: 'LOW', desc: 'When time permits' },
+  { value: 'URGENT', label: 'Urgent', desc: 'Needs immediate attention' },
+  { value: 'HIGH', label: 'High', desc: 'Important, act soon' },
+  { value: 'MEDIUM', label: 'Medium', desc: 'Standard priority' },
+  { value: 'LOW', label: 'Low', desc: 'When time permits' },
 ];
 
 export default function CreateTaskScreen(): React.JSX.Element {
@@ -66,78 +66,51 @@ export default function CreateTaskScreen(): React.JSX.Element {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: theme.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.cancelBtn}
-          accessibilityRole="button"
-        >
-          <Text style={styles.cancelText}>Cancel</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>New Task</Text>
-        <View style={{ width: 64 }} />
-      </View>
+    <Screen>
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <LargeHeader title="New Task" onBack={() => router.back()} />
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Title input */}
-        <Text style={[styles.sectionLabel, { color: theme.primary }]}>WHAT NEEDS TO BE DONE</Text>
-        <View style={[styles.inputWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.inputShadow} />
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {/* Title input */}
+          <Text style={[styles.label, { color: theme.onSurfaceVariant }]}>What needs to be done</Text>
           <TextInput
             ref={inputRef}
-            style={[styles.titleInput, { backgroundColor: theme.surface, color: theme.onSurface }]}
+            style={[styles.titleInput, { backgroundColor: theme.surfaceVariant, color: theme.onSurface }]}
             value={title}
             onChangeText={setTitle}
-            placeholder="Describe the task clearly..."
+            placeholder="Describe the task clearly…"
             placeholderTextColor={theme.onSurfaceVariant}
             multiline
-            numberOfLines={3}
             autoFocus
             returnKeyType="done"
             blurOnSubmit
           />
-        </View>
 
-        {/* Priority selector */}
-        <Text style={[styles.sectionLabel, { color: theme.primary }]}>PRIORITY</Text>
-        <View style={styles.priorityGrid}>
-          {PRIORITIES.map((p) => {
-            const color = getPriorityColor(p.value);
-            const active = priority === p.value;
-            return (
-              <View
-                key={p.value}
-                style={[styles.priorityWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}
-              >
-                <View style={[styles.priorityShadow, { backgroundColor: color + '66' }]} />
+          {/* Priority selector */}
+          <Text style={[styles.label, { color: theme.onSurfaceVariant, marginTop: 24 }]}>Priority</Text>
+          <View style={styles.priorityGrid}>
+            {PRIORITIES.map((p) => {
+              const color = getPriorityColor(p.value);
+              const active = priority === p.value;
+              return (
                 <Pressable
+                  key={p.value}
                   style={[
                     styles.priorityCard,
-                    { borderColor: active ? color : theme.outline, backgroundColor: theme.surface },
-                    active && { backgroundColor: color + '15' },
+                    { backgroundColor: theme.surface, borderColor: active ? color : theme.outline },
+                    active && { backgroundColor: color + '12', borderWidth: 1.5 },
                   ]}
                   onPress={() => setPriority(p.value)}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
                 >
-                  <View
-                    style={[
-                      styles.priorityDot,
-                      { backgroundColor: active ? color : theme.outline },
-                    ]}
-                  />
+                  <View style={[styles.priorityDot, { backgroundColor: color }]} />
                   <View style={styles.priorityText}>
                     <Text
-                      style={[
-                        styles.priorityLabel,
-                        { color: theme.onSurfaceVariant },
-                        active && { color },
-                      ]}
+                      style={[styles.priorityLabel, { color: active ? color : theme.onSurface }]}
                     >
                       {p.label}
                     </Text>
@@ -148,102 +121,66 @@ export default function CreateTaskScreen(): React.JSX.Element {
                       {p.desc}
                     </Text>
                   </View>
+                  {active && (
+                    <View style={[styles.radioOn, { borderColor: color }]}>
+                      <View style={[styles.radioDot, { backgroundColor: color }]} />
+                    </View>
+                  )}
                 </Pressable>
-              </View>
-            );
-          })}
-        </View>
-      </ScrollView>
+              );
+            })}
+          </View>
+        </ScrollView>
 
-      {/* Footer */}
-      <View
-        style={[styles.footer, { backgroundColor: theme.surface, borderTopColor: theme.outline }]}
-      >
-        <Button
-          label="Create Task"
-          variant="primary"
-          onPress={() => void handleCreate()}
-          loading={loading}
-          fullWidth
-        />
-      </View>
-    </KeyboardAvoidingView>
+        {/* Footer */}
+        <View style={[styles.footer, { backgroundColor: theme.background, borderTopColor: theme.outline }]}>
+          <Button
+            label="Create task"
+            variant="primary"
+            onPress={() => void handleCreate()}
+            loading={loading}
+            fullWidth
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
-  },
-  cancelBtn: { padding: 4, minWidth: 64 },
-  cancelText: { fontSize: 15, color: Colors.white, fontWeight: '500' },
-  headerTitle: { fontSize: 17, fontWeight: '800', color: Colors.white },
-  content: { padding: 20, gap: 8, paddingBottom: 8 },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  inputWrapper: { position: 'relative' },
-  inputShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
+  content: { paddingHorizontal: 20, paddingBottom: 8, paddingTop: 4 },
+  label: { fontSize: 13, fontWeight: '600', marginBottom: 10, marginLeft: 4 },
   titleInput: {
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    minHeight: 96,
+    minHeight: 100,
     textAlignVertical: 'top',
-    fontWeight: '500',
+    lineHeight: 22,
   },
-  priorityGrid: { gap: 8 },
-  priorityWrapper: { position: 'relative' },
-  priorityShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
-  },
+  priorityGrid: { gap: 10 },
   priorityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderWidth: 2,
-    borderRadius: 2,
-    gap: 12,
+    padding: 16,
+    borderWidth: 0.5,
+    borderRadius: 14,
+    gap: 14,
   },
-  priorityDot: { width: 14, height: 14, borderRadius: 2 },
+  priorityDot: { width: 12, height: 12, borderRadius: 6 },
   priorityText: { flex: 1 },
-  priorityLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+  priorityLabel: { fontSize: 15, fontWeight: '600' },
+  priorityDesc: { fontSize: 13, marginTop: 2 },
+  radioOn: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  priorityDesc: { fontSize: 11, marginTop: 2 },
-  footer: {
-    padding: 20,
-    paddingTop: 12,
-    borderTopWidth: 2,
-  },
+  radioDot: { width: 10, height: 10, borderRadius: 5 },
+  footer: { padding: 20, paddingTop: 12, borderTopWidth: 0.5 },
 });
