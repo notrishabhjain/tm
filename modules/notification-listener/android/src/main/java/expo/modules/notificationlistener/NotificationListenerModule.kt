@@ -280,8 +280,16 @@ class NotificationListenerModule : Module() {
                     ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
                     context.startActivity(intent)
                 } catch (_: Exception) {
+                    openAppDetailsSettings()
                 }
             }
+        }
+
+        // Opens this app's system "App info" page — a reliable fallback for
+        // granting any permission when the runtime dialog was permanently
+        // denied ("Don't ask again").
+        AsyncFunction("openAppSettings") {
+            openAppDetailsSettings()
         }
 
         AsyncFunction("downloadWhisperModel") { promise: Promise ->
@@ -299,6 +307,17 @@ class NotificationListenerModule : Module() {
 
         AsyncFunction("deleteWhisperModel") {
             WhisperModelManager.deleteModel(context)
+        }
+    }
+
+    private fun openAppDetailsSettings() {
+        try {
+            val intent = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${context.packageName}")
+            ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+            context.startActivity(intent)
+        } catch (_: Exception) {
         }
     }
 

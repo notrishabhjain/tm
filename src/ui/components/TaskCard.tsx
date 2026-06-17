@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Pressable, Animated, PanResponder } from 'react
 import * as Haptics from 'expo-haptics';
 import { getPriorityColor, Colors } from '../theme/colors';
 import { useTheme } from '../theme';
-import { PriorityChip } from './PriorityChip';
 import type { Task } from '@/domain/types';
 
 interface TaskCardProps {
@@ -16,8 +15,8 @@ interface TaskCardProps {
 function formatRelativeTime(ts: number): string {
   const diffMs = Date.now() - ts;
   const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 1) return 'now';
+  if (diffMins < 60) return `${diffMins}m`;
   const d = new Date(ts);
   const diffHrs = Math.floor(diffMins / 60);
   if (diffHrs < 24) {
@@ -43,31 +42,17 @@ function getSourceLabel(sourceApp: string): string {
   return labels[sourceApp] ?? sourceApp.split('.').pop() ?? sourceApp;
 }
 
-function DueDateBadge({ dueDate }: { dueDate: number }): React.JSX.Element {
-  const now = Date.now();
-  const diffMs = dueDate - now;
+function dueLabel(dueDate: number): { label: string; color: string } {
+  const diffMs = dueDate - Date.now();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  let label: string;
-  let color: string;
-  if (diffMs < 0) {
-    label = 'Overdue';
-    color = Colors.urgentFg;
-  } else if (diffDays === 0) {
-    label = 'Today';
-    color = '#B45309';
-  } else if (diffDays === 1) {
-    label = 'Tomorrow';
-    color = Colors.mediumFg;
-  } else {
-    const d = new Date(dueDate);
-    label = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
-    color = Colors.lowFg;
-  }
-  return (
-    <View style={[styles.dueBadge, { borderColor: color + '40', backgroundColor: color + '14' }]}>
-      <Text style={[styles.dueBadgeText, { color }]}>{label}</Text>
-    </View>
-  );
+  if (diffMs < 0) return { label: 'Overdue', color: Colors.urgentFg };
+  if (diffDays === 0) return { label: 'Today', color: Colors.highFg };
+  if (diffDays === 1) return { label: 'Tomorrow', color: Colors.mediumFg };
+  const d = new Date(dueDate);
+  return {
+    label: d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+    color: Colors.lowFg,
+  };
 }
 
 const SWIPE_THRESHOLD = 80;
@@ -111,32 +96,24 @@ export function TaskCard({
       },
       onPanResponderRelease: (_, gs) => {
         if (gs.dx > SWIPE_THRESHOLD) {
-          Animated.timing(swipeX, {
-            toValue: 500,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            swipeX.setValue(0);
-            swiping.current = false;
-            handleComplete();
-          });
+          Animated.timing(swipeX, { toValue: 500, duration: 200, useNativeDriver: true }).start(
+            () => {
+              swipeX.setValue(0);
+              swiping.current = false;
+              handleComplete();
+            }
+          );
         } else if (gs.dx < -SWIPE_THRESHOLD) {
-          Animated.timing(swipeX, {
-            toValue: -500,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            swipeX.setValue(0);
-            swiping.current = false;
-            handleDelete();
-          });
+          Animated.timing(swipeX, { toValue: -500, duration: 200, useNativeDriver: true }).start(
+            () => {
+              swipeX.setValue(0);
+              swiping.current = false;
+              handleDelete();
+            }
+          );
         } else {
           swiping.current = false;
-          Animated.spring(swipeX, {
-            toValue: 0,
-            useNativeDriver: true,
-            bounciness: 6,
-          }).start();
+          Animated.spring(swipeX, { toValue: 0, useNativeDriver: true, bounciness: 6 }).start();
         }
       },
       onPanResponderTerminate: () => {
@@ -157,58 +134,54 @@ export function TaskCard({
     extrapolate: 'clamp',
   });
 
+  const due = task.dueDate ? dueLabel(task.dueDate) : null;
+
   return (
     <View style={styles.wrapper}>
       {/* Swipe reveal backgrounds */}
-      <Animated.View style={[styles.swipeRevealLeft, { opacity: completeOpacity }]}>
-        <Text style={styles.swipeIcon}>✓</Text>
-        <Text style={styles.swipeLabel}>Done</Text>
+      <Animated.View style={[styles.revealLeft, { opacity: completeOpacity }]}>
+        <Text style={styles.revealIcon}>✓</Text>
       </Animated.View>
-      <Animated.View style={[styles.swipeRevealRight, { opacity: deleteOpacity }]}>
-        <Text style={styles.swipeLabel}>Delete</Text>
-        <Text style={styles.swipeIcon}>✕</Text>
+      <Animated.View style={[styles.revealRight, { opacity: deleteOpacity }]}>
+        <Text style={styles.revealIcon}>✕</Text>
       </Animated.View>
 
-      {/* Swipeable card */}
-      <Animated.View style={{ transform: [{ translateX: swipeX }] }} {...panResponder.panHandlers}>
+      <Animated.View
+        style={[{ transform: [{ translateX: swipeX }], backgroundColor: theme.background }]}
+        {...panResponder.panHandlers}
+      >
         <Pressable
           onPress={handlePress}
           style={({ pressed }) => [
-            styles.card,
-            { backgroundColor: theme.surface },
-            pressed && !swiping.current && { opacity: 0.92 },
+            styles.row,
+            { borderBottomColor: theme.outline },
+            pressed && !swiping.current && { backgroundColor: theme.surfaceVariant },
           ]}
           accessibilityRole="button"
           accessibilityLabel={`${task.priority} priority: ${task.title}`}
         >
-          {/* Priority accent bar */}
-          <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
+          <View style={[styles.dot, { backgroundColor: priorityColor }]} />
 
           <View style={styles.content}>
             <Text style={[styles.title, { color: theme.onSurface }]} numberOfLines={2}>
               {task.title}
             </Text>
-
             <View style={styles.metaRow}>
               <Text style={[styles.meta, { color: theme.onSurfaceVariant }]} numberOfLines={1}>
                 {task.sender ? `${task.sender} · ` : ''}
-                {getSourceLabel(task.sourceApp)}
+                {getSourceLabel(task.sourceApp)} · {formatRelativeTime(task.createdAt)}
               </Text>
-              <Text style={[styles.time, { color: theme.onSurfaceVariant }]}>
-                {formatRelativeTime(task.createdAt)}
-              </Text>
-            </View>
-
-            <View style={styles.badgeRow}>
-              <PriorityChip priority={task.priority} />
-              {task.dueDate && <DueDateBadge dueDate={task.dueDate} />}
               {task.needsConfirmation && (
-                <View style={styles.reviewBadge}>
-                  <Text style={styles.reviewBadgeText}>Review</Text>
-                </View>
+                <Text style={[styles.reviewTag, { color: Colors.primary500 }]}>Review</Text>
               )}
             </View>
           </View>
+
+          {due && (
+            <View style={styles.dueWrap}>
+              <Text style={[styles.dueText, { color: due.color }]}>{due.label}</Text>
+            </View>
+          )}
         </Pressable>
       </Animated.View>
     </View>
@@ -216,101 +189,42 @@ export function TaskCard({
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginHorizontal: 16,
-    marginVertical: 5,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  swipeRevealLeft: {
+  wrapper: { position: 'relative' },
+  revealLeft: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.success,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 24,
-    gap: 8,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingLeft: 28,
   },
-  swipeRevealRight: {
+  revealRight: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.urgentFg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingRight: 24,
-    gap: 8,
-  },
-  swipeIcon: { color: '#fff', fontWeight: '700', fontSize: 18 },
-  swipeLabel: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  card: {
-    flexDirection: 'row',
-    borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  priorityBar: {
-    width: 4,
-    alignSelf: 'stretch',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: '600',
-    lineHeight: 22,
-    marginBottom: 5,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  meta: {
-    fontSize: 12,
-    flex: 1,
-    fontWeight: '400',
-  },
-  time: {
-    fontSize: 11,
-    marginLeft: 8,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-  },
-  dueBadge: {
-    height: 20,
-    paddingHorizontal: 7,
-    borderRadius: 5,
-    borderWidth: 1,
     justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: 28,
+  },
+  revealIcon: { color: '#fff', fontWeight: '700', fontSize: 20 },
+  row: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 0.5,
   },
-  dueBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  reviewBadge: {
-    height: 20,
-    paddingHorizontal: 7,
+  dot: {
+    width: 9,
+    height: 9,
     borderRadius: 5,
-    borderWidth: 1,
-    borderColor: Colors.primary300,
-    backgroundColor: Colors.primary50,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: 14,
+    marginTop: 5,
+    alignSelf: 'flex-start',
   },
-  reviewBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.primary500,
-  },
+  content: { flex: 1 },
+  title: { fontSize: 16, fontWeight: '500', lineHeight: 22 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 },
+  meta: { fontSize: 13, flex: 1, fontWeight: '400' },
+  reviewTag: { fontSize: 12, fontWeight: '600' },
+  dueWrap: { marginLeft: 12, alignSelf: 'flex-start', marginTop: 1 },
+  dueText: { fontSize: 13, fontWeight: '600' },
 });
