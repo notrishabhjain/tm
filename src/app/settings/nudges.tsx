@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { getSetting, setSetting } from '@/data/storage/settings';
 import { scheduleNudge, cancelNudge } from '@/services/nudge-scheduler';
 
@@ -23,8 +24,6 @@ const FREQUENCY_OPTIONS = [
   { label: 'Every 2 hours', value: 120 },
   { label: 'Every 4 hours', value: 240 },
 ] as const;
-
-const DEPTH = 4;
 
 function isValidTime(t: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(t.trim());
@@ -74,14 +73,8 @@ export default function NudgesScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Nudge Schedule</Text>
-        <View style={{ width: 56 }} />
-      </View>
+    <Screen>
+      <LargeHeader title="Nudges" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
@@ -89,175 +82,139 @@ export default function NudgesScreen(): React.JSX.Element {
           often it nudges you.
         </Text>
 
-        <Text style={[styles.sectionLabel, { color: theme.primary }]}>NUDGE FREQUENCY</Text>
-        <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.cardShadow} />
-          <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            {FREQUENCY_OPTIONS.map((opt, i) => (
-              <Pressable
-                key={opt.value}
+        <Text style={[styles.sectionLabel, { color: theme.onSurfaceVariant }]}>
+          Nudge frequency
+        </Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          {FREQUENCY_OPTIONS.map((opt, i) => (
+            <Pressable
+              key={opt.value}
+              style={({ pressed }) => [
+                styles.optionRow,
+                i < FREQUENCY_OPTIONS.length - 1 && {
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: theme.outline,
+                },
+                frequencyMinutes === opt.value && { backgroundColor: theme.surfaceVariant },
+                pressed && { opacity: 0.7 },
+              ]}
+              onPress={() => handleFrequency(opt.value)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: frequencyMinutes === opt.value }}
+            >
+              <View
                 style={[
-                  styles.optionRow,
-                  i < FREQUENCY_OPTIONS.length - 1 && {
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.outline,
-                  },
-                  frequencyMinutes === opt.value && styles.optionSelected,
-                  frequencyMinutes === opt.value && { backgroundColor: theme.pressHighlight },
+                  styles.radio,
+                  { borderColor: theme.onSurfaceVariant },
+                  frequencyMinutes === opt.value && styles.radioSelected,
                 ]}
-                onPress={() => handleFrequency(opt.value)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: frequencyMinutes === opt.value }}
+              />
+              <Text
+                style={[
+                  styles.optionLabel,
+                  { color: theme.onSurface },
+                  frequencyMinutes === opt.value && styles.optionLabelSelected,
+                  frequencyMinutes === opt.value && { color: Colors.primary500 },
+                ]}
               >
-                <View
-                  style={[
-                    styles.radio,
-                    { borderColor: theme.onSurfaceVariant },
-                    frequencyMinutes === opt.value && styles.radioSelected,
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.optionLabel,
-                    { color: theme.onSurface },
-                    frequencyMinutes === opt.value && styles.optionLabelSelected,
-                    frequencyMinutes === opt.value && { color: theme.primary },
-                  ]}
-                >
-                  {opt.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
         {/* Quiet Hours */}
-        <Text style={[styles.sectionLabel, { color: theme.primary }]}>QUIET HOURS</Text>
-        <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.cardShadow} />
-          <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            <View style={styles.quietRow}>
-              <View style={styles.quietField}>
-                <Text style={[styles.quietFieldLabel, { color: theme.onSurfaceVariant }]}>
-                  FROM
-                </Text>
-                <View
-                  style={[
-                    styles.timeInputWrapper,
-                    { paddingRight: DEPTH / 2, paddingBottom: DEPTH / 2 },
-                  ]}
-                >
-                  <View style={styles.timeInputShadow} />
-                  <TextInput
-                    style={[
-                      styles.timeInput,
-                      { backgroundColor: theme.surface, color: theme.onSurface },
-                      !quietEnabled && {
-                        borderColor: theme.outline,
-                        color: theme.onSurfaceVariant,
-                        backgroundColor: theme.background,
-                      },
-                    ]}
-                    value={quietStart}
-                    onChangeText={setQuietStart}
-                    placeholder="22:00"
-                    placeholderTextColor={theme.onSurfaceVariant}
-                    keyboardType="numbers-and-punctuation"
-                    maxLength={5}
-                    editable={quietEnabled}
-                    selectTextOnFocus
-                  />
-                </View>
-              </View>
-              <Text style={[styles.quietSeparator, { color: theme.onSurfaceVariant }]}>—</Text>
-              <View style={styles.quietField}>
-                <Text style={[styles.quietFieldLabel, { color: theme.onSurfaceVariant }]}>TO</Text>
-                <View
-                  style={[
-                    styles.timeInputWrapper,
-                    { paddingRight: DEPTH / 2, paddingBottom: DEPTH / 2 },
-                  ]}
-                >
-                  <View style={styles.timeInputShadow} />
-                  <TextInput
-                    style={[
-                      styles.timeInput,
-                      { backgroundColor: theme.surface, color: theme.onSurface },
-                      !quietEnabled && {
-                        borderColor: theme.outline,
-                        color: theme.onSurfaceVariant,
-                        backgroundColor: theme.background,
-                      },
-                    ]}
-                    value={quietEnd}
-                    onChangeText={setQuietEnd}
-                    placeholder="07:00"
-                    placeholderTextColor={theme.onSurfaceVariant}
-                    keyboardType="numbers-and-punctuation"
-                    maxLength={5}
-                    editable={quietEnabled}
-                    selectTextOnFocus
-                  />
-                </View>
-              </View>
-              <Pressable
-                style={[styles.saveTimeBtn, !quietEnabled && styles.saveTimeBtnDisabled]}
-                onPress={handleSaveQuietHours}
-                disabled={!quietEnabled}
-              >
-                <Text style={styles.saveTimeBtnText}>Save</Text>
-              </Pressable>
-            </View>
-            {!quietEnabled && (
-              <Text style={[styles.quietDisabledHint, { color: theme.onSurfaceVariant }]}>
-                Enable nudges to configure quiet hours
-              </Text>
-            )}
-          </View>
-        </View>
-
-        <Text style={[styles.sectionLabel, { color: theme.primary }]}>BEHAVIOUR</Text>
-        <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.cardShadow} />
-          <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleInfo}>
-                <Text style={[styles.toggleTitle, { color: theme.onSurface }]}>
-                  Urgent overrides quiet hours
-                </Text>
-                <Text style={[styles.toggleSubtitle, { color: theme.onSurfaceVariant }]}>
-                  URGENT tasks always nudge, even during quiet hours
-                </Text>
-              </View>
-              <Switch
-                value={urgentOverride}
-                onValueChange={handleUrgentOverride}
-                trackColor={{ true: Colors.primary900, false: theme.outline }}
-                thumbColor={Colors.white}
+        <Text style={[styles.sectionLabel, { color: theme.onSurfaceVariant }]}>Quiet hours</Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          <View style={styles.quietRow}>
+            <View style={styles.quietField}>
+              <Text style={[styles.quietFieldLabel, { color: theme.onSurfaceVariant }]}>From</Text>
+              <TextInput
+                style={[
+                  styles.timeInput,
+                  { backgroundColor: theme.surfaceVariant, color: theme.onSurface },
+                  !quietEnabled && {
+                    color: theme.onSurfaceVariant,
+                    opacity: 0.6,
+                  },
+                ]}
+                value={quietStart}
+                onChangeText={setQuietStart}
+                placeholder="22:00"
+                placeholderTextColor={theme.onSurfaceVariant}
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                editable={quietEnabled}
+                selectTextOnFocus
               />
             </View>
+            <Text style={[styles.quietSeparator, { color: theme.onSurfaceVariant }]}>—</Text>
+            <View style={styles.quietField}>
+              <Text style={[styles.quietFieldLabel, { color: theme.onSurfaceVariant }]}>To</Text>
+              <TextInput
+                style={[
+                  styles.timeInput,
+                  { backgroundColor: theme.surfaceVariant, color: theme.onSurface },
+                  !quietEnabled && {
+                    color: theme.onSurfaceVariant,
+                    opacity: 0.6,
+                  },
+                ]}
+                value={quietEnd}
+                onChangeText={setQuietEnd}
+                placeholder="07:00"
+                placeholderTextColor={theme.onSurfaceVariant}
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                editable={quietEnabled}
+                selectTextOnFocus
+              />
+            </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.saveTimeBtn,
+                { backgroundColor: Colors.primary500 },
+                !quietEnabled && styles.saveTimeBtnDisabled,
+                pressed && quietEnabled && { opacity: 0.7 },
+              ]}
+              onPress={handleSaveQuietHours}
+              disabled={!quietEnabled}
+            >
+              <Text style={styles.saveTimeBtnText}>Save</Text>
+            </Pressable>
+          </View>
+          {!quietEnabled && (
+            <Text style={[styles.quietDisabledHint, { color: theme.onSurfaceVariant }]}>
+              Enable nudges to configure quiet hours
+            </Text>
+          )}
+        </View>
+
+        <Text style={[styles.sectionLabel, { color: theme.onSurfaceVariant }]}>Behaviour</Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleInfo}>
+              <Text style={[styles.toggleTitle, { color: theme.onSurface }]}>
+                Urgent overrides quiet hours
+              </Text>
+              <Text style={[styles.toggleSubtitle, { color: theme.onSurfaceVariant }]}>
+                URGENT tasks always nudge, even during quiet hours
+              </Text>
+            </View>
+            <Switch
+              value={urgentOverride}
+              onValueChange={handleUrgentOverride}
+              trackColor={{ true: Colors.primary500, false: theme.outline }}
+              thumbColor={Colors.white}
+            />
           </View>
         </View>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
-  },
-  backBtn: { padding: 4, minWidth: 56 },
-  backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
-  title: { fontSize: 17, fontWeight: '800', color: Colors.white },
   content: { padding: 16, paddingBottom: 32 },
   description: {
     fontSize: 13,
@@ -265,28 +222,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    fontSize: 13,
+    fontWeight: '600',
     marginBottom: 8,
     marginTop: 8,
   },
-  cardWrapper: { position: 'relative', marginBottom: 20 },
-  cardShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
   card: {
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
+    borderWidth: 0.5,
+    borderRadius: 16,
     overflow: 'hidden',
+    marginBottom: 20,
   },
   optionRow: {
     flexDirection: 'row',
@@ -295,16 +240,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  optionSelected: {},
   radio: {
     width: 18,
     height: 18,
-    borderRadius: 2,
+    borderRadius: 9,
     borderWidth: 2,
   },
-  radioSelected: { borderColor: Colors.primary900, backgroundColor: Colors.primary900 },
+  radioSelected: { borderColor: Colors.primary500, backgroundColor: Colors.primary500 },
   optionLabel: { fontSize: 15 },
-  optionLabelSelected: { fontWeight: '700' },
+  optionLabelSelected: { fontWeight: '600' },
   quietRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -314,50 +258,33 @@ const styles = StyleSheet.create({
   },
   quietField: { gap: 6 },
   quietFieldLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  timeInputWrapper: { position: 'relative' },
-  timeInputShadow: {
-    position: 'absolute',
-    top: DEPTH / 2,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
+    fontSize: 12,
+    fontWeight: '600',
   },
   timeInput: {
     width: 72,
     height: 42,
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
+    borderRadius: 12,
     textAlign: 'center',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   quietSeparator: {
     fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 6,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   saveTimeBtn: {
     flex: 1,
     height: 42,
-    backgroundColor: Colors.primary900,
-    borderRadius: 2,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.black,
   },
   saveTimeBtnDisabled: {
-    backgroundColor: Colors.neoShadowDefault,
-    borderColor: Colors.neoShadowDefault,
+    opacity: 0.4,
   },
-  saveTimeBtnText: { fontSize: 13, fontWeight: '800', color: Colors.white, letterSpacing: 0.5 },
+  saveTimeBtnText: { fontSize: 14, fontWeight: '600', color: Colors.white, letterSpacing: 0.1 },
   quietDisabledHint: {
     fontSize: 12,
     paddingHorizontal: 16,
@@ -372,5 +299,5 @@ const styles = StyleSheet.create({
   },
   toggleInfo: { flex: 1 },
   toggleTitle: { fontSize: 15, fontWeight: '600' },
-  toggleSubtitle: { fontSize: 12, marginTop: 2 },
+  toggleSubtitle: { fontSize: 13, marginTop: 2 },
 });

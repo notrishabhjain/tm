@@ -9,8 +9,6 @@ import { ContactPickerModal } from '@/ui/components/ContactPickerModal';
 import { db, initializeDatabase } from '@/data/db/client';
 import { VipContactRepository } from '@/data/repositories/VipContactRepository';
 
-const DEPTH = 4;
-
 export default function OnboardingVipScreen(): React.JSX.Element {
   const theme = useTheme();
   const router = useRouter();
@@ -45,35 +43,36 @@ export default function OnboardingVipScreen(): React.JSX.Element {
       ]}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.stepLabel, { color: theme.primary }]}>STEP 3 OF 4</Text>
-        <Text style={[styles.title, { color: theme.primary }]}>VIP Contacts</Text>
+        <Text style={[styles.stepLabel, { color: theme.primary }]}>Step 3 of 4</Text>
+        <Text style={[styles.title, { color: theme.onSurface }]}>VIP Contacts</Text>
         <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
           Messages from VIP contacts always create URGENT tasks and skip the confirmation queue. Add
           names as they appear in your notifications.
         </Text>
 
-        <View style={[styles.inputWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.inputShadow} />
-          <View style={[styles.inputRow, { backgroundColor: theme.surface }]}>
-            <TextInput
-              style={[styles.input, { color: theme.onSurface }]}
-              value={name}
-              onChangeText={setName}
-              placeholder="e.g. Ravi Sharma"
-              placeholderTextColor={theme.onSurfaceVariant}
-              onSubmitEditing={addVip}
-              returnKeyType="done"
-            />
-            <Pressable style={styles.addButton} onPress={addVip}>
-              <Text style={styles.addButtonText}>Add</Text>
-            </Pressable>
-          </View>
+        <View style={[styles.inputRow, { backgroundColor: theme.surfaceVariant }]}>
+          <TextInput
+            style={[styles.input, { color: theme.onSurface }]}
+            value={name}
+            onChangeText={setName}
+            placeholder="e.g. Ravi Sharma"
+            placeholderTextColor={theme.onSurfaceVariant}
+            onSubmitEditing={addVip}
+            returnKeyType="done"
+          />
+          <Pressable
+            style={({ pressed }) => [styles.addButton, pressed && { opacity: 0.7 }]}
+            onPress={addVip}
+          >
+            <Text style={styles.addButtonText}>Add</Text>
+          </Pressable>
         </View>
 
         <Pressable
           style={({ pressed }) => [
             styles.pickerBtn,
-            pressed && { backgroundColor: theme.pressHighlight },
+            { borderColor: theme.outline },
+            pressed && { opacity: 0.7 },
           ]}
           onPress={() => setPickerVisible(true)}
           accessibilityRole="button"
@@ -87,36 +86,28 @@ export default function OnboardingVipScreen(): React.JSX.Element {
           </Text>
         ) : (
           <>
-            <Text style={[styles.sectionLabel, { color: theme.primary }]}>
-              ADDED ({vips.length})
+            <Text style={[styles.sectionLabel, { color: theme.onSurfaceVariant }]}>
+              Added ({vips.length})
             </Text>
-            <View style={[styles.vipListWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-              <View style={[styles.vipListShadow, { backgroundColor: Colors.neoShadowUrgent }]} />
-              <View
-                style={[
-                  styles.vipList,
-                  { borderColor: Colors.urgentFg, backgroundColor: theme.surface },
-                ]}
-              >
-                {vips.map((v, i) => (
-                  <View
-                    key={v}
-                    style={[
-                      styles.vipRow,
-                      i < vips.length - 1 && {
-                        borderBottomWidth: 1,
-                        borderBottomColor: theme.outline,
-                      },
-                    ]}
-                  >
-                    <View style={styles.urgentDot} />
-                    <Text style={[styles.vipName, { color: theme.onSurface }]}>{v}</Text>
-                    <Pressable onPress={() => removeVip(v)} hitSlop={8}>
-                      <Text style={styles.removeBtn}>Remove</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
+            <View style={[styles.vipList, { backgroundColor: theme.surfaceVariant }]}>
+              {vips.map((v, i) => (
+                <View
+                  key={v}
+                  style={[
+                    styles.vipRow,
+                    i < vips.length - 1 && {
+                      borderBottomWidth: 0.5,
+                      borderBottomColor: theme.outline,
+                    },
+                  ]}
+                >
+                  <View style={styles.urgentDot} />
+                  <Text style={[styles.vipName, { color: theme.onSurface }]}>{v}</Text>
+                  <Pressable onPress={() => removeVip(v)} hitSlop={8}>
+                    <Text style={styles.removeBtn}>Remove</Text>
+                  </Pressable>
+                </View>
+              ))}
             </View>
           </>
         )}
@@ -163,84 +154,55 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 24, gap: 12 },
   stepLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    fontSize: 13,
+    fontWeight: '600',
   },
-  title: { fontSize: 26, fontWeight: '800' },
+  title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   description: { fontSize: 14, lineHeight: 22 },
-  inputWrapper: { position: 'relative' },
-  inputShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
   inputRow: {
     flexDirection: 'row',
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   input: {
     flex: 1,
-    height: 48,
+    height: 46,
     paddingHorizontal: 14,
     fontSize: 15,
   },
   addButton: {
-    height: 48,
+    height: 46,
     paddingHorizontal: 20,
-    backgroundColor: Colors.primary900,
+    backgroundColor: Colors.primary500,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addButtonText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
+  addButtonText: { color: Colors.white, fontWeight: '600', fontSize: 14 },
   pickerBtn: {
-    height: 48,
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
+    height: 46,
+    borderWidth: 0.5,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pickerBtnPressed: {},
-  pickerBtnText: { fontSize: 14, fontWeight: '700' },
+  pickerBtnText: { fontSize: 14, fontWeight: '600' },
   emptyHint: { fontSize: 13, lineHeight: 20 },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  vipListWrapper: { position: 'relative' },
-  vipListShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
+    fontSize: 13,
+    fontWeight: '600',
   },
   vipList: {
-    borderWidth: 2,
-    borderRadius: 2,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   vipRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
   urgentDot: {
     width: 10,
     height: 10,
-    borderRadius: 2,
+    borderRadius: 5,
     backgroundColor: Colors.urgentFg,
-    borderWidth: 1.5,
-    borderColor: Colors.neoShadowUrgent,
   },
   vipName: { flex: 1, fontSize: 14, fontWeight: '600' },
-  removeBtn: { fontSize: 13, color: Colors.urgentFg, fontWeight: '700' },
+  removeBtn: { fontSize: 13, color: Colors.urgentFg, fontWeight: '600' },
   footer: { padding: 24, gap: 12 },
 });

@@ -16,13 +16,13 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Colors } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
 import { tasksToCSV, tasksToJSON, parseImportJSON } from '@/services/task-exporter';
 import type { Task } from '@/domain/types';
 
 const taskRepo = new TaskRepository(db);
-const DEPTH = 4;
 
 export default function ExportImportScreen(): React.JSX.Element {
   const theme = useTheme();
@@ -127,143 +127,107 @@ export default function ExportImportScreen(): React.JSX.Element {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Export / Import</Text>
-        <View style={{ width: 56 }} />
-      </View>
+    <Screen>
+      <LargeHeader title="Export / Import" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.sectionLabel, { color: theme.primary }]}>EXPORT</Text>
-        <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.cardShadow} />
-          <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.cardHint, { color: theme.onSurfaceVariant }]}>
-              Export all your tasks (pending + completed) to share or back up.
-            </Text>
-            <View style={styles.btnRow}>
-              <Button
-                label="Export JSON"
-                variant="primary"
-                onPress={() => void exportFormat('json')}
-                loading={busy}
-                style={styles.halfBtn}
-              />
-              <Button
-                label="Export CSV"
-                variant="secondary"
-                onPress={() => void exportFormat('csv')}
-                loading={busy}
-                style={styles.halfBtn}
-              />
-            </View>
+        <Text style={[styles.sectionLabel, { color: theme.onSurfaceVariant }]}>Export</Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          <Text style={[styles.cardHint, { color: theme.onSurfaceVariant }]}>
+            Export all your tasks (pending + completed) to share or back up.
+          </Text>
+          <View style={styles.btnRow}>
+            <Button
+              label="Export JSON"
+              variant="primary"
+              onPress={() => void exportFormat('json')}
+              loading={busy}
+              style={styles.halfBtn}
+            />
+            <Button
+              label="Export CSV"
+              variant="secondary"
+              onPress={() => void exportFormat('csv')}
+              loading={busy}
+              style={styles.halfBtn}
+            />
           </View>
         </View>
 
-        <Text style={[styles.sectionLabel, { color: theme.primary }]}>IMPORT</Text>
-        <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.cardShadow} />
-          <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.cardHint, { color: theme.onSurfaceVariant }]}>
-              Import tasks from a TaskMind JSON export. Merge with existing tasks or replace all
-              pending tasks.
-            </Text>
-            {!importPreview ? (
-              <Button
-                label="Pick JSON File"
-                variant="secondary"
-                onPress={() => void pickImportFile()}
-                loading={busy}
-              />
-            ) : (
-              <View style={styles.previewSection}>
-                <View
-                  style={[
-                    styles.previewBox,
-                    { backgroundColor: theme.background, borderColor: theme.outline },
-                  ]}
-                >
-                  <Text style={[styles.previewTitle, { color: theme.onSurface }]}>
-                    {importPreview.tasks.length} tasks found
+        <Text style={[styles.sectionLabel, { color: theme.onSurfaceVariant }]}>Import</Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          <Text style={[styles.cardHint, { color: theme.onSurfaceVariant }]}>
+            Import tasks from a TaskMind JSON export. Merge with existing tasks or replace all
+            pending tasks.
+          </Text>
+          {!importPreview ? (
+            <Button
+              label="Pick JSON File"
+              variant="secondary"
+              onPress={() => void pickImportFile()}
+              loading={busy}
+            />
+          ) : (
+            <View style={styles.previewSection}>
+              <View
+                style={[
+                  styles.previewBox,
+                  { backgroundColor: theme.surfaceVariant, borderColor: theme.outline },
+                ]}
+              >
+                <Text style={[styles.previewTitle, { color: theme.onSurface }]}>
+                  {importPreview.tasks.length} tasks found
+                </Text>
+                {importPreview.errors.length > 0 && (
+                  <Text style={styles.previewErrors}>
+                    {importPreview.errors.length} warning
+                    {importPreview.errors.length !== 1 ? 's' : ''}:{' '}
+                    {importPreview.errors.slice(0, 3).join('; ')}
                   </Text>
-                  {importPreview.errors.length > 0 && (
-                    <Text style={styles.previewErrors}>
-                      {importPreview.errors.length} warning
-                      {importPreview.errors.length !== 1 ? 's' : ''}:{' '}
-                      {importPreview.errors.slice(0, 3).join('; ')}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.btnRow}>
-                  <Button
-                    label="Merge"
-                    variant="primary"
-                    onPress={() => void confirmImport('merge')}
-                    loading={busy}
-                    style={styles.halfBtn}
-                  />
-                  <Button
-                    label="Replace Pending"
-                    variant="destructive"
-                    onPress={() => void confirmImport('replace')}
-                    loading={busy}
-                    style={styles.halfBtn}
-                  />
-                </View>
-                <Pressable onPress={() => setImportPreview(null)} style={styles.cancelLink}>
-                  <Text style={[styles.cancelText, { color: theme.onSurfaceVariant }]}>Cancel</Text>
-                </Pressable>
+                )}
               </View>
-            )}
-            {busy && <ActivityIndicator style={styles.spinner} color={Colors.primary900} />}
-          </View>
+              <View style={styles.btnRow}>
+                <Button
+                  label="Merge"
+                  variant="primary"
+                  onPress={() => void confirmImport('merge')}
+                  loading={busy}
+                  style={styles.halfBtn}
+                />
+                <Button
+                  label="Replace Pending"
+                  variant="destructive"
+                  onPress={() => void confirmImport('replace')}
+                  loading={busy}
+                  style={styles.halfBtn}
+                />
+              </View>
+              <Pressable
+                onPress={() => setImportPreview(null)}
+                style={({ pressed }) => [styles.cancelLink, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={[styles.cancelText, { color: theme.onSurfaceVariant }]}>Cancel</Text>
+              </Pressable>
+            </View>
+          )}
+          {busy && <ActivityIndicator style={styles.spinner} color={Colors.primary500} />}
         </View>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
-  },
-  backBtn: { padding: 4, minWidth: 56 },
-  backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
-  title: { fontSize: 17, fontWeight: '800', color: Colors.white },
   content: { padding: 16, paddingBottom: 40 },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    fontSize: 13,
+    fontWeight: '600',
     marginBottom: 8,
     marginTop: 16,
   },
-  cardWrapper: { position: 'relative', marginBottom: 4 },
-  cardShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
   card: {
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
+    borderWidth: 0.5,
+    borderRadius: 16,
     padding: 16,
     gap: 12,
   },
@@ -272,11 +236,11 @@ const styles = StyleSheet.create({
   halfBtn: { flex: 1 },
   previewSection: { gap: 12 },
   previewBox: {
-    borderWidth: 1,
-    borderRadius: 2,
+    borderWidth: 0.5,
+    borderRadius: 12,
     padding: 12,
   },
-  previewTitle: { fontSize: 14, fontWeight: '700' },
+  previewTitle: { fontSize: 14, fontWeight: '600' },
   previewErrors: { fontSize: 12, color: Colors.warning, marginTop: 4 },
   cancelLink: { alignSelf: 'center', paddingVertical: 8 },
   cancelText: { fontSize: 13, fontWeight: '600' },
