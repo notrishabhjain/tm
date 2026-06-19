@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/ui/theme';
@@ -11,6 +11,12 @@ import type {
   CallDiagnostics,
   CallTranscriptionTestResult,
 } from '../../../modules/notification-listener/src';
+
+interface LogEntry {
+  stage: string;
+  message: string;
+  ts: number;
+}
 
 function fmtAge(ms: number | null | undefined): string {
   if (ms == null) return '—';
@@ -28,11 +34,11 @@ function fmtSize(bytes: number): string {
 }
 
 const STAGE_LABEL: Record<string, string> = {
-  find: 'Finding recording',
-  model: 'Loading model',
-  engine: 'On-device engine',
-  decode: 'Decoding audio',
-  transcribe: 'Transcribing',
+  find: 'Find recording',
+  model: 'Load model',
+  engine: 'Engine',
+  decode: 'Decode audio',
+  transcribe: 'Transcribe',
 };
 
 export default function TranscriptionDebugScreen(): React.JSX.Element {
@@ -40,7 +46,13 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
   const router = useRouter();
   const [diag, setDiag] = useState<CallDiagnostics | null>(null);
   const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const [testResult, setTestResult] = useState<CallTranscriptionTestResult | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [simulateStatus, setSimulateStatus] = useState<string | null>(null);
+  const [receivedTranscript, setReceivedTranscript] = useState<string | null>(null);
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const logScrollRef = useRef<ScrollView>(null);
 
   const refresh = useCallback(() => {
     void NotificationListener.getCallDiagnostics().then(setDiag);
@@ -52,9 +64,46 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
     }, [refresh])
   );
 
+  // Real-time log events from native during runCallTranscriptionTest
+  useEffect(() => {
+    const sub = NotificationListener.addCallTranscriptionTestLogListener((data) => {
+      setLogs((prev) => [...prev, data]);
+      setTimeout(() => logScrollRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Listen for transcript-ready so simulate can show the result inline
+  useEffect(() => {
+    const sub = NotificationListener.addCallTranscriptReadyListener((data) => {
+      setReceivedTranscript(data.text);
+      setSimulateStatus(
+        `Transcript received from ${data.callerLabel} — review screen should appear`
+      );
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Elapsed timer while test is running
+  useEffect(() => {
+    if (running) {
+      setElapsed(0);
+      elapsedRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    } else {
+      if (elapsedRef.current) {
+        clearInterval(elapsedRef.current);
+        elapsedRef.current = null;
+      }
+    }
+    return () => {
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+    };
+  }, [running]);
+
   const runTest = async (): Promise<void> => {
     setRunning(true);
     setTestResult(null);
+    setLogs([]);
     try {
       const result = await NotificationListener.runCallTranscriptionTest();
       setTestResult(result);
@@ -71,6 +120,8 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
   };
 
   const simulate = async (): Promise<void> => {
+    setSimulateStatus('Starting transcription service — this will take several minutes…');
+    setReceivedTranscript(null);
     await NotificationListener.simulateCallEnded();
     setTimeout(refresh, 1000);
   };
@@ -80,18 +131,18 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
       <LargeHeader title="Transcription Debug" onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[styles.intro, { color: theme.onSurfaceVariant }]}>
-          Live view of every step in the call-transcription pipeline. Use this to see exactly where
-          things break.
+          Live view of every step in the call-transcription pipeline. Logs appear in real-time as
+          each stage runs.
         </Text>
 
-        {/* ── Prerequisites ───────────────────────────────────────── */}
+        {/* ── Prerequisites ─────────────────────────────────────────── */}
         <Section theme={theme} title="Prerequisites">
           <Flag theme={theme} label="Transcription enabled" ok={diag?.enabled} />
           <Flag
             theme={theme}
             label="Call-end trigger registered"
             ok={diag?.monitorRegistered}
-            hint="If off: grant phone permission, then toggle transcription on. The trigger only registers when the foreground service starts with permission granted."
+            hint="If off: grant phone permission then toggle transcription off/on."
           />
           <Flag
             theme={theme}
@@ -114,7 +165,7 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
           <Flag theme={theme} label="On-device engine built" ok={diag?.engineBuilt} />
         </Section>
 
-        {/* ── Recordings ──────────────────────────────────────────── */}
+        {/* ── Latest recording ──────────────────────────────────────── */}
         <Section theme={theme} title="Latest recording">
           {diag?.latestUnprocessedPath ? (
             <>
@@ -137,7 +188,7 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
           ) : null}
         </Section>
 
-        {/* ── Recent files seen ───────────────────────────────────── */}
+        {/* ── Recent audio files ────────────────────────────────────── */}
         <Section theme={theme} title={`Recent audio files (${diag?.recentRecordings.length ?? 0})`}>
           {diag && diag.recentRecordings.length > 0 ? (
             diag.recentRecordings.map((r) => (
@@ -152,13 +203,12 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
             ))
           ) : (
             <Text style={[styles.sub, { color: theme.onSurfaceVariant }]}>
-              No audio files visible in any candidate folder. This usually means all-files access is
-              off, or your recorder saves somewhere not in the list below.
+              No audio files visible. Check all-files access or your recorder save folder.
             </Text>
           )}
         </Section>
 
-        {/* ── Folders scanned ─────────────────────────────────────── */}
+        {/* ── Folders scanned ───────────────────────────────────────── */}
         <Section theme={theme} title="Folders scanned">
           {diag?.dirs
             .filter((d) => d.exists)
@@ -179,8 +229,53 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
           )}
         </Section>
 
-        {/* ── Test result ─────────────────────────────────────────── */}
-        {testResult && (
+        {/* ── Live log ──────────────────────────────────────────────── */}
+        {(running || logs.length > 0) && (
+          <View
+            style={[styles.logCard, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+          >
+            <View style={styles.logHead}>
+              {running ? (
+                <ActivityIndicator size="small" color={Colors.primary500} />
+              ) : (
+                <Ionicons
+                  name={testResult?.ok ? 'checkmark-circle' : 'alert-circle'}
+                  size={18}
+                  color={testResult?.ok ? Colors.success : Colors.urgentFg}
+                />
+              )}
+              <Text style={[styles.logTitle, { color: theme.onSurface }]}>
+                {running ? `Running… ${elapsed}s elapsed` : 'Pipeline log'}
+              </Text>
+            </View>
+            {running && (
+              <Text style={[styles.runningHint, { color: Colors.primary500 }]}>
+                Whisper medium takes 3–10 min on a phone CPU. Keep the screen on and wait.
+              </Text>
+            )}
+            <ScrollView
+              ref={logScrollRef}
+              style={styles.logScroll}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+            >
+              {logs.length === 0 && (
+                <Text style={[styles.logLine, { color: theme.onSurfaceVariant }]}>Starting…</Text>
+              )}
+              {logs.map((entry, i) => (
+                <Text key={i} style={[styles.logLine, { color: theme.onSurface }]}>
+                  <Text style={{ color: theme.onSurfaceVariant }}>
+                    [{STAGE_LABEL[entry.stage] ?? entry.stage}]{' '}
+                  </Text>
+                  {entry.message}
+                </Text>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ── Final test result ─────────────────────────────────────── */}
+        {testResult && !running && (
           <View
             style={[
               styles.resultCard,
@@ -197,8 +292,9 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
                 color={testResult.ok ? Colors.success : Colors.urgentFg}
               />
               <Text style={[styles.cardTitle, { color: theme.onSurface }]}>
-                {testResult.ok ? 'Pipeline succeeded' : 'Stopped at: '}
-                {!testResult.ok && (STAGE_LABEL[testResult.stage] ?? testResult.stage)}
+                {testResult.ok
+                  ? 'Pipeline succeeded'
+                  : `Stopped at: ${STAGE_LABEL[testResult.stage] ?? testResult.stage}`}
               </Text>
             </View>
             {testResult.error && (
@@ -225,18 +321,46 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
           </View>
         )}
 
-        {/* ── Actions ─────────────────────────────────────────────── */}
+        {/* ── Simulate result ───────────────────────────────────────── */}
+        {simulateStatus && (
+          <View
+            style={[
+              styles.resultCard,
+              {
+                backgroundColor: theme.surface,
+                borderColor: receivedTranscript ? Colors.success : theme.outline,
+              },
+            ]}
+          >
+            <View style={styles.cardHead}>
+              {receivedTranscript ? (
+                <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+              ) : (
+                <ActivityIndicator size="small" color={Colors.primary500} />
+              )}
+              <Text style={[styles.cardTitle, { color: theme.onSurface }]}>{simulateStatus}</Text>
+            </View>
+            {receivedTranscript && (
+              <View style={[styles.transcriptBox, { backgroundColor: theme.surfaceVariant }]}>
+                <Text style={[styles.body, { color: theme.onSurface }]}>{receivedTranscript}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Actions ───────────────────────────────────────────────── */}
         <View style={styles.actions}>
           <Button
-            label={running ? 'Running pipeline…' : 'Run full pipeline test'}
+            label={running ? `Running… ${elapsed}s` : 'Run full pipeline test'}
             loading={running}
             onPress={() => void runTest()}
             fullWidth
           />
           <Text style={[styles.note, { color: theme.onSurfaceVariant }]}>
-            Decodes and transcribes the newest recording right now — ignores the enabled flag and
-            the “already processed” marker, so you can re-run it as many times as you like.
+            Decodes and transcribes the newest recording on the spot — re-runnable, ignores enabled
+            flag and processed marker. Each stage logs in real-time above.
           </Text>
+
           <Button
             label="Simulate call-ended trigger"
             variant="secondary"
@@ -244,9 +368,10 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
             fullWidth
           />
           <Text style={[styles.note, { color: theme.onSurfaceVariant }]}>
-            Fires the same code path a real call-end takes (starts the transcription service). Use
-            this to confirm the trigger → service → review-screen flow end to end.
+            Fires the exact code path a real call-end takes. Transcription runs in the background —
+            it will take several minutes. The review screen should appear when done.
           </Text>
+
           <Pressable onPress={refresh} style={styles.refreshBtn}>
             <Ionicons name="refresh" size={16} color={theme.primary} />
             <Text style={[styles.link, { color: theme.primary }]}>Refresh diagnostics</Text>
@@ -318,9 +443,16 @@ const styles = StyleSheet.create({
   mono: { fontSize: 12, fontFamily: 'monospace' },
   sub: { fontSize: 12, lineHeight: 17 },
 
+  logCard: { borderRadius: 16, borderWidth: 0.5, padding: 16, gap: 8 },
+  logHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logTitle: { fontSize: 15, fontWeight: '700', flex: 1 },
+  runningHint: { fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  logScroll: { maxHeight: 200 },
+  logLine: { fontSize: 12, lineHeight: 19, fontFamily: 'monospace' },
+
   resultCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  cardTitle: { fontSize: 16, fontWeight: '700', flex: 1 },
+  cardTitle: { fontSize: 15, fontWeight: '700', flex: 1 },
   body: { fontSize: 14, lineHeight: 21 },
   transcriptBox: { borderRadius: 12, padding: 12 },
 
