@@ -30,7 +30,8 @@ class NotificationListenerModule : Module() {
             "onQuickActionOpen",
             "onManualTrigger",
             "onCallTranscriptReady",
-            "onModelDownloadProgress"
+            "onModelDownloadProgress",
+            "onCallTranscriptionTestLog"
         )
 
         OnCreate {
@@ -349,7 +350,18 @@ class NotificationListenerModule : Module() {
         AsyncFunction("runCallTranscriptionTest") { promise: Promise ->
             Thread {
                 try {
-                    promise.resolve(CallTranscriptionDiagnostics.runFullTest(context))
+                    val result = CallTranscriptionDiagnostics.runFullTest(context) { stage, message ->
+                        val inst = instance
+                        inst?.sendEvent(
+                            "onCallTranscriptionTestLog",
+                            mapOf(
+                                "stage" to stage,
+                                "message" to message,
+                                "ts" to System.currentTimeMillis().toDouble()
+                            )
+                        )
+                    }
+                    promise.resolve(result)
                 } catch (e: Exception) {
                     promise.reject("test_failed", e.message ?: "Test failed", e)
                 }

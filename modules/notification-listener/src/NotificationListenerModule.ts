@@ -278,6 +278,16 @@ const NotificationListenerModule = {
       remove: () => void;
     };
   },
+
+  addCallTranscriptionTestLogListener(
+    listener: (data: { stage: string; message: string; ts: number }) => void
+  ) {
+    if (!emitter) return { remove: () => undefined };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (emitter as any).addListener('onCallTranscriptionTestLog', listener) as {
+      remove: () => void;
+    };
+  },
 };
 
 export default NotificationListenerModule;

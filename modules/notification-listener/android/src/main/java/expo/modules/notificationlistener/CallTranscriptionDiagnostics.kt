@@ -96,15 +96,20 @@ object CallTranscriptionDiagnostics {
     /**
      * Runs the full decode + transcribe pipeline on the newest recording found,
      * ignoring both the "enabled" flag and the last-processed marker so it can be
-     * triggered on demand. Returns a step-by-step report. Heavy — call off the
-     * main thread.
+     * triggered on demand. [onLog] is called at each stage with a stage key and a
+     * human-readable message — callers can forward these to the JS bridge for
+     * real-time display. Heavy — call off the main thread.
      */
-    fun runFullTest(context: Context): Map<String, Any?> {
+    fun runFullTest(
+        context: Context,
+        onLog: ((stage: String, message: String) -> Unit)? = null
+    ): Map<String, Any?> {
         val now = System.currentTimeMillis()
+        val dirs = CallRecordingFinder.candidateDirs(context)
+        onLog?.invoke("start", "Scanning ${dirs.size} folder(s) for audio files…")
 
-        // Find newest audio file across candidate dirs (ignore processed marker).
         var newest: File? = null
-        for (path in CallRecordingFinder.candidateDirs(context)) {
+        for (path in dirs) {
             val files = try {
                 File(path).listFiles { f ->
                     f.isFile && AUDIO_EXTENSIONS.contains(f.extension.lowercase())
@@ -117,15 +122,22 @@ object CallTranscriptionDiagnostics {
             }
         }
 
-        val recording = newest
-            ?: return mapOf(
+        val recording = newest ?: run {
+            onLog?.invoke("find", "FAILED — no audio file found in any candidate folder")
+            return mapOf(
                 "ok" to false,
                 "stage" to "find",
                 "error" to "No audio recording found in any candidate folder. " +
                     "Check that all-files access is granted and that your recorder saves to one of the listed folders."
             )
+        }
+
+        val ageSec = (now - recording.lastModified()) / 1000
+        val sizeKb = recording.length() / 1024
+        onLog?.invoke("find", "Found: ${recording.name} (${sizeKb} KB, ${ageSec}s old)")
 
         if (!WhisperModelManager.isModelDownloaded(context)) {
+            onLog?.invoke("model", "FAILED — model not downloaded")
             return mapOf(
                 "ok" to false,
                 "stage" to "model",
@@ -133,8 +145,10 @@ object CallTranscriptionDiagnostics {
                 "error" to "Whisper model is not downloaded."
             )
         }
+        onLog?.invoke("model", "Model OK: ${WhisperModelManager.MODEL_FILENAME}")
 
         if (!(WhisperJNI.ensureLoaded() && WhisperJNI.isReal())) {
+            onLog?.invoke("engine", "FAILED — engine not built into this APK")
             return mapOf(
                 "ok" to false,
                 "stage" to "engine",
@@ -142,11 +156,15 @@ object CallTranscriptionDiagnostics {
                 "error" to "On-device whisper engine is not built into this APK."
             )
         }
+        onLog?.invoke("engine", "Engine loaded OK")
 
+        onLog?.invoke("decode", "Decoding ${recording.name}…")
         val decodeStart = System.currentTimeMillis()
         val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
         val decodeMs = System.currentTimeMillis() - decodeStart
+
         if (pcm == null || pcm.isEmpty()) {
+            onLog?.invoke("decode", "FAILED — could not decode audio (unsupported codec or unreadable file)")
             return mapOf(
                 "ok" to false,
                 "stage" to "decode",
@@ -156,40 +174,77 @@ object CallTranscriptionDiagnostics {
             )
         }
 
-        val transcribeStart = System.currentTimeMillis()
+        val durationSec = pcm.size / 16000.0
+        onLog?.invoke(
+            "decode",
+            "Decoded %.1fs of audio in %dms".format(durationSec, decodeMs)
+        )
+
+        val estSec = (durationSec * 15).toInt().coerceAtLeast(5)
+        onLog?.invoke(
+            "transcribe",
+            "Transcribing %.1fs of audio — estimated ~%ds on this device. Keep screen on.".format(
+                durationSec, estSec
+            )
+        )
+
         val modelPath = WhisperModelManager.modelFile(context).absolutePath
+        val transcribeStart = System.currentTimeMillis()
         val result = WhisperTranscriber.transcribe(modelPath, pcm)
         val transcribeMs = System.currentTimeMillis() - transcribeStart
 
         return when (result) {
-            is WhisperTranscriber.Result.Success -> mapOf(
-                "ok" to true,
-                "stage" to "transcribe",
-                "recordingPath" to recording.absolutePath,
-                "recordingAgeMs" to (now - recording.lastModified()).toDouble(),
-                "decodedSamples" to pcm.size.toDouble(),
-                "decodeMs" to decodeMs.toDouble(),
-                "transcribeMs" to transcribeMs.toDouble(),
-                "transcript" to result.text
-            )
-            WhisperTranscriber.Result.EngineNotBuilt -> mapOf(
-                "ok" to false, "stage" to "transcribe",
-                "recordingPath" to recording.absolutePath,
-                "error" to "Engine not built."
-            )
-            WhisperTranscriber.Result.ModelMissing -> mapOf(
-                "ok" to false, "stage" to "transcribe",
-                "recordingPath" to recording.absolutePath,
-                "error" to "Model failed to load."
-            )
-            WhisperTranscriber.Result.TranscriptionFailed -> mapOf(
-                "ok" to false, "stage" to "transcribe",
-                "recordingPath" to recording.absolutePath,
-                "decodedSamples" to pcm.size.toDouble(),
-                "decodeMs" to decodeMs.toDouble(),
-                "transcribeMs" to transcribeMs.toDouble(),
-                "error" to "Transcription produced no text (silent or unintelligible audio)."
-            )
+            is WhisperTranscriber.Result.Success -> {
+                onLog?.invoke(
+                    "transcribe",
+                    "Done in %.1fs. Preview: %s".format(
+                        transcribeMs / 1000.0,
+                        result.text.take(100).replace('\n', ' ')
+                    )
+                )
+                mapOf(
+                    "ok" to true,
+                    "stage" to "transcribe",
+                    "recordingPath" to recording.absolutePath,
+                    "recordingAgeMs" to (now - recording.lastModified()).toDouble(),
+                    "decodedSamples" to pcm.size.toDouble(),
+                    "decodeMs" to decodeMs.toDouble(),
+                    "transcribeMs" to transcribeMs.toDouble(),
+                    "transcript" to result.text
+                )
+            }
+            WhisperTranscriber.Result.EngineNotBuilt -> {
+                onLog?.invoke("transcribe", "FAILED — engine not built")
+                mapOf(
+                    "ok" to false, "stage" to "transcribe",
+                    "recordingPath" to recording.absolutePath,
+                    "error" to "Engine not built."
+                )
+            }
+            WhisperTranscriber.Result.ModelMissing -> {
+                onLog?.invoke("transcribe", "FAILED — model failed to load from disk")
+                mapOf(
+                    "ok" to false, "stage" to "transcribe",
+                    "recordingPath" to recording.absolutePath,
+                    "error" to "Model failed to load."
+                )
+            }
+            WhisperTranscriber.Result.TranscriptionFailed -> {
+                onLog?.invoke(
+                    "transcribe",
+                    "FAILED after %.1fs — no text produced (silent or unintelligible audio)".format(
+                        transcribeMs / 1000.0
+                    )
+                )
+                mapOf(
+                    "ok" to false, "stage" to "transcribe",
+                    "recordingPath" to recording.absolutePath,
+                    "decodedSamples" to pcm.size.toDouble(),
+                    "decodeMs" to decodeMs.toDouble(),
+                    "transcribeMs" to transcribeMs.toDouble(),
+                    "error" to "Transcription produced no text (silent or unintelligible audio)."
+                )
+            }
         }
     }
 }
