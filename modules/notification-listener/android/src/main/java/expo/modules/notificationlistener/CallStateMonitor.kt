@@ -21,9 +21,7 @@ object CallStateMonitor {
     private const val TAG = "CallStateMonitor"
 
     // Wait for the recorder to finish writing before scanning for the file.
-    // 30 s covers most third-party and VoIP recorders (stock Android: ~5 s,
-    // WhatsApp: ~15 s, some ROMs: up to 25 s).
-    private const val TRANSCRIBE_DELAY_MS = 30_000L
+    private const val TRANSCRIBE_DELAY_MS = 15_000L
 
     private val handler = Handler(Looper.getMainLooper())
     private var registered = false

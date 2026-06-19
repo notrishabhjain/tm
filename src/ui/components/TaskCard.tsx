@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, PanResponder } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { getPriorityColor, Colors } from '../theme/colors';
 import { useTheme } from '../theme';
@@ -177,11 +178,22 @@ export function TaskCard({
             </View>
           </View>
 
-          {due && (
-            <View style={styles.dueWrap}>
-              <Text style={[styles.dueText, { color: due.color }]}>{due.label}</Text>
-            </View>
-          )}
+          <View style={styles.rightCol}>
+            {due && <Text style={[styles.dueText, { color: due.color }]}>{due.label}</Text>}
+            <Pressable
+              onPress={handleComplete}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.checkBtn,
+                { borderColor: theme.outline },
+                pressed && { backgroundColor: Colors.success, borderColor: Colors.success },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Mark complete"
+            >
+              <Ionicons name="checkmark" size={14} color={theme.onSurfaceVariant} />
+            </Pressable>
+          </View>
         </Pressable>
       </Animated.View>
     </View>
@@ -225,6 +237,14 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 },
   meta: { fontSize: 13, flex: 1, fontWeight: '400' },
   reviewTag: { fontSize: 12, fontWeight: '600' },
-  dueWrap: { marginLeft: 12, alignSelf: 'flex-start', marginTop: 1 },
-  dueText: { fontSize: 13, fontWeight: '600' },
+  rightCol: { marginLeft: 12, alignItems: 'flex-end', gap: 6, alignSelf: 'center' },
+  dueText: { fontSize: 12, fontWeight: '600' },
+  checkBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
