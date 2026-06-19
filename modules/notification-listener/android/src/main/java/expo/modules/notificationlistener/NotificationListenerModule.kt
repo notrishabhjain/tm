@@ -336,6 +336,32 @@ class NotificationListenerModule : Module() {
         AsyncFunction("deleteWhisperModel") {
             WhisperModelManager.deleteModel(context)
         }
+
+        // ── Call-transcription diagnostics (debug screen) ──────────────────────
+
+        AsyncFunction("getCallDiagnostics") {
+            CallTranscriptionDiagnostics.inspect(context)
+        }
+
+        // Runs the full decode + transcribe pipeline on the newest recording on
+        // demand (ignores enabled flag + processed marker). Heavy — runs on its
+        // own thread so it never blocks the bridge.
+        AsyncFunction("runCallTranscriptionTest") { promise: Promise ->
+            Thread {
+                try {
+                    promise.resolve(CallTranscriptionDiagnostics.runFullTest(context))
+                } catch (e: Exception) {
+                    promise.reject("test_failed", e.message ?: "Test failed", e)
+                }
+            }.start()
+        }
+
+        // Fires the exact path a real call-end takes: starts CallTranscriptionService.
+        AsyncFunction("simulateCallEnded") {
+            context.startForegroundService(
+                Intent(context, CallTranscriptionService::class.java)
+            )
+        }
     }
 
     private fun openAppDetailsSettings() {

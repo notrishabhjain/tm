@@ -6,6 +6,8 @@ import type {
   FocusState,
   CallTranscriptionStatus,
   CallTranscriptReadyEvent,
+  CallDiagnostics,
+  CallTranscriptionTestResult,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -239,6 +241,26 @@ const NotificationListenerModule = {
   clearPendingCallTranscript(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.clearPendingCallTranscript() as Promise<void>;
+  },
+
+  getCallDiagnostics(): Promise<CallDiagnostics | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.getCallDiagnostics() as Promise<CallDiagnostics>;
+  },
+
+  runCallTranscriptionTest(): Promise<CallTranscriptionTestResult> {
+    if (!NativeModule)
+      return Promise.resolve({
+        ok: false,
+        stage: 'engine',
+        error: 'Native module unavailable',
+      } as CallTranscriptionTestResult);
+    return NativeModule.runCallTranscriptionTest() as Promise<CallTranscriptionTestResult>;
+  },
+
+  simulateCallEnded(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.simulateCallEnded() as Promise<void>;
   },
 
   addCallTranscriptReadyListener(listener: (data: CallTranscriptReadyEvent) => void) {

@@ -7,4 +7,8 @@ export type {
   FocusState,
   CallTranscriptionStatus,
   CallTranscriptReadyEvent,
+  CallDiagnostics,
+  CallDirReport,
+  CallRecordingReport,
+  CallTranscriptionTestResult,
 } from './types';

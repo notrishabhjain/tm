@@ -333,6 +333,10 @@ export default function RootLayout(): React.JSX.Element {
                   name="settings/in-app-transcription"
                   options={{ presentation: 'card' }}
                 />
+                <Stack.Screen
+                  name="settings/transcription-debug"
+                  options={{ presentation: 'card' }}
+                />
                 <Stack.Screen name="settings/google-tasks" options={{ presentation: 'card' }} />
                 <Stack.Screen name="settings/ai-cloud" options={{ presentation: 'card' }} />
                 <Stack.Screen name="settings/focus-lock" options={{ presentation: 'card' }} />

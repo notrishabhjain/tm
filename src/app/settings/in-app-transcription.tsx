@@ -255,6 +255,17 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
           recording, and transcribes it on-device — audio never leaves your phone. The transcript
           opens the review screen where AI extracts action items with correct dates.
         </Text>
+
+        <Pressable
+          onPress={() => router.push('/settings/transcription-debug')}
+          style={[styles.debugBtn, { borderColor: theme.outline }]}
+        >
+          <Ionicons name="bug-outline" size={18} color={theme.primary} />
+          <Text style={[styles.debugLabel, { color: theme.primary }]}>
+            Not working? Open debug & test tools
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.onSurfaceVariant} />
+        </Pressable>
       </ScrollView>
     </Screen>
   );
@@ -353,4 +364,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 4,
   },
+  debugBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 0.5,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  debugLabel: { fontSize: 14, fontWeight: '600', flex: 1 },
 });
