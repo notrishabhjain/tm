@@ -57,3 +57,46 @@ export interface CallTranscriptReadyEvent {
   callTime: number;
   callerLabel: string;
 }
+
+export interface CallDirReport {
+  path: string;
+  exists: boolean;
+  isDirectory: boolean;
+  canRead: boolean;
+  audioFileCount: number;
+}
+
+export interface CallRecordingReport {
+  name: string;
+  path: string;
+  ageMs: number;
+  sizeBytes: number;
+}
+
+export interface CallDiagnostics {
+  enabled: boolean;
+  monitorRegistered: boolean;
+  foregroundServiceRunning: boolean;
+  hasPhoneStatePermission: boolean;
+  hasCallLogPermission: boolean;
+  hasAllFilesAccess: boolean;
+  modelDownloaded: boolean;
+  engineBuilt: boolean;
+  lastProcessedPath: string | null;
+  latestUnprocessedPath: string | null;
+  latestUnprocessedAgeMs: number | null;
+  dirs: CallDirReport[];
+  recentRecordings: CallRecordingReport[];
+}
+
+export interface CallTranscriptionTestResult {
+  ok: boolean;
+  stage: 'find' | 'model' | 'engine' | 'decode' | 'transcribe';
+  recordingPath?: string;
+  recordingAgeMs?: number;
+  decodedSamples?: number;
+  decodeMs?: number;
+  transcribeMs?: number;
+  transcript?: string;
+  error?: string;
+}

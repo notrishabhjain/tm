@@ -27,6 +27,9 @@ object CallStateMonitor {
     private var registered = false
     private var wasOffhook = false
 
+    /** True once the telephony callback has been successfully registered. */
+    fun isRegistered(): Boolean = registered
+
     private var telephonyManager: TelephonyManager? = null
     private var legacyListener: PhoneStateListener? = null
     private var modernCallback: TelephonyCallback? = null
