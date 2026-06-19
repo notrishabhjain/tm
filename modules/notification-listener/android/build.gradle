@@ -11,39 +11,20 @@ useDefaultAndroidSdkVersions()
 
 android {
   namespace "expo.modules.notificationlistener"
-
-  defaultConfig {
-    def archProperty = findProperty("reactNativeArchitectures")
-    def archs = archProperty ? archProperty.toString().split(",") : ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
-    externalNativeBuild {
-      cmake {
-        abiFilters (*archs)
-      }
-    }
-  }
-
-  // Builds the on-device whisper.cpp JNI bridge used for in-app call
-  // transcription. If src/main/cpp/whisper.cpp (a checkout of
-  // https://github.com/ggerganov/whisper.cpp) is not present, CMake builds a
-  // stub library instead — see src/main/cpp/CMakeLists.txt and the "Call
-  // Transcription" settings screen for setup instructions.
-  externalNativeBuild {
-    cmake {
-      path "src/main/cpp/CMakeLists.txt"
-      version "3.22.1"
-    }
-  }
 }
 
 dependencies {
-  // React Native runtime — needed for HeadlessJsTaskService / Arguments used by
-  // the background notification pipeline. Version is supplied by the app's React
-  // Native Gradle setup (same as expo-splash-screen and other Expo modules).
   implementation 'com.facebook.react:react-android'
 
-  // ML Kit bundled text recognition — models ship inside the APK, fully offline,
-  // no data leaves the device at runtime.
   implementation 'com.google.mlkit:text-recognition:16.0.1'
   implementation 'com.google.mlkit:text-recognition-devanagari:16.0.1'
 
+  // gRPC for NVIDIA cloud ASR
+  implementation('io.grpc:grpc-okhttp:1.65.0') {
+    exclude group: 'com.google.guava', module: 'listenablefuture'
+  }
+  implementation('io.grpc:grpc-stub:1.65.0') {
+    exclude group: 'com.google.guava', module: 'listenablefuture'
+    exclude module: 'annotations'
+  }
 }

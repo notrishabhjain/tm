@@ -30,7 +30,6 @@ class NotificationListenerModule : Module() {
             "onQuickActionOpen",
             "onManualTrigger",
             "onCallTranscriptReady",
-            "onModelDownloadProgress",
             "onCallTranscriptionTestLog"
         )
 
@@ -266,10 +265,18 @@ class NotificationListenerModule : Module() {
                 "hasPhoneStatePermission" to hasPermission(android.Manifest.permission.READ_PHONE_STATE),
                 "hasCallLogPermission" to hasPermission(android.Manifest.permission.READ_CALL_LOG),
                 "hasAllFilesAccess" to hasAllFilesAccess(),
-                "modelDownloaded" to WhisperModelManager.isModelDownloaded(context),
-                "engineBuilt" to (WhisperJNI.ensureLoaded() && WhisperJNI.isReal()),
-                "modelName" to WhisperModelManager.MODEL_FILENAME,
+                "apiKeySet" to prefs.getString("nvidia_api_key", null).orEmpty().isNotBlank(),
             )
+        }
+
+        AsyncFunction("setNvidiaApiKey") { key: String ->
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit().putString("nvidia_api_key", key.trim()).apply()
+        }
+
+        AsyncFunction("getNvidiaApiKey") {
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .getString("nvidia_api_key", null).orEmpty()
         }
 
         AsyncFunction("setCallTranscriptionEnabled") { enabled: Boolean ->
@@ -319,23 +326,6 @@ class NotificationListenerModule : Module() {
         // denied ("Don't ask again").
         AsyncFunction("openAppSettings") {
             openAppDetailsSettings()
-        }
-
-        AsyncFunction("downloadWhisperModel") { promise: Promise ->
-            Thread {
-                try {
-                    WhisperModelManager.downloadModel(context) { pct ->
-                        instance?.sendEvent("onModelDownloadProgress", mapOf("progress" to pct))
-                    }
-                    promise.resolve(true)
-                } catch (e: Exception) {
-                    promise.reject("download_failed", e.message ?: "Download failed", e)
-                }
-            }.start()
-        }
-
-        AsyncFunction("deleteWhisperModel") {
-            WhisperModelManager.deleteModel(context)
         }
 
         // ── Call-transcription diagnostics (debug screen) ──────────────────────

@@ -182,12 +182,20 @@ const NotificationListenerModule = {
         hasPhoneStatePermission: false,
         hasCallLogPermission: false,
         hasAllFilesAccess: false,
-        modelDownloaded: false,
-        engineBuilt: false,
-        modelName: 'ggml-medium-q5_0.bin',
+        apiKeySet: false,
       });
     }
     return NativeModule.getCallTranscriptionStatus() as Promise<CallTranscriptionStatus>;
+  },
+
+  setNvidiaApiKey(key: string): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setNvidiaApiKey(key) as Promise<void>;
+  },
+
+  getNvidiaApiKey(): Promise<string> {
+    if (!NativeModule) return Promise.resolve('');
+    return NativeModule.getNvidiaApiKey() as Promise<string>;
   },
 
   setCallTranscriptionEnabled(enabled: boolean): Promise<void> {
@@ -213,16 +221,6 @@ const NotificationListenerModule = {
   openAppSettings(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.openAppSettings() as Promise<void>;
-  },
-
-  downloadWhisperModel(): Promise<boolean> {
-    if (!NativeModule) return Promise.resolve(false);
-    return NativeModule.downloadWhisperModel() as Promise<boolean>;
-  },
-
-  deleteWhisperModel(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.deleteWhisperModel() as Promise<void>;
   },
 
   peekPendingCallTranscript(): Promise<{
@@ -252,7 +250,7 @@ const NotificationListenerModule = {
     if (!NativeModule)
       return Promise.resolve({
         ok: false,
-        stage: 'engine',
+        stage: 'apikey',
         error: 'Native module unavailable',
       } as CallTranscriptionTestResult);
     return NativeModule.runCallTranscriptionTest() as Promise<CallTranscriptionTestResult>;
@@ -267,14 +265,6 @@ const NotificationListenerModule = {
     if (!emitter) return { remove: () => undefined };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (emitter as any).addListener('onCallTranscriptReady', listener) as {
-      remove: () => void;
-    };
-  },
-
-  addModelDownloadProgressListener(listener: (data: { progress: number }) => void) {
-    if (!emitter) return { remove: () => undefined };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (emitter as any).addListener('onModelDownloadProgress', listener) as {
       remove: () => void;
     };
   },

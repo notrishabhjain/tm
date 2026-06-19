@@ -35,10 +35,10 @@ function fmtSize(bytes: number): string {
 
 const STAGE_LABEL: Record<string, string> = {
   find: 'Find recording',
-  model: 'Load model',
-  engine: 'Engine',
+  apikey: 'API key',
+  network: 'Network',
   decode: 'Decode audio',
-  transcribe: 'Transcribe',
+  transcribe: 'Transcribe (NVIDIA)',
 };
 
 export default function TranscriptionDebugScreen(): React.JSX.Element {
@@ -110,7 +110,7 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
     } catch (e) {
       setTestResult({
         ok: false,
-        stage: 'engine',
+        stage: 'transcribe',
         error: e instanceof Error ? e.message : 'Test threw an error',
       });
     } finally {
@@ -120,7 +120,7 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
   };
 
   const simulate = async (): Promise<void> => {
-    setSimulateStatus('Starting transcription service — this will take several minutes…');
+    setSimulateStatus('Starting transcription service…');
     setReceivedTranscript(null);
     await NotificationListener.simulateCallEnded();
     setTimeout(refresh, 1000);
@@ -161,8 +161,12 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
             ok={diag?.hasAllFilesAccess}
             hint="Required to read recordings outside app-visible folders."
           />
-          <Flag theme={theme} label="Model downloaded" ok={diag?.modelDownloaded} />
-          <Flag theme={theme} label="On-device engine built" ok={diag?.engineBuilt} />
+          <Flag
+            theme={theme}
+            label="NVIDIA API key set"
+            ok={diag?.apiKeySet}
+            hint="Enter your nvapi-... key in Call Transcription settings."
+          />
         </Section>
 
         {/* ── Latest recording ──────────────────────────────────────── */}
@@ -250,7 +254,7 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
             </View>
             {running && (
               <Text style={[styles.runningHint, { color: Colors.primary500 }]}>
-                Whisper medium takes 3–10 min on a phone CPU. Keep the screen on and wait.
+                Sending audio to NVIDIA cloud ASR — usually completes in under 30s.
               </Text>
             )}
             <ScrollView
@@ -368,8 +372,8 @@ export default function TranscriptionDebugScreen(): React.JSX.Element {
             fullWidth
           />
           <Text style={[styles.note, { color: theme.onSurfaceVariant }]}>
-            Fires the exact code path a real call-end takes. Transcription runs in the background —
-            it will take several minutes. The review screen should appear when done.
+            Fires the exact code path a real call-end takes. The review screen should appear once
+            NVIDIA returns the transcript (usually under a minute).
           </Text>
 
           <Pressable onPress={refresh} style={styles.refreshBtn}>
