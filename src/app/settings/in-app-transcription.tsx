@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Switch, Pressable } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/ui/theme';
 import { Colors } from '@/ui/theme/colors';
@@ -19,14 +18,6 @@ const DEFAULT_STATUS: CallTranscriptionStatus = {
   engineBuilt: false,
   modelName: 'ggml-medium-q5_0.bin',
 };
-
-const BUILD_STEPS = `# 1. From the project root, clone whisper.cpp into the native folder
-cd modules/notification-listener/android/src/main/cpp
-git clone --depth 1 https://github.com/ggerganov/whisper.cpp
-
-# 2. Back to project root, rebuild the app (this compiles whisper.cpp)
-cd ../../../../../../..
-npx expo run:android --variant release`;
 
 export default function InAppTranscriptionScreen(): React.JSX.Element {
   const theme = useTheme();
@@ -58,7 +49,7 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     if (!granted) {
       Alert.alert(
         'Permission needed',
-        'Phone & call-log access was not granted. If the dialog didn’t appear, you may have denied it before — open App Settings → Permissions to enable it manually.',
+        'Phone & call-log access was not granted. If the dialog didn’t appear, you may have denied it before — open App Settings → Permissions and enable “Phone” and “Call logs” manually.',
         [
           { text: 'Not now', style: 'cancel' },
           { text: 'Open App Settings', onPress: () => void NotificationListener.openAppSettings() },
@@ -69,11 +60,6 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
 
   const grantAllFiles = async (): Promise<void> => {
     await NotificationListener.openAllFilesAccessSettings();
-  };
-
-  const copyBuildSteps = async (): Promise<void> => {
-    await Clipboard.setStringAsync(BUILD_STEPS);
-    Alert.alert('Copied', 'Build commands copied to clipboard.');
   };
 
   const downloadModel = async (): Promise<void> => {
@@ -109,7 +95,7 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     status.hasAllFilesAccess;
 
   const steps = [
-    { ok: status.engineBuilt, label: 'On-device engine built (whisper.cpp)' },
+    { ok: status.engineBuilt, label: 'On-device engine (ships in the app)' },
     { ok: status.modelDownloaded, label: `Model downloaded · ${status.modelName}` },
     { ok: status.hasPhoneStatePermission, label: 'Phone & call-log access' },
     { ok: status.hasAllFilesAccess, label: 'All-files access (to read recordings)' },
@@ -122,8 +108,7 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[styles.intro, { color: theme.onSurfaceVariant }]}>
           TaskMind detects when a call ends, finds the recording your phone saved, and transcribes
-          it on-device with whisper.cpp — fully inside the app. No Termux, no MacroDroid, nothing
-          Android can kill in the background.
+          it on-device — fully inside the app. No Termux, no MacroDroid, no computer needed.
         </Text>
 
         {/* Progress summary */}
@@ -148,30 +133,27 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
           ))}
         </View>
 
-        {/* Step 1: build engine */}
+        {/* Engine note — only if somehow missing from this build */}
         {!status.engineBuilt && (
-          <Card theme={theme} step="1" title="Build the on-device engine">
-            <Text style={[styles.body, { color: theme.onSurface }]}>
-              A one-time rebuild compiles whisper.cpp into the app. Run these from your computer in
-              the project folder:
-            </Text>
-            <View style={styles.codeBox}>
-              <Text style={styles.code}>{BUILD_STEPS}</Text>
+          <View
+            style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+          >
+            <View style={styles.cardHead}>
+              <Ionicons name="information-circle" size={22} color={Colors.primary500} />
+              <Text style={[styles.cardTitle, { color: theme.onSurface }]}>
+                Engine not detected
+              </Text>
             </View>
-            <Button
-              label="Copy commands"
-              variant="secondary"
-              onPress={() => void copyBuildSteps()}
-              fullWidth
-            />
-            <Text style={[styles.note, { color: theme.onSurfaceVariant }]}>
-              After this, every future build includes the engine automatically.
+            <Text style={[styles.body, { color: theme.onSurface }]}>
+              The transcription engine is compiled into the app automatically. This build doesn’t
+              include it — install the latest TaskMind build (the newest APK from your releases) and
+              this step will complete on its own. Nothing to do on your phone.
             </Text>
-          </Card>
+          </View>
         )}
 
-        {/* Step 2: permissions */}
-        <Card theme={theme} step="2" title="Grant permissions">
+        {/* Permissions */}
+        <Card theme={theme} step="1" title="Grant permissions">
           <PermLine
             theme={theme}
             label="Phone & call log"
@@ -207,11 +189,11 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
           </Pressable>
         </Card>
 
-        {/* Step 3: model */}
-        <Card theme={theme} step="3" title="Download the model">
+        {/* Model */}
+        <Card theme={theme} step="2" title="Download the model">
           <Text style={[styles.body, { color: theme.onSurface }]}>
             medium-q5_0 (~530 MB) gives much better accuracy on Hindi/Hinglish and accented speech
-            than the small model. Downloaded once, stored on your device.
+            than the small model. Downloaded once, over Wi-Fi, and stored on your device.
           </Text>
           {status.modelDownloaded ? (
             <Button
@@ -237,8 +219,8 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
           )}
         </Card>
 
-        {/* Step 4: enable */}
-        <Card theme={theme} step="4" title="Enable">
+        {/* Enable */}
+        <Card theme={theme} step="3" title="Enable">
           <View style={styles.enableRow}>
             <Text style={[styles.body, styles.flex1, { color: theme.onSurface }]}>
               Auto-transcribe and review tasks after every call
@@ -344,9 +326,6 @@ const styles = StyleSheet.create({
   body: { fontSize: 14, lineHeight: 22 },
   note: { fontSize: 13, lineHeight: 19 },
   flex1: { flex: 1 },
-
-  codeBox: { borderRadius: 12, padding: 14, backgroundColor: '#16161A' },
-  code: { fontFamily: 'monospace', fontSize: 12, color: '#D4D4D8', lineHeight: 19 },
 
   permLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   permLabel: { fontSize: 14, flex: 1 },
