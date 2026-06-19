@@ -38,6 +38,22 @@ function isQuietHours(): boolean {
   }
 }
 
+// Returns true when a near-identical task was already created from the same app
+// within the last 10 minutes — catches the WhatsApp "unread + new message fires
+// old notification again" pattern and Android group-summary re-deliveries.
+async function isContentDuplicate(
+  candidateTitle: string,
+  sourceApp: string,
+  taskRepo: TaskRepository
+): Promise<boolean> {
+  try {
+    const recent = await taskRepo.getRecentBySourceApp(sourceApp);
+    return recent.some((t) => titleSimilarity(t.title, candidateTitle) >= 0.85);
+  } catch {
+    return false; // best-effort — never block on dedup failure
+  }
+}
+
 // Jaccard similarity on word tokens — used for near-duplicate task detection.
 function titleSimilarity(a: string, b: string): number {
   const tokens = (s: string): Set<string> =>
@@ -145,6 +161,11 @@ async function _handleNotification(notification: NotificationData): Promise<void
     // When Cloud AI is enabled we still pass the message through it to get a
     // cleaner title / smarter priority, but we never let AI suppress a VIP.
     let title = extractTitle(messageText, notification.title ?? '', notification.packageName);
+    if (await isContentDuplicate(title, notification.packageName, taskRepo)) {
+      logCapturedNotification(notification, 'FILTERED');
+      await refreshPersistentNotification(taskRepo);
+      return;
+    }
     let priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW' = 'URGENT';
     let dueDate: number | null = null;
     const aiActive = Boolean(getSetting('ai_enabled') && getSetting('ai_api_key'));
@@ -224,6 +245,11 @@ async function _handleNotification(notification: NotificationData): Promise<void
         const title2 =
           aiResult.title ??
           extractTitle(messageText2, notification.title ?? '', notification.packageName);
+        if (await isContentDuplicate(title2, notification.packageName, taskRepo2)) {
+          logCapturedNotification(notification, 'FILTERED');
+          await refreshPersistentNotification(taskRepo2);
+          return;
+        }
         const needsConfirmation = aiResult.certainty !== 'high';
         const confidence = aiResult.certainty === 'high' ? 0.95 : 0.6;
         const aiTask = await taskRepo2.createTask({
@@ -354,6 +380,11 @@ async function _handleNotification(notification: NotificationData): Promise<void
     } catch {
       /* non-fatal — dedup is best-effort */
     }
+  }
+
+  if (await isContentDuplicate(candidateTitle, notification.packageName, taskRepo)) {
+    logCapturedNotification(notification, 'FILTERED');
+    return;
   }
 
   // ── Create task ──────────────────────────────────────────────────────────────
