@@ -16,18 +16,35 @@ object CallRecordingFinder {
 
     // Common locations across OEMs for call recordings, checked in order.
     private val DEFAULT_DIRS = listOf(
+        // Samsung
         "/storage/emulated/0/Recordings/Record/Call",
         "/storage/emulated/0/Recordings/Call",
-        "/storage/emulated/0/MIUI/sounds/Call",
+        // Generic / AOSP
         "/storage/emulated/0/Recordings/CallRecordings",
         "/storage/emulated/0/Call",
         "/storage/emulated/0/CallRecordings",
+        "/storage/emulated/0/CallRecorder",
+        // Xiaomi / MIUI
+        "/storage/emulated/0/MIUI/sounds/Call",
+        "/storage/emulated/0/MIUI/sounds",
+        // OnePlus / OxygenOS
+        "/storage/emulated/0/Sounds/Call",
+        // Pixel / stock Android dialer
+        "/storage/emulated/0/Documents/Call Recordings",
+        "/storage/emulated/0/Music/Call Recordings",
+        // Huawei / EMUI
+        "/storage/emulated/0/Recorder/CallRecord",
+        // Third-party call recorder apps
+        "/storage/emulated/0/CallRecording",
+        "/storage/emulated/0/PhoneCallRecordings",
+        "/storage/emulated/0/Sounds",
     )
 
-    private val AUDIO_EXTENSIONS = setOf("m4a", "amr", "3gp", "mp3", "wav", "aac")
+    private val AUDIO_EXTENSIONS = setOf("m4a", "amr", "3gp", "mp3", "wav", "aac", "opus", "ogg")
 
-    /** Max age (ms) for a recording to be considered "from this call". */
-    private const val MAX_AGE_MS = 10 * 60 * 1000L
+    /** Max age (ms) for a recording to be considered "from this call".
+     *  Extended to 30 min to cover retry attempts inside CallTranscriptionService. */
+    private const val MAX_AGE_MS = 30 * 60 * 1000L
 
     fun candidateDirs(context: Context): List<String> {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
