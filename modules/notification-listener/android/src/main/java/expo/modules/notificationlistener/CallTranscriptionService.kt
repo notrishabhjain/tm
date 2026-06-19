@@ -102,6 +102,14 @@ class CallTranscriptionService : Service() {
             ?: "Unknown"
         val callTime = callInfo?.endedAt ?: recording.lastModified()
 
+        // Persist transcript so the app can pick it up when it resumes from background
+        // (sendCallTranscriptReady's sendEvent is a no-op if the JS bridge isn't active).
+        getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE).edit()
+            .putString("pending_transcript_text", text)
+            .putLong("pending_transcript_time", callTime)
+            .putString("pending_transcript_caller", callerLabel)
+            .apply()
+
         NotificationListenerModule.sendCallTranscriptReady(text, callTime, callerLabel)
         TaskWidgetProvider.triggerUpdate(this)
     }

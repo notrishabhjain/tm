@@ -11,6 +11,7 @@ import { Button } from '@/ui/components/Button';
 import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
+import { completeGoogleTask } from '@/services/google-tasks';
 
 const taskRepo = new TaskRepository(db);
 
@@ -73,6 +74,9 @@ export default function TaskDetailScreen(): React.JSX.Element {
   const completeMutation = useMutation({
     mutationFn: () => taskRepo.completeTask(id ?? ''),
     onSuccess: () => {
+      if (task?.googleTaskId) {
+        void completeGoogleTask(task.googleTaskId);
+      }
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
       router.back();
     },

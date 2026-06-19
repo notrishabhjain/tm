@@ -149,6 +149,24 @@ class NotificationListenerModule : Module() {
             clearShareIntentData()
         }
 
+        AsyncFunction("peekPendingCallTranscript") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            val text = prefs.getString("pending_transcript_text", null) ?: return@AsyncFunction null
+            mapOf(
+                "text" to text,
+                "callTime" to prefs.getLong("pending_transcript_time", System.currentTimeMillis()).toDouble(),
+                "callerLabel" to (prefs.getString("pending_transcript_caller", null) ?: "Unknown")
+            )
+        }
+
+        AsyncFunction("clearPendingCallTranscript") {
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE).edit()
+                .remove("pending_transcript_text")
+                .remove("pending_transcript_time")
+                .remove("pending_transcript_caller")
+                .apply()
+        }
+
         AsyncFunction("getLatestScreenshot") {
             val file = java.io.File(context.filesDir, "taskmind_share_screenshot.jpg")
             if (file.exists()) file.absolutePath else null

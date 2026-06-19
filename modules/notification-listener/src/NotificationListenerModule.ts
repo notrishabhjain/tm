@@ -223,6 +223,24 @@ const NotificationListenerModule = {
     return NativeModule.deleteWhisperModel() as Promise<void>;
   },
 
+  peekPendingCallTranscript(): Promise<{
+    text: string;
+    callTime: number;
+    callerLabel: string;
+  } | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.peekPendingCallTranscript() as Promise<{
+      text: string;
+      callTime: number;
+      callerLabel: string;
+    } | null>;
+  },
+
+  clearPendingCallTranscript(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.clearPendingCallTranscript() as Promise<void>;
+  },
+
   addCallTranscriptReadyListener(listener: (data: CallTranscriptReadyEvent) => void) {
     if (!emitter) return { remove: () => undefined };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

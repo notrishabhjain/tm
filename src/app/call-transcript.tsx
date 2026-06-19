@@ -87,7 +87,7 @@ export default function CallTranscriptScreen(): React.JSX.Element {
     const payload = consumeCallTranscript() ?? payloadRef.current;
     if (!payload) {
       setErrorMsg(
-        'No transcript was received.\n\nMake sure the Termux script ran after your call — see Settings → Call Transcription for setup.'
+        'No transcript was received.\n\nMake sure Call Transcription is enabled and all required permissions are granted in Settings → Call Transcription.'
       );
       setCanRetry(false);
       setState('error');
