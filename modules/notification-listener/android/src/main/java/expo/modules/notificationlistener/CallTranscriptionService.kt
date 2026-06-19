@@ -57,8 +57,19 @@ class CallTranscriptionService : Service() {
         val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("call_transcription_enabled", false)) return
 
-        val recording = CallRecordingFinder.findLatestUnprocessed(this) ?: run {
-            Log.d(TAG, "No new call recording found")
+        // Some recorder apps take longer than the initial delay to flush the file to
+        // disk (WhatsApp ~15 s, VoIP recorders up to 25 s after the initial 30 s wait).
+        // Retry every 15 s for up to 90 s before giving up.
+        var recording = CallRecordingFinder.findLatestUnprocessed(this)
+        if (recording == null) {
+            for (attempt in 1..6) {
+                Thread.sleep(15_000)
+                recording = CallRecordingFinder.findLatestUnprocessed(this)
+                if (recording != null) break
+            }
+        }
+        if (recording == null) {
+            Log.d(TAG, "No new call recording found after retries")
             return
         }
 

@@ -182,14 +182,8 @@ export default function SettingsScreen(): React.JSX.Element {
               icon="call-outline"
               tint={Colors.primary500}
               label="Call Transcription"
-              onPress={() => void router.push('/settings/in-app-transcription')}
-            />
-            <Row
-              icon="construct-outline"
-              tint={Colors.lowFg}
-              label="Call Transcription (legacy)"
               isLast
-              onPress={() => void router.push('/settings/call-transcription')}
+              onPress={() => void router.push('/settings/in-app-transcription')}
             />
           </Section>
 
