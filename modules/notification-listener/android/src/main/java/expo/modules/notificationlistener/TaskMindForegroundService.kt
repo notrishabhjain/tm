@@ -65,6 +65,9 @@ class TaskMindForegroundService : Service() {
                 val notification = buildNotification(pendingCount, urgentCount, taskTexts)
                 startForeground(NOTIFICATION_ID, notification)
                 hasStartedForeground = true
+                // Re-attempt every time the service starts in case READ_PHONE_STATE
+                // was not yet granted during onCreate (idempotent if already registered).
+                CallStateMonitor.start(this)
             }
         }
         return START_STICKY

@@ -203,6 +203,22 @@ export class TaskRepository {
     return rows as { id: string; title: string }[];
   }
 
+  async getRecentBySourceApp(
+    sourceApp: string,
+    windowMs = 10 * 60 * 1000
+  ): Promise<{ id: string; title: string }[]> {
+    const cutoff = Date.now() - windowMs;
+    const rows = await this.db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(
+        and(eq(tasks.sourceApp, sourceApp), isNull(tasks.deletedAt), gt(tasks.createdAt, cutoff))
+      )
+      .orderBy(desc(tasks.createdAt))
+      .limit(20);
+    return rows as { id: string; title: string }[];
+  }
+
   async findByNotificationKey(notificationKey: string): Promise<Task | null> {
     const result = await this.db
       .select()

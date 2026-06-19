@@ -106,6 +106,10 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         // Skip our own notifications
         if (packageName == applicationContext.packageName) return
 
+        // Group-summary notifications (FLAG_GROUP_SUMMARY) are meta-notifications that
+        // aggregate child notifications already dispatched individually — skip them.
+        if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+
         // Filter by monitored apps (empty set = monitor all)
         if (monitoredApps.isNotEmpty() && !monitoredApps.contains(packageName)) return
 

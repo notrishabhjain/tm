@@ -46,10 +46,19 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
   const requestPhonePermissions = async (): Promise<void> => {
     const granted = await NotificationListener.requestCallTranscriptionPermissions();
     refresh();
-    if (!granted) {
+    if (granted) {
+      // Restart the foreground service so CallStateMonitor can register now
+      // that READ_PHONE_STATE is available — the service start triggers the
+      // else-branch in onStartCommand which calls CallStateMonitor.start().
+      try {
+        await NotificationListener.startService();
+      } catch {
+        // non-fatal
+      }
+    } else {
       Alert.alert(
         'Permission needed',
-        'Phone & call-log access was not granted. If the dialog didn’t appear, you may have denied it before — open App Settings → Permissions and enable “Phone” and “Call logs” manually.',
+        'Phone & call-log access was not granted. If the dialog didn\'t appear, you may have denied it before — open App Settings → Permissions and enable "Phone" and "Call logs" manually.',
         [
           { text: 'Not now', style: 'cancel' },
           { text: 'Open App Settings', onPress: () => void NotificationListener.openAppSettings() },
@@ -145,7 +154,7 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
               </Text>
             </View>
             <Text style={[styles.body, { color: theme.onSurface }]}>
-              The transcription engine is compiled into the app automatically. This build doesn’t
+              The transcription engine is compiled into the app automatically. This build doesn't
               include it — install the latest TaskMind build (the newest APK from your releases) and
               this step will complete on its own. Nothing to do on your phone.
             </Text>

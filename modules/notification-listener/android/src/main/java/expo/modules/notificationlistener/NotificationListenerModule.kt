@@ -274,6 +274,16 @@ class NotificationListenerModule : Module() {
         AsyncFunction("setCallTranscriptionEnabled") { enabled: Boolean ->
             val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
             prefs.edit().putBoolean("call_transcription_enabled", enabled).apply()
+            if (enabled) {
+                // (Re-)start the foreground service so its onStartCommand else-branch
+                // calls CallStateMonitor.start() — handles the case where the service
+                // was already alive when READ_PHONE_STATE was first granted.
+                try {
+                    context.startForegroundService(Intent(context, TaskMindForegroundService::class.java))
+                } catch (_: Exception) { }
+            } else {
+                CallStateMonitor.stop()
+            }
         }
 
         AsyncFunction("setCallRecordingsDir") { dir: String? ->
