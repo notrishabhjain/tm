@@ -13,12 +13,12 @@ import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { db } from '@/data/db/client';
 import { MonitoredAppRepository } from '@/data/repositories/MonitoredAppRepository';
 import NotificationListener from '../../../modules/notification-listener/src';
 
 const repo = new MonitoredAppRepository(db);
-const DEPTH = 4;
 
 const COMMON_APPS = [
   { packageName: 'com.whatsapp', displayName: 'WhatsApp' },
@@ -91,14 +91,8 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
   const activeCount = apps.filter((a) => a.isActive).length;
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Monitored Apps</Text>
-        <View style={{ width: 56 }} />
-      </View>
+    <Screen>
+      <LargeHeader title="Monitored Apps" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.description, { color: theme.onSurfaceVariant }]}>
@@ -107,82 +101,80 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
             : 'No apps selected — all notifications are monitored.'}
         </Text>
 
-        <Text style={[styles.sectionLabel, { color: theme.primary }]}>COMMON APPS</Text>
-        <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={styles.cardShadow} />
-          <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            {COMMON_APPS.map((app, i) => {
-              const existing = appMap.get(app.packageName);
-              const isActive = existing?.isActive ?? false;
-              return (
-                <View
-                  key={app.packageName}
-                  style={[
-                    styles.row,
-                    i < COMMON_APPS.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderBottomColor: theme.outline,
-                    },
-                  ]}
-                >
-                  <View style={styles.rowInfo}>
-                    <Text style={[styles.appName, { color: theme.onSurface }]}>
-                      {app.displayName}
-                    </Text>
-                    <Text style={[styles.packageName, { color: theme.onSurfaceVariant }]}>
-                      {app.packageName}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={isActive}
-                    onValueChange={(v) => handleToggle(app.packageName, app.displayName, v)}
-                    trackColor={{ true: Colors.primary900, false: theme.outline }}
-                    thumbColor={Colors.white}
-                  />
+        <Text style={[styles.sectionLabel, { color: theme.onSurfaceVariant }]}>Common apps</Text>
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+          {COMMON_APPS.map((app, i) => {
+            const existing = appMap.get(app.packageName);
+            const isActive = existing?.isActive ?? false;
+            return (
+              <View
+                key={app.packageName}
+                style={[
+                  styles.row,
+                  i < COMMON_APPS.length - 1 && {
+                    borderBottomWidth: 0.5,
+                    borderBottomColor: theme.outline,
+                  },
+                ]}
+              >
+                <View style={styles.rowInfo}>
+                  <Text style={[styles.appName, { color: theme.onSurface }]}>
+                    {app.displayName}
+                  </Text>
+                  <Text style={[styles.packageName, { color: theme.onSurfaceVariant }]}>
+                    {app.packageName}
+                  </Text>
                 </View>
-              );
-            })}
-          </View>
+                <Switch
+                  value={isActive}
+                  onValueChange={(v) => handleToggle(app.packageName, app.displayName, v)}
+                  trackColor={{ true: Colors.primary500, false: theme.outline }}
+                  thumbColor={Colors.white}
+                />
+              </View>
+            );
+          })}
         </View>
 
         {apps.some((a) => !COMMON_APPS.find((c) => c.packageName === a.packageName)) && (
           <>
-            <Text style={[styles.sectionLabel, { color: theme.primary }]}>CUSTOM APPS</Text>
-            <View style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-              <View style={styles.cardShadow} />
-              <View style={[styles.card, { backgroundColor: theme.surface }]}>
-                {apps
-                  .filter((a) => !COMMON_APPS.find((c) => c.packageName === a.packageName))
-                  .map((app, i, arr) => (
-                    <View
-                      key={app.packageName}
-                      style={[
-                        styles.row,
-                        i < arr.length - 1 && {
-                          borderBottomWidth: 1,
-                          borderBottomColor: theme.outline,
-                        },
-                      ]}
-                    >
-                      <View style={styles.rowInfo}>
-                        <Text style={[styles.appName, { color: theme.onSurface }]}>
-                          {app.displayName}
-                        </Text>
-                        <Text style={[styles.packageName, { color: theme.onSurfaceVariant }]}>
-                          {app.packageName}
-                        </Text>
-                      </View>
-                      <Switch
-                        value={app.isActive}
-                        onValueChange={(v) =>
-                          toggleMutation.mutate({ packageName: app.packageName, isActive: v })
-                        }
-                        trackColor={{ true: Colors.primary900, false: theme.outline }}
-                        thumbColor={Colors.white}
-                      />
+            <Text style={[styles.sectionLabel, { color: theme.onSurfaceVariant }]}>
+              Custom apps
+            </Text>
+            <View
+              style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+            >
+              {apps
+                .filter((a) => !COMMON_APPS.find((c) => c.packageName === a.packageName))
+                .map((app, i, arr) => (
+                  <View
+                    key={app.packageName}
+                    style={[
+                      styles.row,
+                      i < arr.length - 1 && {
+                        borderBottomWidth: 0.5,
+                        borderBottomColor: theme.outline,
+                      },
+                    ]}
+                  >
+                    <View style={styles.rowInfo}>
+                      <Text style={[styles.appName, { color: theme.onSurface }]}>
+                        {app.displayName}
+                      </Text>
+                      <Text style={[styles.packageName, { color: theme.onSurfaceVariant }]}>
+                        {app.packageName}
+                      </Text>
                     </View>
-                  ))}
-              </View>
+                    <Switch
+                      value={app.isActive}
+                      onValueChange={(v) =>
+                        toggleMutation.mutate({ packageName: app.packageName, isActive: v })
+                      }
+                      trackColor={{ true: Colors.primary500, false: theme.outline }}
+                      thumbColor={Colors.white}
+                    />
+                  </View>
+                ))}
             </View>
           </>
         )}
@@ -190,8 +182,8 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
         <Pressable
           style={({ pressed }) => [
             styles.addBtn,
-            pressed && styles.addBtnPressed,
-            pressed && { backgroundColor: theme.pressHighlight },
+            { borderColor: theme.outline },
+            pressed && { opacity: 0.7 },
           ]}
           onPress={() => {
             setNewPackageName('');
@@ -216,7 +208,10 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
               Enter the package name (e.g. com.example.app)
             </Text>
             <TextInput
-              style={[styles.modalInput, { color: theme.onSurface, borderColor: theme.outline }]}
+              style={[
+                styles.modalInput,
+                { color: theme.onSurface, backgroundColor: theme.surfaceVariant },
+              ]}
               value={newPackageName}
               onChangeText={setNewPackageName}
               placeholder="com.example.app"
@@ -227,14 +222,14 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
             />
             <View style={styles.modalButtons}>
               <Pressable
-                style={styles.modalBtn}
+                style={({ pressed }) => [styles.modalBtn, pressed && { opacity: 0.7 }]}
                 onPress={() => setAddModalVisible(false)}
                 accessibilityRole="button"
               >
                 <Text style={[styles.modalBtnText, { color: theme.onSurfaceVariant }]}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={styles.modalBtn}
+                style={({ pressed }) => [styles.modalBtn, pressed && { opacity: 0.7 }]}
                 onPress={() => {
                   const trimmed = newPackageName.trim();
                   if (trimmed) {
@@ -250,25 +245,11 @@ export default function MonitoredAppsScreen(): React.JSX.Element {
           </View>
         </View>
       </Modal>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
-  },
-  backBtn: { padding: 4, minWidth: 56 },
-  backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
-  title: { fontSize: 17, fontWeight: '800', color: Colors.white },
   content: { padding: 16, paddingBottom: 32 },
   description: {
     fontSize: 13,
@@ -276,28 +257,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    fontSize: 13,
+    fontWeight: '600',
     marginBottom: 8,
     marginTop: 4,
   },
-  cardWrapper: { position: 'relative', marginBottom: 20 },
-  cardShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
   card: {
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
+    borderRadius: 16,
+    borderWidth: 0.5,
     overflow: 'hidden',
+    marginBottom: 20,
   },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   rowInfo: { flex: 1 },
@@ -305,14 +274,12 @@ const styles = StyleSheet.create({
   packageName: { fontSize: 11, marginTop: 2 },
   addBtn: {
     height: 48,
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
+    borderWidth: 0.5,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addBtnPressed: {},
-  addBtnText: { fontSize: 14, fontWeight: '700' },
+  addBtnText: { fontSize: 14, fontWeight: '600' },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -320,16 +287,13 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalCard: {
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: Colors.primary900,
+    borderRadius: 16,
     padding: 20,
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', marginBottom: 4 },
+  modalTitle: { fontSize: 17, fontWeight: '700', marginBottom: 4 },
   modalHint: { fontSize: 13, marginBottom: 12 },
   modalInput: {
-    borderWidth: 1,
-    borderRadius: 2,
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
@@ -341,5 +305,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   modalBtn: { paddingHorizontal: 16, paddingVertical: 10 },
-  modalBtnText: { fontSize: 14, fontWeight: '700' },
+  modalBtnText: { fontSize: 14, fontWeight: '600' },
 });

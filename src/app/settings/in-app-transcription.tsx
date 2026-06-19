@@ -1,8 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Switch, Pressable } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/ui/theme';
 import { Colors } from '@/ui/theme/colors';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { Button } from '@/ui/components/Button';
 import NotificationListener from '../../../modules/notification-listener/src';
 import type { CallTranscriptionStatus } from '../../../modules/notification-listener/src';
@@ -16,42 +18,6 @@ const DEFAULT_STATUS: CallTranscriptionStatus = {
   engineBuilt: false,
   modelName: 'ggml-medium-q5_0.bin',
 };
-
-function CheckRow({
-  label,
-  ok,
-  theme,
-}: {
-  label: string;
-  ok: boolean;
-  theme: ReturnType<typeof useTheme>;
-}): React.JSX.Element {
-  return (
-    <View style={styles.checkRow}>
-      <Text style={[styles.checkMark, { color: ok ? Colors.success : theme.onSurfaceVariant }]}>
-        {ok ? '✓' : '○'}
-      </Text>
-      <Text style={[styles.checkLabel, { color: theme.onSurface }]}>{label}</Text>
-    </View>
-  );
-}
-
-function Section({
-  title,
-  children,
-  theme,
-}: {
-  title: string;
-  children: React.ReactNode;
-  theme: ReturnType<typeof useTheme>;
-}): React.JSX.Element {
-  return (
-    <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-      <Text style={[styles.sectionTitle, { color: theme.primary }]}>{title}</Text>
-      {children}
-    </View>
-  );
-}
 
 export default function InAppTranscriptionScreen(): React.JSX.Element {
   const theme = useTheme();
@@ -77,12 +43,22 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     return () => sub.remove();
   }, []);
 
-  const requestPermissions = async (): Promise<void> => {
-    await NotificationListener.requestCallTranscriptionPermissions();
+  const requestPhonePermissions = async (): Promise<void> => {
+    const granted = await NotificationListener.requestCallTranscriptionPermissions();
     refresh();
+    if (!granted) {
+      Alert.alert(
+        'Permission needed',
+        'Phone & call-log access was not granted. If the dialog didn’t appear, you may have denied it before — open App Settings → Permissions and enable “Phone” and “Call logs” manually.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open App Settings', onPress: () => void NotificationListener.openAppSettings() },
+        ]
+      );
+    }
   };
 
-  const openAllFilesAccess = async (): Promise<void> => {
+  const grantAllFiles = async (): Promise<void> => {
     await NotificationListener.openAllFilesAccessSettings();
   };
 
@@ -92,16 +68,10 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     try {
       const ok = await NotificationListener.downloadWhisperModel();
       if (!ok) {
-        Alert.alert(
-          'Download failed',
-          'Could not download the transcription model. Check your connection and try again.'
-        );
+        Alert.alert('Download failed', 'Check your connection and try again.');
       }
     } catch {
-      Alert.alert(
-        'Download failed',
-        'Could not download the transcription model. Check your connection and try again.'
-      );
+      Alert.alert('Download failed', 'Check your connection and try again.');
     } finally {
       setDownloading(false);
       refresh();
@@ -124,183 +94,254 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     status.hasPhoneStatePermission &&
     status.hasAllFilesAccess;
 
+  const steps = [
+    { ok: status.engineBuilt, label: 'On-device engine (ships in the app)' },
+    { ok: status.modelDownloaded, label: `Model downloaded · ${status.modelName}` },
+    { ok: status.hasPhoneStatePermission, label: 'Phone & call-log access' },
+    { ok: status.hasAllFilesAccess, label: 'All-files access (to read recordings)' },
+  ];
+  const doneCount = steps.filter((s) => s.ok).length;
+
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
-    >
-      <Pressable style={styles.backRow} onPress={() => router.back()}>
-        <Text style={[styles.back, { color: theme.primary }]}>‹ Settings</Text>
-      </Pressable>
+    <Screen>
+      <LargeHeader title="Call Transcription" onBack={() => router.back()} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={[styles.intro, { color: theme.onSurfaceVariant }]}>
+          TaskMind detects when a call ends, finds the recording your phone saved, and transcribes
+          it on-device — fully inside the app. No Termux, no MacroDroid, no computer needed.
+        </Text>
 
-      <Text style={[styles.title, { color: theme.onSurface }]}>In-App Call Transcription</Text>
-      <Text style={[styles.intro, { color: theme.onSurfaceVariant }]}>
-        TaskMind can detect when a call ends, find the recording your phone's built-in recorder
-        saved, and transcribe it on-device with whisper.cpp — entirely inside the app. No Termux, no
-        MacroDroid, nothing that Android can kill in the background.
-      </Text>
-
-      <Section title="Status" theme={theme}>
-        <CheckRow
-          label="Native transcription engine built into this app"
-          ok={status.engineBuilt}
-          theme={theme}
-        />
-        <CheckRow
-          label={`Model downloaded (${status.modelName}, ~530 MB)`}
-          ok={status.modelDownloaded}
-          theme={theme}
-        />
-        <CheckRow
-          label="Phone & call log access"
-          ok={status.hasPhoneStatePermission}
-          theme={theme}
-        />
-        <CheckRow
-          label="All files access (to read recordings)"
-          ok={status.hasAllFilesAccess}
-          theme={theme}
-        />
-      </Section>
-
-      {!status.engineBuilt && (
-        <Section title="1 — Build the native engine" theme={theme}>
-          <Text style={[styles.body, { color: theme.onSurface }]}>
-            This requires a one-time rebuild of the Android app with whisper.cpp's source checked
-            out. From the project root:
-          </Text>
-          <View style={[styles.codeBox, { backgroundColor: '#0A2540' }]}>
-            <Text style={styles.code}>
-              {'cd modules/notification-listener/android/src/main/cpp\n'}
-              {'git clone --depth 1 https://github.com/ggerganov/whisper.cpp\n'}
-              {'cd ../../../../../..\n'}
-              {'npx expo run:android --variant release'}
+        {/* Progress summary */}
+        <View style={[styles.summary, { backgroundColor: theme.surfaceVariant }]}>
+          <View style={styles.summaryHead}>
+            <Text style={[styles.summaryTitle, { color: theme.onSurface }]}>Setup</Text>
+            <Text
+              style={[styles.summaryCount, { color: ready ? Colors.success : Colors.primary500 }]}
+            >
+              {ready ? 'Ready' : `${doneCount} / ${steps.length}`}
             </Text>
           </View>
-          <Text style={[styles.body, { color: theme.onSurface }]}>
-            After this one-time build, every future build of the app includes the on-device
-            transcription engine automatically.
-          </Text>
-        </Section>
-      )}
+          {steps.map((s) => (
+            <View key={s.label} style={styles.checkRow}>
+              <Ionicons
+                name={s.ok ? 'checkmark-circle' : 'ellipse-outline'}
+                size={20}
+                color={s.ok ? Colors.success : theme.onSurfaceVariant}
+              />
+              <Text style={[styles.checkLabel, { color: theme.onSurface }]}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
 
-      <Section title="2 — Permissions" theme={theme}>
-        <Text style={[styles.body, { color: theme.onSurface }]}>
-          TaskMind needs to know when a call ends (Phone & call log access) and where your phone's
-          call-recorder app saves files (All files access — most call-recording apps save outside
-          the folders Android shares by default).
-        </Text>
-        <Button
-          variant="secondary"
-          label="Grant Phone & Call Log Access"
-          onPress={() => void requestPermissions()}
-          fullWidth
-        />
-        <Button
-          variant="secondary"
-          label="Grant All Files Access"
-          onPress={() => void openAllFilesAccess()}
-          fullWidth
-        />
-      </Section>
+        {/* Engine note — only if somehow missing from this build */}
+        {!status.engineBuilt && (
+          <View
+            style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+          >
+            <View style={styles.cardHead}>
+              <Ionicons name="information-circle" size={22} color={Colors.primary500} />
+              <Text style={[styles.cardTitle, { color: theme.onSurface }]}>
+                Engine not detected
+              </Text>
+            </View>
+            <Text style={[styles.body, { color: theme.onSurface }]}>
+              The transcription engine is compiled into the app automatically. This build doesn’t
+              include it — install the latest TaskMind build (the newest APK from your releases) and
+              this step will complete on its own. Nothing to do on your phone.
+            </Text>
+          </View>
+        )}
 
-      <Section title="3 — Transcription model" theme={theme}>
-        <Text style={[styles.body, { color: theme.onSurface }]}>
-          medium-q5_0 gives noticeably better accuracy than the small model on Hindi/Hinglish and
-          accented speech — at roughly 2-3x the transcription time. Downloaded once, stored on your
-          device.
-        </Text>
-        {status.modelDownloaded ? (
-          <Button
-            variant="destructive"
-            label="Delete Model"
-            onPress={() => void deleteModel()}
-            fullWidth
+        {/* Permissions */}
+        <Card theme={theme} step="1" title="Grant permissions">
+          <PermLine
+            theme={theme}
+            label="Phone & call log"
+            granted={status.hasPhoneStatePermission}
           />
-        ) : (
-          <>
+          <PermLine theme={theme} label="All files access" granted={status.hasAllFilesAccess} />
+          <Text style={[styles.note, { color: theme.onSurfaceVariant }]}>
+            Call-recorder apps usually save outside the folders Android shares by default, so
+            all-files access is required to read them.
+          </Text>
+          {!status.hasPhoneStatePermission && (
             <Button
-              variant="primary"
-              label={downloading ? `Downloading… ${progress}%` : 'Download Model (~530 MB)'}
-              loading={downloading}
-              onPress={() => void downloadModel()}
+              label="Grant phone & call-log access"
+              onPress={() => void requestPhonePermissions()}
               fullWidth
             />
-            {downloading && (
-              <View style={[styles.progressTrack, { backgroundColor: theme.outline }]}>
-                <View style={[styles.progressFill, { width: `${progress}%` }]} />
-              </View>
-            )}
-          </>
-        )}
-      </Section>
+          )}
+          {!status.hasAllFilesAccess && (
+            <Button
+              label="Grant all-files access"
+              variant="secondary"
+              onPress={() => void grantAllFiles()}
+              fullWidth
+            />
+          )}
+          <Pressable
+            onPress={() => void NotificationListener.openAppSettings()}
+            style={styles.linkBtn}
+          >
+            <Text style={[styles.link, { color: theme.primary }]}>
+              Permissions not sticking? Open App Settings ›
+            </Text>
+          </Pressable>
+        </Card>
 
-      <Section title="4 — Enable" theme={theme}>
-        <View style={styles.enableRow}>
-          <Text style={[styles.body, styles.flex1, { color: theme.onSurface }]}>
-            Automatically transcribe and review tasks after every call
+        {/* Model */}
+        <Card theme={theme} step="2" title="Download the model">
+          <Text style={[styles.body, { color: theme.onSurface }]}>
+            medium-q5_0 (~530 MB) gives much better accuracy on Hindi/Hinglish and accented speech
+            than the small model. Downloaded once, over Wi-Fi, and stored on your device.
           </Text>
-          <Switch
-            value={status.enabled}
-            onValueChange={(v) => void toggleEnabled(v)}
-            disabled={!ready}
-            trackColor={{ true: Colors.primary500, false: theme.outline }}
-            thumbColor={Colors.white}
-          />
-        </View>
-        {!ready && (
-          <Text style={[styles.body, { color: theme.onSurfaceVariant }]}>
-            Complete the steps above to enable this.
-          </Text>
-        )}
-      </Section>
+          {status.modelDownloaded ? (
+            <Button
+              label="Delete model"
+              variant="destructive"
+              onPress={() => void deleteModel()}
+              fullWidth
+            />
+          ) : (
+            <>
+              <Button
+                label={downloading ? `Downloading… ${progress}%` : 'Download model (~530 MB)'}
+                loading={downloading}
+                onPress={() => void downloadModel()}
+                fullWidth
+              />
+              {downloading && (
+                <View style={[styles.progressTrack, { backgroundColor: theme.outline }]}>
+                  <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                </View>
+              )}
+            </>
+          )}
+        </Card>
 
-      <Section title="How it works" theme={theme}>
-        <Text style={[styles.body, { color: theme.onSurface }]}>
-          {'• '}When a call ends, TaskMind waits 15s for your recorder app to finish saving the
-          file, then finds the newest recording automatically.
-          {'\n\n'}
-          {'• '}The recording is decoded and transcribed on-device — audio never leaves your phone.
-          {'\n\n'}
-          {'• '}The transcript opens the same review screen as before, where AI extracts action
-          items with correct dates (uses the Cloud AI configured in Settings → Intelligence).
-          {'\n\n'}
-          {'• '}If your phone saves recordings somewhere unusual, browse to the folder with a file
-          manager — TaskMind checks the common locations automatically, but you can also look at the
-          Call Transcription (legacy) screen for the exact paths checked.
+        {/* Enable */}
+        <Card theme={theme} step="3" title="Enable">
+          <View style={styles.enableRow}>
+            <Text style={[styles.body, styles.flex1, { color: theme.onSurface }]}>
+              Auto-transcribe and review tasks after every call
+            </Text>
+            <Switch
+              value={status.enabled}
+              onValueChange={(v) => void toggleEnabled(v)}
+              disabled={!ready}
+              trackColor={{ true: Colors.primary500, false: theme.outline }}
+              thumbColor={Colors.white}
+            />
+          </View>
+          {!ready && (
+            <Text style={[styles.note, { color: theme.onSurfaceVariant }]}>
+              Finish the steps above to enable this.
+            </Text>
+          )}
+        </Card>
+
+        <Text style={[styles.howTitle, { color: theme.onSurfaceVariant }]}>HOW IT WORKS</Text>
+        <Text style={[styles.body, { color: theme.onSurfaceVariant, paddingHorizontal: 4 }]}>
+          When a call ends, TaskMind waits ~15s for your recorder to save the file, finds the newest
+          recording, and transcribes it on-device — audio never leaves your phone. The transcript
+          opens the review screen where AI extracts action items with correct dates.
         </Text>
-      </Section>
-    </ScrollView>
+      </ScrollView>
+    </Screen>
+  );
+}
+
+function Card({
+  theme,
+  step,
+  title,
+  children,
+}: {
+  theme: ReturnType<typeof useTheme>;
+  step: string;
+  title: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+      <View style={styles.cardHead}>
+        <View style={styles.stepBadge}>
+          <Text style={styles.stepBadgeText}>{step}</Text>
+        </View>
+        <Text style={[styles.cardTitle, { color: theme.onSurface }]}>{title}</Text>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function PermLine({
+  theme,
+  label,
+  granted,
+}: {
+  theme: ReturnType<typeof useTheme>;
+  label: string;
+  granted: boolean;
+}): React.JSX.Element {
+  return (
+    <View style={styles.permLine}>
+      <Ionicons
+        name={granted ? 'checkmark-circle' : 'close-circle-outline'}
+        size={18}
+        color={granted ? Colors.success : Colors.urgentFg}
+      />
+      <Text style={[styles.permLabel, { color: theme.onSurface }]}>{label}</Text>
+      <Text style={[styles.permStatus, { color: granted ? Colors.success : Colors.urgentFg }]}>
+        {granted ? 'Granted' : 'Needed'}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 16, paddingBottom: 48, gap: 16 },
-  backRow: { marginBottom: 4 },
-  back: { fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
-  intro: { fontSize: 14, lineHeight: 22 },
-  section: {
-    borderWidth: 2,
-    borderRadius: 2,
-    padding: 16,
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  body: { fontSize: 14, lineHeight: 22 },
-  flex1: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingBottom: 48, gap: 16, paddingTop: 4 },
+  intro: { fontSize: 15, lineHeight: 23 },
+
+  summary: { borderRadius: 16, padding: 16, gap: 12 },
+  summaryHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  summaryTitle: { fontSize: 16, fontWeight: '700' },
+  summaryCount: { fontSize: 15, fontWeight: '700' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  checkMark: { fontSize: 16, fontWeight: '800', width: 20 },
   checkLabel: { fontSize: 14, flex: 1 },
-  codeBox: { borderRadius: 2, padding: 12 },
-  code: { fontFamily: 'monospace', fontSize: 12, color: '#E2E8F0', lineHeight: 20 },
+
+  card: { borderRadius: 16, borderWidth: 0.5, padding: 16, gap: 12 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stepBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.primary500,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepBadgeText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
+  cardTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+
+  body: { fontSize: 14, lineHeight: 22 },
+  note: { fontSize: 13, lineHeight: 19 },
+  flex1: { flex: 1 },
+
+  permLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  permLabel: { fontSize: 14, flex: 1 },
+  permStatus: { fontSize: 13, fontWeight: '600' },
+  linkBtn: { paddingTop: 2 },
+  link: { fontSize: 14, fontWeight: '600' },
+
   enableRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: 6, backgroundColor: Colors.primary500 },
+
+  howTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
 });

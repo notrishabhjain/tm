@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 
 const GUIDES: Array<{ manufacturer: string; steps: string[] }> = [
   {
@@ -34,21 +35,13 @@ const GUIDES: Array<{ manufacturer: string; steps: string[] }> = [
   },
 ];
 
-const DEPTH = 4;
-
 export default function BatteryGuideScreen(): React.JSX.Element {
   const theme = useTheme();
   const router = useRouter();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Battery Guide</Text>
-        <View style={{ width: 56 }} />
-      </View>
+    <Screen>
+      <LargeHeader title="Battery" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.intro, { color: theme.onSurfaceVariant }]}>
@@ -59,87 +52,49 @@ export default function BatteryGuideScreen(): React.JSX.Element {
         {GUIDES.map((guide) => (
           <View
             key={guide.manufacturer}
-            style={[styles.cardWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}
+            style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}
           >
-            <View style={styles.cardShadow} />
-            <View style={[styles.card, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.manufacturer, { color: theme.primary }]}>
-                {guide.manufacturer}
-              </Text>
-              {guide.steps.map((step, i) => (
-                <View key={i} style={styles.stepRow}>
-                  <Text style={[styles.stepNum, { color: theme.onSurfaceVariant }]}>{i + 1}.</Text>
-                  <Text style={[styles.stepText, { color: theme.onSurface }]}>{step}</Text>
-                </View>
-              ))}
-            </View>
+            <Text style={[styles.manufacturer, { color: theme.onSurface }]}>
+              {guide.manufacturer}
+            </Text>
+            {guide.steps.map((step, i) => (
+              <View key={i} style={styles.stepRow}>
+                <Text style={[styles.stepNum, { color: theme.onSurfaceVariant }]}>{i + 1}.</Text>
+                <Text style={[styles.stepText, { color: theme.onSurface }]}>{step}</Text>
+              </View>
+            ))}
           </View>
         ))}
 
-        <View style={[styles.tipWrapper, { paddingRight: DEPTH, paddingBottom: DEPTH }]}>
-          <View style={[styles.cardShadow, { backgroundColor: Colors.neoShadowMedium }]} />
-          <View
-            style={[
-              styles.tipCard,
-              { borderColor: Colors.mediumFg, backgroundColor: theme.mediumBg },
-            ]}
-          >
-            <Text style={[styles.tipTitle, { color: theme.primary }]}>After making changes</Text>
-            <Text style={[styles.tipText, { color: theme.onSurface }]}>
-              Reboot your device, then check Settings → Diagnostics → System to verify the
-              foreground service is running.
-            </Text>
-          </View>
+        <View style={[styles.tipCard, { backgroundColor: Colors.mediumBgLight }]}>
+          <Text style={[styles.tipTitle, { color: Colors.mediumFg }]}>After making changes</Text>
+          <Text style={[styles.tipText, { color: theme.onSurface }]}>
+            Reboot your device, then check Settings → Diagnostics → System to verify the foreground
+            service is running.
+          </Text>
         </View>
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
-  },
-  backBtn: { padding: 4, minWidth: 56 },
-  backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
-  title: { fontSize: 17, fontWeight: '800', color: Colors.white },
   content: { padding: 16, paddingBottom: 32, gap: 12 },
   intro: { fontSize: 13, lineHeight: 20 },
-  cardWrapper: { position: 'relative' },
-  cardShadow: {
-    position: 'absolute',
-    top: DEPTH,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.neoShadowDefault,
-    borderRadius: 2,
-  },
   card: {
-    borderWidth: 2,
-    borderColor: Colors.primary900,
-    borderRadius: 2,
-    padding: 14,
+    borderWidth: 0.5,
+    borderRadius: 16,
+    padding: 16,
     gap: 8,
   },
-  manufacturer: { fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  manufacturer: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
   stepRow: { flexDirection: 'row', gap: 8 },
-  stepNum: { fontSize: 12, fontWeight: '700', minWidth: 16 },
-  stepText: { fontSize: 12, flex: 1, lineHeight: 18 },
-  tipWrapper: { position: 'relative' },
+  stepNum: { fontSize: 13, fontWeight: '600', minWidth: 16 },
+  stepText: { fontSize: 13, flex: 1, lineHeight: 19 },
   tipCard: {
-    borderWidth: 2,
-    borderRadius: 2,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
   },
-  tipTitle: { fontSize: 13, fontWeight: '700', marginBottom: 6 },
+  tipTitle: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
   tipText: { fontSize: 13, lineHeight: 19 },
 });

@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, Pressable, SafeAreaView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { SwipeNavigator } from '@/ui/components/SwipeNavigator';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Colors } from '@/ui/theme/colors';
-import { getPriorityColor } from '@/ui/theme/colors';
+import { Colors, getPriorityColor } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
 import { EmptyState } from '@/ui/components/EmptyState';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { SenderStatsRepository } from '@/data/repositories/SenderStatsRepository';
 import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogRepository';
@@ -25,7 +25,6 @@ const learnedKwRepo = new LearnedKeywordRepository(db);
 
 export default function ConfirmationsScreen(): React.JSX.Element {
   const queryClient = useQueryClient();
-  const theme = useTheme();
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['tasks', 'confirmation'],
@@ -118,53 +117,35 @@ export default function ConfirmationsScreen(): React.JSX.Element {
     },
   });
 
+  const subtitle =
+    tasks.length === 0 ? 'Nothing waiting' : `${tasks.length} waiting for your input`;
+
   return (
     <SwipeNavigator tabIndex={1}>
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
-          {/* Header */}
-          <View
-            style={[
-              styles.header,
-              { backgroundColor: theme.surface, borderBottomColor: theme.outline },
-            ]}
-          >
-            <Text style={[styles.headerTitle, { color: theme.onSurface }]}>Review</Text>
-            {tasks.length > 0 && (
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{tasks.length}</Text>
-              </View>
-            )}
-          </View>
+      <Screen>
+        <LargeHeader title="Review" subtitle={subtitle} />
 
-          {tasks.length > 0 && (
-            <Text style={[styles.subtitle, { color: theme.onSurfaceVariant }]}>
-              {tasks.length} notification{tasks.length !== 1 ? 's' : ''} waiting for your input
-            </Text>
+        <FlatList
+          data={tasks}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ConfirmationCard
+              task={item}
+              onConfirm={(t) => confirmMutation.mutate(t)}
+              onReject={(t) => rejectMutation.mutate(t)}
+            />
           )}
-
-          <FlatList
-            data={tasks}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <ConfirmationCard
-                task={item}
-                onConfirm={(t) => confirmMutation.mutate(t)}
-                onReject={(t) => rejectMutation.mutate(t)}
+          contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
+          ListEmptyComponent={
+            isLoading ? null : (
+              <EmptyState
+                title="Nothing to review"
+                description="Notifications that need a second look land here. High-confidence tasks are added for you automatically."
               />
-            )}
-            contentContainerStyle={tasks.length === 0 ? styles.emptyContainer : styles.list}
-            ListEmptyComponent={
-              isLoading ? null : (
-                <EmptyState
-                  title="Nothing to review"
-                  description="Notifications that need your input will appear here. High-confidence tasks are added automatically."
-                />
-              )
-            }
-          />
-        </View>
-      </SafeAreaView>
+            )
+          }
+        />
+      </Screen>
     </SwipeNavigator>
   );
 }
@@ -184,130 +165,60 @@ function ConfirmationCard({
   const sourceLabel = task.sourceApp.split('.').pop() ?? task.sourceApp;
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.surface }]}>
-      {/* Priority accent */}
-      <View style={[styles.priorityBar, { backgroundColor: priorityColor }]} />
-
-      <View style={styles.cardContent}>
-        {/* Source + confidence */}
-        <View style={styles.cardMeta}>
-          <Text style={[styles.sourceMeta, { color: theme.onSurfaceVariant }]}>
+    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+      <View style={styles.cardMeta}>
+        <View style={styles.metaLeft}>
+          <View style={[styles.dot, { backgroundColor: priorityColor }]} />
+          <Text style={[styles.sourceMeta, { color: theme.onSurfaceVariant }]} numberOfLines={1}>
             {task.sender ? `${task.sender} · ` : ''}
             {sourceLabel}
           </Text>
-          <View
-            style={[
-              styles.confidencePill,
-              { borderColor: priorityColor + '40', backgroundColor: priorityColor + '12' },
-            ]}
-          >
-            <Text style={[styles.confidenceText, { color: priorityColor }]}>{confidencePct}%</Text>
-          </View>
         </View>
+        <Text style={[styles.confidence, { color: theme.onSurfaceVariant }]}>{confidencePct}%</Text>
+      </View>
 
-        {/* Title */}
-        <Text style={[styles.taskTitle, { color: theme.onSurface }]}>{task.title}</Text>
+      <Text style={[styles.taskTitle, { color: theme.onSurface }]}>{task.title}</Text>
 
-        {/* Body preview */}
-        {task.body != null && task.body !== task.title && (
-          <Text style={[styles.taskBody, { color: theme.onSurfaceVariant }]} numberOfLines={2}>
-            {task.body}
-          </Text>
-        )}
+      {task.body != null && task.body !== task.title && (
+        <Text style={[styles.taskBody, { color: theme.onSurfaceVariant }]} numberOfLines={2}>
+          {task.body}
+        </Text>
+      )}
 
-        {/* Action buttons */}
-        <View style={styles.buttonRow}>
-          <Pressable
-            onPress={() => onConfirm(task)}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              styles.confirmBtn,
-              pressed && { opacity: 0.82 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Add as task"
-          >
-            <Text style={styles.confirmBtnText}>Add task</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => onReject(task)}
-            style={({ pressed }) => [
-              styles.actionBtn,
-              styles.rejectBtn,
-              { borderColor: theme.outline },
-              pressed && { opacity: 0.82 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Skip notification"
-          >
-            <Text style={[styles.rejectBtnText, { color: theme.onSurfaceVariant }]}>Skip</Text>
-          </Pressable>
-        </View>
+      <View style={styles.buttonRow}>
+        <Pressable
+          onPress={() => onConfirm(task)}
+          style={({ pressed }) => [styles.confirmBtn, pressed && { opacity: 0.8 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Add as task"
+        >
+          <Text style={styles.confirmBtnText}>Add task</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onReject(task)}
+          style={({ pressed }) => [
+            styles.rejectBtn,
+            { backgroundColor: theme.surfaceVariant },
+            pressed && { opacity: 0.8 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Skip"
+        >
+          <Text style={[styles.rejectBtnText, { color: theme.onSurfaceVariant }]}>Skip</Text>
+        </Pressable>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  container: { flex: 1 },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    gap: 10,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  countBadge: {
-    backgroundColor: Colors.urgentFg,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  countBadgeText: {
-    color: Colors.white,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 13,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-
-  list: { paddingTop: 4, paddingBottom: 24 },
-  emptyContainer: { flex: 1 },
+  list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24, gap: 12 },
+  emptyContainer: { flexGrow: 1 },
 
   card: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginVertical: 6,
-    borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  priorityBar: {
-    width: 4,
-    alignSelf: 'stretch',
-  },
-  cardContent: {
-    flex: 1,
-    padding: 14,
+    borderRadius: 16,
+    borderWidth: 0.5,
+    padding: 16,
   },
   cardMeta: {
     flexDirection: 'row',
@@ -315,58 +226,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  sourceMeta: {
-    fontSize: 12,
+  metaLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  sourceMeta: { fontSize: 13, flex: 1 },
+  confidence: { fontSize: 13, fontWeight: '600', marginLeft: 8 },
+  taskTitle: { fontSize: 16, fontWeight: '600', lineHeight: 23, marginBottom: 4 },
+  taskBody: { fontSize: 14, lineHeight: 20, marginBottom: 12 },
+  buttonRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  confirmBtn: {
     flex: 1,
-  },
-  confidencePill: {
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    marginLeft: 8,
-  },
-  confidenceText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  taskTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    lineHeight: 22,
-    marginBottom: 6,
-  },
-  taskBody: {
-    fontSize: 13,
-    lineHeight: 19,
-    marginBottom: 12,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-  },
-  actionBtn: {
-    flex: 1,
-    height: 40,
-    borderRadius: 10,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.primary500,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  confirmBtn: {
-    backgroundColor: Colors.primary900,
-  },
-  confirmBtnText: {
-    color: Colors.white,
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  confirmBtnText: { color: Colors.white, fontSize: 14, fontWeight: '600' },
   rejectBtn: {
-    borderWidth: 1.5,
-    backgroundColor: 'transparent',
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  rejectBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  rejectBtnText: { fontSize: 14, fontWeight: '600' },
 });

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Alert } from 'r
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/ui/theme';
 import { Colors } from '@/ui/theme/colors';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { getSetting } from '@/data/storage/settings';
 import {
   startOAuthFlow,
@@ -81,54 +82,53 @@ export default function GoogleTasksScreen(): React.JSX.Element {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
-    >
-      <Pressable style={styles.backRow} onPress={() => router.back()}>
-        <Text style={[styles.back, { color: theme.primary }]}>‹ Settings</Text>
-      </Pressable>
+    <Screen>
+      <LargeHeader title="Google Tasks" onBack={() => router.back()} />
 
-      <Text style={[styles.title, { color: theme.onSurface }]}>Google Tasks</Text>
-
-      {/* Status banner */}
-      <View
-        style={[
-          styles.statusBanner,
-          {
-            backgroundColor: connected ? '#0D3321' : theme.surface,
-            borderColor: connected ? Colors.success : theme.outline,
-          },
-        ]}
-      >
-        <Text
-          style={[styles.statusDot, { color: connected ? Colors.success : theme.onSurfaceVariant }]}
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* Status banner */}
+        <View
+          style={[
+            styles.statusBanner,
+            {
+              backgroundColor: connected ? Colors.successBg : theme.surface,
+              borderColor: connected ? Colors.success : theme.outline,
+            },
+          ]}
         >
-          {connected ? '● Connected' : '○ Not connected'}
-        </Text>
-        {connected && (
-          <Text style={[styles.statusSub, { color: Colors.success }]}>
-            New tasks are automatically synced to your Google Tasks app
+          <Text
+            style={[
+              styles.statusDot,
+              { color: connected ? Colors.success : theme.onSurfaceVariant },
+            ]}
+          >
+            {connected ? '● Connected' : '○ Not connected'}
           </Text>
-        )}
-      </View>
+          {connected && (
+            <Text style={[styles.statusSub, { color: Colors.success }]}>
+              New tasks are automatically synced to your Google Tasks app
+            </Text>
+          )}
+        </View>
 
-      {!connected && (
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-          <Text style={[styles.cardTitle, { color: theme.primary }]}>Connect your account</Text>
-          <Text style={[styles.bodyText, { color: theme.onSurface }]}>
-            Sign in with your Google account to start syncing tasks. Make sure{' '}
-            <Text style={styles.bold}>rishabh59jain@gmail.com</Text> is set as a Test User in the
-            OAuth consent screen.
-          </Text>
+        {!connected && (
+          <View
+            style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+          >
+            <Text style={[styles.cardTitle, { color: theme.onSurfaceVariant }]}>
+              Connect your account
+            </Text>
+            <Text style={[styles.bodyText, { color: theme.onSurface }]}>
+              Sign in with your Google account to start syncing tasks. Make sure{' '}
+              <Text style={styles.bold}>rishabh59jain@gmail.com</Text> is set as a Test User in the
+              OAuth consent screen.
+            </Text>
 
-          <View style={styles.btnWrapper}>
-            <View style={[styles.btnShadow, { backgroundColor: Colors.black }]} />
             <Pressable
               style={({ pressed }) => [
                 styles.btn,
-                { backgroundColor: Colors.primary900, borderColor: Colors.black },
-                pressed && { transform: [{ translateX: 3 }, { translateY: 3 }] },
+                { backgroundColor: Colors.primary500 },
+                pressed && { opacity: 0.7 },
                 connecting && styles.btnDisabled,
               ]}
               onPress={() => void handleConnect()}
@@ -139,82 +139,73 @@ export default function GoogleTasksScreen(): React.JSX.Element {
               </Text>
             </Pressable>
           </View>
-        </View>
-      )}
+        )}
 
-      {connected && (
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-          <Text style={[styles.cardTitle, { color: theme.primary }]}>What syncs</Text>
-          <Text style={[styles.bodyText, { color: theme.onSurface }]}>
-            • Every new task captured from a notification is automatically created in Google Tasks
-          </Text>
-          <Text style={[styles.bodyText, { color: theme.onSurface }]}>
-            • AI-extracted details (how to complete, time estimate) are added to the task notes
-          </Text>
-          <Text style={[styles.bodyText, { color: theme.onSurface }]}>
-            • Due dates are synced so Google Calendar shows reminders
-          </Text>
-          <Text style={[styles.bodyText, { color: theme.onSurface }]}>
-            • Completing a task in TaskMind marks it complete in Google Tasks too
-          </Text>
-        </View>
-      )}
+        {connected && (
+          <View
+            style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+          >
+            <Text style={[styles.cardTitle, { color: theme.onSurfaceVariant }]}>What syncs</Text>
+            <Text style={[styles.bodyText, { color: theme.onSurface }]}>
+              • Every new task captured from a notification is automatically created in Google Tasks
+            </Text>
+            <Text style={[styles.bodyText, { color: theme.onSurface }]}>
+              • AI-extracted details (how to complete, time estimate) are added to the task notes
+            </Text>
+            <Text style={[styles.bodyText, { color: theme.onSurface }]}>
+              • Due dates are synced so Google Calendar shows reminders
+            </Text>
+            <Text style={[styles.bodyText, { color: theme.onSurface }]}>
+              • Completing a task in TaskMind marks it complete in Google Tasks too
+            </Text>
+          </View>
+        )}
 
-      {connected && (
-        <Pressable style={styles.disconnectBtn} onPress={handleDisconnect}>
-          <Text style={styles.disconnectText}>Disconnect Google Tasks</Text>
-        </Pressable>
-      )}
-    </ScrollView>
+        {connected && (
+          <Pressable
+            style={({ pressed }) => [styles.disconnectBtn, pressed && { opacity: 0.7 }]}
+            onPress={handleDisconnect}
+          >
+            <Text style={styles.disconnectText}>Disconnect Google Tasks</Text>
+          </Pressable>
+        )}
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 48 },
-  backRow: { marginBottom: 8 },
-  back: { fontSize: 16, fontWeight: '600' },
-  title: { fontSize: 22, fontWeight: '800', marginBottom: 20, letterSpacing: -0.3 },
   statusBanner: {
-    borderWidth: 2,
-    borderRadius: 2,
-    padding: 14,
-    marginBottom: 20,
+    borderWidth: 0.5,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
   },
-  statusDot: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  statusDot: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
   statusSub: { fontSize: 13, lineHeight: 18 },
   card: {
-    borderWidth: 2,
-    borderRadius: 2,
+    borderWidth: 0.5,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
   },
   cardTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
+    fontSize: 13,
+    fontWeight: '600',
     marginBottom: 12,
   },
-  bold: { fontWeight: '700' },
-  btnWrapper: { position: 'relative', paddingRight: 3, paddingBottom: 3 },
-  btnShadow: {
-    position: 'absolute',
-    top: 3,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 2,
-  },
+  bold: { fontWeight: '600' },
   btn: {
-    height: 48,
-    borderWidth: 2,
-    borderRadius: 2,
+    height: 52,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 4,
   },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: Colors.white, fontSize: 14, fontWeight: '700', letterSpacing: 0.3 },
+  btnDisabled: { opacity: 0.4 },
+  btnText: { color: Colors.white, fontSize: 15, fontWeight: '600', letterSpacing: 0.1 },
   bodyText: { fontSize: 14, lineHeight: 22, marginBottom: 8 },
   disconnectBtn: {
     alignSelf: 'center',

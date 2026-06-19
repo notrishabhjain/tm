@@ -6,6 +6,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Colors } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import {
   getNotificationBuffer,
   getExtractionBuffer,
@@ -60,38 +61,42 @@ export default function DiagnosticsScreen(): React.JSX.Element {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Diagnostics</Text>
-        <Pressable onPress={() => void handleExport()} style={styles.exportBtn}>
-          <Text style={styles.exportText}>Export</Text>
-        </Pressable>
-      </View>
+    <Screen>
+      <LargeHeader
+        title="Diagnostics"
+        onBack={() => router.back()}
+        right={
+          <Pressable
+            onPress={() => void handleExport()}
+            style={({ pressed }) => [styles.exportBtn, pressed && { opacity: 0.7 }]}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.exportText, { color: theme.primary }]}>Export</Text>
+          </Pressable>
+        }
+      />
 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={[
-          styles.tabBar,
-          { backgroundColor: theme.surface, borderBottomColor: theme.outline },
-        ]}
+        style={[styles.tabBar, { borderBottomColor: theme.outline }]}
         contentContainerStyle={styles.tabBarContent}
       >
         {TABS.map((tab) => (
           <Pressable
             key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
+            style={({ pressed }) => [
+              styles.tab,
+              { borderBottomColor: activeTab === tab ? theme.primary : Colors.transparent },
+              pressed && { opacity: 0.7 },
+            ]}
             onPress={() => setActiveTab(tab)}
           >
             <Text
               style={[
                 styles.tabText,
-                { color: theme.onSurfaceVariant },
+                { color: activeTab === tab ? theme.primary : theme.onSurfaceVariant },
                 activeTab === tab && styles.tabTextActive,
-                activeTab === tab && { color: theme.primary },
               ]}
             >
               {tab}
@@ -107,7 +112,7 @@ export default function DiagnosticsScreen(): React.JSX.Element {
         {activeTab === 'DB' && <DBTab />}
         {activeTab === 'System' && <SystemTab />}
       </ScrollView>
-    </View>
+    </Screen>
   );
 }
 
@@ -357,7 +362,11 @@ function DiscardedRow({
         </Text>
       </View>
       <Pressable
-        style={[styles.promoteBtn, promoting && styles.promoteBtnDisabled]}
+        style={({ pressed }) => [
+          styles.promoteBtn,
+          promoting && styles.promoteBtnDisabled,
+          pressed && { opacity: 0.7 },
+        ]}
         onPress={onPromote}
         disabled={promoting}
       >
@@ -476,7 +485,11 @@ function DBTab(): React.JSX.Element {
         />
       )}
       <Pressable
-        style={[styles.refreshBtn, { borderColor: theme.primary }]}
+        style={({ pressed }) => [
+          styles.refreshBtn,
+          { borderColor: theme.primary },
+          pressed && { opacity: 0.7 },
+        ]}
         onPress={() => void refetch()}
       >
         <Text style={[styles.refreshBtnText, { color: theme.primary }]}>Refresh</Text>
@@ -564,41 +577,26 @@ function SystemRow({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: Colors.primary900,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.black,
-  },
-  backBtn: { padding: 4, minWidth: 56 },
-  backText: { fontSize: 15, color: Colors.white, fontWeight: '600' },
-  title: { fontSize: 17, fontWeight: '800', color: Colors.white },
-  exportBtn: { padding: 4, minWidth: 56, alignItems: 'flex-end' },
-  exportText: { fontSize: 14, color: Colors.white, fontWeight: '700' },
+  exportBtn: { padding: 4 },
+  exportText: { fontSize: 15, fontWeight: '600' },
   tabBar: {
-    borderBottomWidth: 2,
+    borderBottomWidth: 0.5,
     maxHeight: 46,
+    marginTop: 4,
   },
   tabBarContent: { alignItems: 'center' },
   tab: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 3,
-    borderBottomColor: Colors.transparent,
+    borderBottomWidth: 2,
   },
-  tabActive: { borderBottomColor: Colors.primary900 },
-  tabText: { fontSize: 12, fontWeight: '600' },
-  tabTextActive: { fontWeight: '800' },
+  tabText: { fontSize: 13, fontWeight: '500' },
+  tabTextActive: { fontWeight: '600' },
   content: { flex: 1 },
   emptyTab: { padding: 32, alignItems: 'center' },
   emptyText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -612,50 +610,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     padding: 12,
-    borderRadius: 2,
-    borderWidth: 1,
+    borderRadius: 12,
+    borderWidth: 0.5,
   },
-  statusDot: { width: 8, height: 8, borderRadius: 2, marginTop: 4 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
   logContent: { flex: 1 },
-  logTitle: { fontSize: 12, fontWeight: '700', marginBottom: 2 },
+  logTitle: { fontSize: 12, fontWeight: '600', marginBottom: 2 },
   logBody: { fontSize: 11, marginBottom: 2 },
   logMeta: { fontSize: 11 },
-  logKeywords: { fontSize: 11, marginTop: 2, fontWeight: '600' },
+  logKeywords: { fontSize: 11, marginTop: 2, fontWeight: '500' },
   discardedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     padding: 12,
-    borderRadius: 2,
-    borderWidth: 1,
+    borderRadius: 12,
+    borderWidth: 0.5,
     marginBottom: 8,
   },
   promoteBtn: {
-    backgroundColor: Colors.primary900,
-    borderRadius: 2,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: Colors.primary500,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   promoteBtnDisabled: { opacity: 0.5 },
-  promoteBtnText: { color: Colors.white, fontSize: 12, fontWeight: '700' },
+  promoteBtnText: { color: Colors.white, fontSize: 12, fontWeight: '600' },
   dbTab: { padding: 16 },
   systemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 10,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.5,
   },
   systemLabel: { fontSize: 13 },
-  systemLabelHighlight: { fontWeight: '700' },
+  systemLabelHighlight: { fontWeight: '600' },
   systemValue: { fontSize: 13, fontWeight: '500' },
-  systemValueHighlight: { fontWeight: '800' },
+  systemValueHighlight: { fontWeight: '700' },
   refreshBtn: {
     marginTop: 16,
     alignSelf: 'flex-start',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 2,
-    borderWidth: 2,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  refreshBtnText: { fontSize: 13, fontWeight: '700' },
+  refreshBtnText: { fontSize: 13, fontWeight: '600' },
 });

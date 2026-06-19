@@ -26,21 +26,9 @@ export function Button({
   const isDisabled = disabled ?? loading;
 
   const VARIANT_STYLES = {
-    primary: {
-      bg: Colors.primary900,
-      text: Colors.white,
-      border: Colors.primary900,
-    },
-    secondary: {
-      bg: theme.surface,
-      text: theme.primary,
-      border: theme.primary,
-    },
-    destructive: {
-      bg: Colors.urgentFg,
-      text: Colors.white,
-      border: Colors.urgentFg,
-    },
+    primary: { bg: Colors.primary500, text: Colors.white, border: 'transparent' },
+    secondary: { bg: theme.surfaceVariant, text: theme.onSurface, border: 'transparent' },
+    destructive: { bg: 'transparent', text: Colors.urgentFg, border: Colors.urgentFg },
   };
 
   const v = VARIANT_STYLES[variant];
@@ -50,10 +38,14 @@ export function Button({
       onPress={isDisabled ? undefined : onPress}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: v.bg, borderColor: v.border },
+        {
+          backgroundColor: v.bg,
+          borderColor: v.border,
+          borderWidth: v.border === 'transparent' ? 0 : 1.5,
+        },
         fullWidth && styles.fullWidth,
         isDisabled && styles.disabled,
-        pressed && !isDisabled && { opacity: 0.82 },
+        pressed && !isDisabled && { opacity: 0.7 },
         style,
       ]}
       accessibilityRole="button"
@@ -71,28 +63,14 @@ export function Button({
 
 const styles = StyleSheet.create({
   button: {
-    height: 50,
+    height: 52,
     paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     minWidth: 80,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
   },
-  fullWidth: {
-    alignSelf: 'stretch',
-  },
-  disabled: {
-    opacity: 0.45,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
+  fullWidth: { alignSelf: 'stretch' },
+  disabled: { opacity: 0.4 },
+  label: { fontSize: 15, fontWeight: '600', letterSpacing: 0.1 },
 });

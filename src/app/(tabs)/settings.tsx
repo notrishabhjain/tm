@@ -1,9 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
+import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { getSetting, setSetting } from '@/data/storage/settings';
 import { db } from '@/data/db/client';
 import { MonitoredAppRepository } from '@/data/repositories/MonitoredAppRepository';
@@ -13,6 +15,8 @@ import { SwipeNavigator } from '@/ui/components/SwipeNavigator';
 
 const monitoredRepo = new MonitoredAppRepository(db);
 const vipRepo = new VipContactRepository(db);
+
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export default function SettingsScreen(): React.JSX.Element {
   const router = useRouter();
@@ -76,146 +80,131 @@ export default function SettingsScreen(): React.JSX.Element {
 
   return (
     <SwipeNavigator tabIndex={3}>
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-        <ScrollView
-          style={[styles.container, { backgroundColor: theme.background }]}
-          contentContainerStyle={styles.content}
-        >
-          {/* Header */}
-          <View
-            style={[
-              styles.screenHeader,
-              { backgroundColor: theme.surface, borderBottomColor: theme.outline },
-            ]}
-          >
-            <Text style={[styles.screenTitle, { color: theme.onSurface }]}>Settings</Text>
-          </View>
-
-          {/* Permission banner */}
+      <Screen>
+        <LargeHeader title="Settings" />
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {permissionStatus === 'denied' && (
-            <Pressable style={styles.permissionBanner} onPress={handleGrantPermission}>
-              <Text style={styles.permissionBannerIcon}>⚠</Text>
-              <View style={styles.permissionBannerText}>
-                <Text style={styles.permissionTitle}>Notification Access Required</Text>
-                <Text style={styles.permissionSubtitle}>
+            <Pressable style={styles.banner} onPress={handleGrantPermission}>
+              <Ionicons name="alert-circle" size={22} color={Colors.urgentFg} />
+              <View style={styles.bannerText}>
+                <Text style={styles.bannerTitle}>Notification access required</Text>
+                <Text style={styles.bannerSubtitle}>
                   Tap to grant access so TaskMind can capture tasks from your apps.
                 </Text>
               </View>
-              <Text style={styles.permissionArrow}>›</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.urgentFg} />
             </Pressable>
           )}
 
           <Section title="Monitoring">
-            <NavRow
+            <Row
+              icon="notifications-outline"
+              tint={Colors.urgentFg}
               label="Notification Access"
-              subtitle={
-                permissionStatus === 'granted'
-                  ? 'Granted'
-                  : permissionStatus === 'denied'
-                    ? 'Not granted — tap to fix'
-                    : 'Checking…'
+              value={
+                permissionStatus === 'granted' ? 'On' : permissionStatus === 'denied' ? 'Off' : '…'
               }
-              subtitleColor={permissionStatus === 'granted' ? Colors.success : undefined}
-              icon="🔔"
+              valueColor={permissionStatus === 'granted' ? Colors.success : Colors.urgentFg}
               isFirst
               onPress={handleGrantPermission}
             />
-            <NavRow
+            <Row
+              icon="apps-outline"
+              tint={Colors.mediumFg}
               label="Monitored Apps"
-              subtitle={
-                activeAppCount === 0
-                  ? 'All apps'
-                  : `${activeAppCount} app${activeAppCount !== 1 ? 's' : ''} active`
-              }
-              icon="📱"
+              value={activeAppCount === 0 ? 'All' : `${activeAppCount}`}
               onPress={() => void router.push('/settings/monitored-apps')}
             />
-            <NavRow
+            <Row
+              icon="star-outline"
+              tint={Colors.highFg}
               label="VIP Contacts"
-              subtitle={
-                vipContacts.length === 0
-                  ? 'None set'
-                  : `${vipContacts.length} contact${vipContacts.length !== 1 ? 's' : ''}`
-              }
-              icon="⭐"
+              value={vipContacts.length === 0 ? 'None' : `${vipContacts.length}`}
               isLast
               onPress={() => void router.push('/settings/vip-contacts')}
             />
           </Section>
 
           <Section title="Intelligence">
-            <NavRow
+            <Row
+              icon="cloud-outline"
+              tint={Colors.mediumFg}
               label="Cloud AI"
-              subtitle={aiEnabled ? 'NVIDIA · enabled' : 'Off — on-device only'}
-              icon="☁️"
+              value={aiEnabled ? 'On' : 'Off'}
+              valueColor={aiEnabled ? Colors.success : undefined}
               isFirst
               onPress={() => void router.push('/settings/ai-cloud')}
             />
-            <NavRow
+            <Row
+              icon="lock-closed-outline"
+              tint={Colors.primary500}
               label="Focus Lock"
-              subtitle="Block distracting apps"
-              icon="🔒"
               onPress={() => void router.push('/settings/focus-lock')}
             />
-            <NavRow
+            <Row
+              icon="flash-outline"
+              tint={Colors.highFg}
               label="Signal Engine"
-              subtitle="17-signal local scorer"
-              icon="⚡"
               onPress={() => void router.push('/settings/ai-model')}
             />
-            <NavRow
+            <Row
+              icon="book-outline"
+              tint={Colors.primary500}
               label="Learned Vocabulary"
-              icon="📝"
               onPress={() => void router.push('/settings/vocabulary')}
             />
-            <NavRow
+            <Row
+              icon="stats-chart-outline"
+              tint={Colors.success}
               label="Analytics"
-              subtitle="Decision log, accuracy"
-              icon="📊"
               onPress={() => void router.push('/settings/analytics')}
             />
-            <NavRow
+            <Row
+              icon="search-outline"
+              tint={Colors.mediumFg}
               label="Analyze Text"
-              subtitle="Extract tasks from long text"
-              icon="🔍"
               isLast
               onPress={() => void router.push('/settings/transcript-import')}
             />
           </Section>
 
           <Section title="Integrations">
-            <NavRow
+            <Row
+              icon="checkbox-outline"
+              tint={Colors.success}
               label="Google Tasks"
-              subtitle={googleTasksConnected ? 'Connected · syncing' : 'Sync to Google Tasks'}
-              subtitleColor={googleTasksConnected ? Colors.success : undefined}
-              icon="✅"
+              value={googleTasksConnected ? 'Synced' : 'Off'}
+              valueColor={googleTasksConnected ? Colors.success : undefined}
               isFirst
               onPress={() => void router.push('/settings/google-tasks')}
             />
-            <NavRow
+            <Row
+              icon="call-outline"
+              tint={Colors.primary500}
               label="Call Transcription"
-              subtitle="On-device, no Termux needed"
-              icon="📞"
               onPress={() => void router.push('/settings/in-app-transcription')}
             />
-            <NavRow
+            <Row
+              icon="construct-outline"
+              tint={Colors.lowFg}
               label="Call Transcription (legacy)"
-              subtitle="Termux + MacroDroid setup"
-              icon="🔧"
               isLast
               onPress={() => void router.push('/settings/call-transcription')}
             />
           </Section>
 
           <Section title="Nudges">
-            <NavRow
+            <Row
+              icon="alarm-outline"
+              tint={Colors.highFg}
               label="Nudge Schedule"
-              subtitle={nudgeLabel}
-              icon="⏰"
+              value={nudgeLabel}
               isFirst
               onPress={() => void router.push('/settings/nudges')}
             />
             <ToggleRow
+              icon="moon-outline"
+              tint={Colors.mediumFg}
               label="Urgent overrides quiet hours"
               value={urgentOverride}
               onChange={handleUrgentOverride}
@@ -224,26 +213,27 @@ export default function SettingsScreen(): React.JSX.Element {
           </Section>
 
           <Section title="Reports">
-            <NavRow
+            <Row
+              icon="document-text-outline"
+              tint={Colors.mediumFg}
               label="Task Report"
-              subtitle="Export CSV or JSON"
-              icon="📄"
               isFirst
               onPress={() => void router.push('/settings/email-report')}
             />
-            <NavRow
+            <Row
+              icon="save-outline"
+              tint={Colors.lowFg}
               label="Export / Import"
-              subtitle="JSON or CSV"
-              icon="💾"
               isLast
               onPress={() => void router.push('/settings/export-import')}
             />
           </Section>
 
           <Section title="Device">
-            <NavRow
+            <Row
+              icon="battery-charging-outline"
+              tint={Colors.success}
               label="Battery Optimization"
-              icon="🔋"
               isFirst
               isLast
               onPress={() => void router.push('/settings/battery-guide')}
@@ -251,23 +241,21 @@ export default function SettingsScreen(): React.JSX.Element {
           </Section>
 
           <Section title="Developer">
-            <NavRow
+            <Row
+              icon="bug-outline"
+              tint={Colors.lowFg}
               label="Diagnostics"
-              subtitle="Capture log, notification debug"
-              icon="🐛"
               isFirst
               isLast
               onPress={() => void router.push('/settings/diagnostics')}
             />
           </Section>
 
-          <View style={styles.versionRow}>
-            <Text style={[styles.versionText, { color: theme.onSurfaceVariant }]}>
-              TaskMind v0.1.0 · {process.env['EXPO_PUBLIC_COMMIT_SHA'] ?? 'dev'}
-            </Text>
-          </View>
+          <Text style={[styles.version, { color: theme.onSurfaceVariant }]}>
+            TaskMind v0.1.0 · {process.env['EXPO_PUBLIC_COMMIT_SHA'] ?? 'dev'}
+          </Text>
         </ScrollView>
-      </SafeAreaView>
+      </Screen>
     </SwipeNavigator>
   );
 }
@@ -283,24 +271,27 @@ function Section({
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: t.onSurfaceVariant }]}>{title}</Text>
-      <View style={[styles.sectionCard, { backgroundColor: t.surface }]}>{children}</View>
+      <View style={[styles.sectionCard, { backgroundColor: t.surface, borderColor: t.outline }]}>
+        {children}
+      </View>
     </View>
   );
 }
 
-function NavRow({
-  label,
-  subtitle,
-  subtitleColor,
+function Row({
   icon,
+  tint,
+  label,
+  value,
+  valueColor,
   isFirst,
-  isLast,
   onPress,
 }: {
+  icon: IoniconName;
+  tint: string;
   label: string;
-  subtitle?: string;
-  subtitleColor?: string;
-  icon?: string;
+  value?: string;
+  valueColor?: string;
   isFirst?: boolean;
   isLast?: boolean;
   onPress: () => void;
@@ -310,35 +301,39 @@ function NavRow({
     <Pressable
       style={({ pressed }) => [
         styles.row,
-        !isFirst && { borderTopWidth: 1, borderTopColor: t.outline },
-        isFirst && styles.rowFirst,
-        isLast && styles.rowLast,
-        pressed && { backgroundColor: t.pressHighlight },
+        !isFirst && { borderTopWidth: 0.5, borderTopColor: t.outline },
+        pressed && { backgroundColor: t.surfaceVariant },
       ]}
       onPress={onPress}
       accessibilityRole="button"
     >
-      {icon && <Text style={styles.rowIcon}>{icon}</Text>}
-      <View style={styles.rowLeft}>
-        <Text style={[styles.rowLabel, { color: t.onSurface }]}>{label}</Text>
-        {subtitle && (
-          <Text style={[styles.rowSubtitle, { color: subtitleColor ?? t.onSurfaceVariant }]}>
-            {subtitle}
-          </Text>
-        )}
+      <View style={[styles.iconBox, { backgroundColor: tint + '1A' }]}>
+        <Ionicons name={icon} size={17} color={tint} />
       </View>
-      <Text style={[styles.chevron, { color: t.onSurfaceVariant }]}>›</Text>
+      <Text style={[styles.rowLabel, { color: t.onSurface }]}>{label}</Text>
+      {value ? (
+        <Text style={[styles.rowValue, { color: valueColor ?? t.onSurfaceVariant }]}>{value}</Text>
+      ) : null}
+      <Ionicons
+        name="chevron-forward"
+        size={17}
+        color={t.onSurfaceVariant}
+        style={styles.chevron}
+      />
     </Pressable>
   );
 }
 
 function ToggleRow({
+  icon,
+  tint,
   label,
   value,
   onChange,
   isFirst,
-  isLast,
 }: {
+  icon: IoniconName;
+  tint: string;
   label: string;
   value: boolean;
   onChange: (v: boolean) => void;
@@ -347,19 +342,15 @@ function ToggleRow({
 }): React.JSX.Element {
   const t = useTheme();
   return (
-    <View
-      style={[
-        styles.row,
-        !isFirst && { borderTopWidth: 1, borderTopColor: t.outline },
-        isFirst && styles.rowFirst,
-        isLast && styles.rowLast,
-      ]}
-    >
+    <View style={[styles.row, !isFirst && { borderTopWidth: 0.5, borderTopColor: t.outline }]}>
+      <View style={[styles.iconBox, { backgroundColor: tint + '1A' }]}>
+        <Ionicons name={icon} size={17} color={tint} />
+      </View>
       <Text style={[styles.rowLabel, styles.flex1, { color: t.onSurface }]}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ true: Colors.primary900, false: t.outline }}
+        trackColor={{ true: Colors.primary500, false: t.outline }}
         thumbColor={Colors.white}
       />
     </View>
@@ -367,72 +358,51 @@ function ToggleRow({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  container: { flex: 1 },
   content: { paddingBottom: 40 },
 
-  screenHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
-  screenTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-
-  permissionBanner: {
-    margin: 16,
-    borderRadius: 12,
+  banner: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    borderRadius: 14,
     backgroundColor: Colors.urgentBgLight,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    gap: 10,
+    gap: 12,
   },
-  permissionBannerIcon: { fontSize: 20 },
-  permissionBannerText: { flex: 1 },
-  permissionTitle: { fontSize: 14, fontWeight: '700', color: Colors.urgentFg, marginBottom: 2 },
-  permissionSubtitle: { fontSize: 12, color: Colors.urgentFg, lineHeight: 17, opacity: 0.9 },
-  permissionArrow: { fontSize: 22, color: Colors.urgentFg },
+  bannerText: { flex: 1 },
+  bannerTitle: { fontSize: 14, fontWeight: '700', color: Colors.urgentFg, marginBottom: 2 },
+  bannerSubtitle: { fontSize: 12, color: Colors.urgentFg, lineHeight: 17, opacity: 0.9 },
 
-  section: { marginTop: 28, marginHorizontal: 16 },
+  section: { marginTop: 24, marginHorizontal: 20 },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
     marginBottom: 8,
     marginLeft: 4,
+    letterSpacing: 0.1,
   },
-  sectionCard: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
-  },
+  sectionCard: { borderRadius: 16, borderWidth: 0.5, overflow: 'hidden' },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    minHeight: 52,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    minHeight: 54,
   },
-  rowFirst: { borderTopLeftRadius: 14, borderTopRightRadius: 14 },
-  rowLast: { borderBottomLeftRadius: 14, borderBottomRightRadius: 14 },
-  rowIcon: { fontSize: 18, marginRight: 12, width: 24, textAlign: 'center' },
-  rowLeft: { flex: 1 },
-  rowLabel: { fontSize: 15, fontWeight: '500' },
-  rowSubtitle: { fontSize: 12, marginTop: 1 },
-  chevron: { fontSize: 20 },
+  iconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  rowLabel: { fontSize: 16, fontWeight: '400', flex: 1 },
+  rowValue: { fontSize: 15, marginRight: 6 },
+  chevron: { marginLeft: 2 },
   flex1: { flex: 1 },
 
-  versionRow: { alignItems: 'center', marginTop: 32, marginBottom: 8 },
-  versionText: { fontSize: 12 },
+  version: { fontSize: 12, textAlign: 'center', marginTop: 28 },
 });

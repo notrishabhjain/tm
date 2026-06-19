@@ -33,42 +33,24 @@ export function EmptyState({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: Colors.primary50,
-    borderWidth: 1.5,
-    borderColor: Colors.primary100,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
   },
-  iconText: {
-    fontSize: 22,
-    color: Colors.primary500,
-    fontWeight: '700',
-  },
+  iconText: { fontSize: 26, color: Colors.primary500, fontWeight: '600' },
   title: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
+    letterSpacing: -0.3,
   },
-  description: {
-    fontSize: 14,
-    textAlign: 'center',
-    maxWidth: 280,
-    lineHeight: 21,
-    marginBottom: 8,
-  },
-  button: {
-    marginTop: 20,
-  },
+  description: { fontSize: 14, textAlign: 'center', maxWidth: 300, lineHeight: 21 },
+  button: { marginTop: 24 },
 });

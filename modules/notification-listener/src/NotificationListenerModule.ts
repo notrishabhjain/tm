@@ -208,6 +208,11 @@ const NotificationListenerModule = {
     return NativeModule.openAllFilesAccessSettings() as Promise<void>;
   },
 
+  openAppSettings(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.openAppSettings() as Promise<void>;
+  },
+
   downloadWhisperModel(): Promise<boolean> {
     if (!NativeModule) return Promise.resolve(false);
     return NativeModule.downloadWhisperModel() as Promise<boolean>;
