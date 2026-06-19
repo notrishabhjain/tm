@@ -179,8 +179,9 @@ export default function RootLayout(): React.JSX.Element {
   }, []);
 
   // In-app call transcription: the native CallTranscriptionService emits
-  // this once whisper.cpp finishes transcribing the latest call recording —
-  // no Termux/MacroDroid hand-off needed. Routes to the same review screen.
+  // this once whisper.cpp finishes transcribing the latest call recording.
+  // Also clear the SharedPreferences stash so the resume-check below doesn't
+  // deliver the same transcript a second time when the user opens the app.
   useEffect(() => {
     const sub = NotificationListener.addCallTranscriptReadyListener((data) => {
       stashCallTranscript({
@@ -188,6 +189,7 @@ export default function RootLayout(): React.JSX.Element {
         callTime: data.callTime,
         callerLabel: data.callerLabel,
       });
+      void NotificationListener.clearPendingCallTranscript().catch(() => {});
       router.push('/call-transcript');
     });
     return () => sub.remove();
@@ -224,6 +226,36 @@ export default function RootLayout(): React.JSX.Element {
       })();
     });
     return () => sub.remove();
+  }, []);
+
+  // Resume check: if the app was backgrounded/killed while CallTranscriptionService
+  // was running, the live sendEvent would have been dropped. The service also writes
+  // the transcript to SharedPreferences — pick it up here whenever the app gains focus.
+  useEffect(() => {
+    const checkPendingTranscript = (): void => {
+      void (async () => {
+        try {
+          const pending = await NotificationListener.peekPendingCallTranscript();
+          if (!pending?.text) return;
+          await NotificationListener.clearPendingCallTranscript().catch(() => {});
+          stashCallTranscript({
+            text: pending.text,
+            callTime: pending.callTime,
+            callerLabel: pending.callerLabel,
+          });
+          router.push('/call-transcript');
+        } catch {
+          // Native module unavailable
+        }
+      })();
+    };
+
+    checkPendingTranscript();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkPendingTranscript();
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Share intent: open share screen when app is brought to foreground with a shared text.
@@ -301,6 +333,13 @@ export default function RootLayout(): React.JSX.Element {
                   name="settings/call-transcription"
                   options={{ presentation: 'card' }}
                 />
+                <Stack.Screen
+                  name="settings/in-app-transcription"
+                  options={{ presentation: 'card' }}
+                />
+                <Stack.Screen name="settings/google-tasks" options={{ presentation: 'card' }} />
+                <Stack.Screen name="settings/ai-cloud" options={{ presentation: 'card' }} />
+                <Stack.Screen name="settings/focus-lock" options={{ presentation: 'card' }} />
                 <Stack.Screen
                   name="call-transcript"
                   options={{ presentation: 'modal', headerShown: false }}
