@@ -99,10 +99,7 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     setStatus((s) => ({ ...s, enabled: value }));
   };
 
-  const ready =
-    status.apiKeySet &&
-    status.hasPhoneStatePermission &&
-    status.hasAllFilesAccess;
+  const ready = status.apiKeySet && status.hasPhoneStatePermission && status.hasAllFilesAccess;
 
   const steps = [
     { ok: status.apiKeySet, label: 'NVIDIA API key saved' },
@@ -145,9 +142,8 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
         {/* Step 1 — API key */}
         <Card theme={theme} step="1" title="Enter NVIDIA API key">
           <Text style={[styles.body, { color: theme.onSurface }]}>
-            Get a free key at{' '}
-            <Text style={{ color: theme.primary }}>build.nvidia.com</Text>
-            {' '}(free tier gives 1 000 API calls/month). Keys start with "nvapi-".
+            Get a free key at <Text style={{ color: theme.primary }}>build.nvidia.com</Text> (free
+            tier gives 1 000 API calls/month). Keys start with "nvapi-".
           </Text>
           {status.apiKeySet ? (
             <View style={styles.keyRow}>
