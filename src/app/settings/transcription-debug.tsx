@@ -37,7 +37,6 @@ const STAGE_LABEL: Record<string, string> = {
   find: 'Find recording',
   apikey: 'API key',
   network: 'Network',
-  decode: 'Decode audio',
   transcribe: 'Transcribe (NVIDIA)',
 };
 

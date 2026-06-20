@@ -151,48 +151,30 @@ object CallTranscriptionDiagnostics {
         }
         onLog?.invoke("apikey", "API key present (${apiKey.take(8)}…)")
 
-        // Check network reachability to NVIDIA endpoint
-        onLog?.invoke("network", "Checking connectivity to grpc.nvcf.nvidia.com:443…")
+        // Check network reachability to NVIDIA REST endpoint
+        onLog?.invoke("network", "Checking connectivity to integrate.api.nvidia.com:443…")
         val reachable = try {
             Socket().use { s ->
-                s.connect(InetSocketAddress("grpc.nvcf.nvidia.com", 443), 5_000)
+                s.connect(InetSocketAddress("integrate.api.nvidia.com", 443), 5_000)
                 true
             }
         } catch (_: Exception) { false }
         if (!reachable) {
-            onLog?.invoke("network", "FAILED — cannot reach grpc.nvcf.nvidia.com:443")
+            onLog?.invoke("network", "FAILED — cannot reach integrate.api.nvidia.com:443")
             return mapOf(
                 "ok" to false,
                 "stage" to "network",
                 "recordingPath" to recording.absolutePath,
-                "error" to "Cannot reach grpc.nvcf.nvidia.com:443. Check internet connection."
+                "error" to "Cannot reach integrate.api.nvidia.com:443. Check internet connection."
             )
         }
         onLog?.invoke("network", "Network OK")
 
-        onLog?.invoke("decode", "Decoding ${recording.name}…")
-        val decodeStart = System.currentTimeMillis()
-        val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
-        val decodeMs = System.currentTimeMillis() - decodeStart
-
-        if (pcm == null || pcm.isEmpty()) {
-            onLog?.invoke("decode", "FAILED — could not decode audio (unsupported codec or unreadable file)")
-            return mapOf(
-                "ok" to false,
-                "stage" to "decode",
-                "recordingPath" to recording.absolutePath,
-                "recordingAgeMs" to (now - recording.lastModified()).toDouble(),
-                "error" to "Failed to decode audio (unsupported codec or unreadable file)."
-            )
-        }
-
-        val durationSec = pcm.size / 16000.0
-        onLog?.invoke("decode", "Decoded %.1fs of audio in %dms".format(durationSec, decodeMs))
-
-        onLog?.invoke("transcribe", "Sending %.1fs of audio to NVIDIA cloud ASR…".format(durationSec))
+        val fileSizeKb = recording.length() / 1024
+        onLog?.invoke("transcribe", "Uploading ${recording.name} (${fileSizeKb} KB) to NVIDIA cloud ASR…")
 
         val transcribeStart = System.currentTimeMillis()
-        val result = NvidiaAsrClient.transcribe(apiKey, pcm)
+        val result = NvidiaAsrClient.transcribeFile(apiKey, recording)
         val transcribeMs = System.currentTimeMillis() - transcribeStart
 
         return when (result) {
@@ -209,8 +191,6 @@ object CallTranscriptionDiagnostics {
                     "stage" to "transcribe",
                     "recordingPath" to recording.absolutePath,
                     "recordingAgeMs" to (now - recording.lastModified()).toDouble(),
-                    "decodedSamples" to pcm.size.toDouble(),
-                    "decodeMs" to decodeMs.toDouble(),
                     "transcribeMs" to transcribeMs.toDouble(),
                     "transcript" to result.text
                 )
@@ -221,19 +201,13 @@ object CallTranscriptionDiagnostics {
                     "ok" to false,
                     "stage" to "transcribe",
                     "recordingPath" to recording.absolutePath,
-                    "decodedSamples" to pcm.size.toDouble(),
-                    "decodeMs" to decodeMs.toDouble(),
                     "transcribeMs" to transcribeMs.toDouble(),
                     "error" to result.message
                 )
             }
             NvidiaAsrClient.Result.NoApiKey -> {
                 onLog?.invoke("apikey", "FAILED — API key disappeared during test")
-                mapOf(
-                    "ok" to false,
-                    "stage" to "apikey",
-                    "error" to "API key not set."
-                )
+                mapOf("ok" to false, "stage" to "apikey", "error" to "API key not set.")
             }
         }
     }
