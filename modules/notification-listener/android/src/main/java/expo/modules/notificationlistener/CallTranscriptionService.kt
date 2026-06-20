@@ -11,8 +11,8 @@ import android.util.Log
 
 /**
  * Foreground service that runs the in-app call-transcription pipeline:
- * find the newest call recording, upload it to NVIDIA cloud ASR (Whisper Large V3),
- * and hand the transcript to the JS review screen.
+ * find the newest call recording, decode it to PCM, send to NVIDIA cloud ASR
+ * (Whisper Large V3 over gRPC), and hand the transcript to the JS review screen.
  */
 class CallTranscriptionService : Service() {
 
@@ -75,7 +75,14 @@ class CallTranscriptionService : Service() {
             return
         }
 
-        val result = NvidiaAsrClient.transcribeFile(apiKey, recording)
+        val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
+        if (pcm == null || pcm.isEmpty()) {
+            Log.w(TAG, "Failed to decode ${recording.absolutePath}")
+            CallRecordingFinder.markProcessed(this, recording)
+            return
+        }
+
+        val result = NvidiaAsrClient.transcribe(apiKey, pcm)
         CallRecordingFinder.markProcessed(this, recording)
 
         val text = when (result) {
