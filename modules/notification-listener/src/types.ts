@@ -47,9 +47,7 @@ export interface CallTranscriptionStatus {
   hasPhoneStatePermission: boolean;
   hasCallLogPermission: boolean;
   hasAllFilesAccess: boolean;
-  modelDownloaded: boolean;
-  engineBuilt: boolean;
-  modelName: string;
+  apiKeySet: boolean;
 }
 
 export interface CallTranscriptReadyEvent {
@@ -80,8 +78,7 @@ export interface CallDiagnostics {
   hasPhoneStatePermission: boolean;
   hasCallLogPermission: boolean;
   hasAllFilesAccess: boolean;
-  modelDownloaded: boolean;
-  engineBuilt: boolean;
+  apiKeySet: boolean;
   lastProcessedPath: string | null;
   latestUnprocessedPath: string | null;
   latestUnprocessedAgeMs: number | null;
@@ -91,7 +88,7 @@ export interface CallDiagnostics {
 
 export interface CallTranscriptionTestResult {
   ok: boolean;
-  stage: 'find' | 'model' | 'engine' | 'decode' | 'transcribe';
+  stage: 'find' | 'apikey' | 'network' | 'decode' | 'transcribe';
   recordingPath?: string;
   recordingAgeMs?: number;
   decodedSamples?: number;

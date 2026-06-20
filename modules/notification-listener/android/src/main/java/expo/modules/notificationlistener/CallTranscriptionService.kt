@@ -11,11 +11,8 @@ import android.util.Log
 
 /**
  * Foreground service that runs the in-app call-transcription pipeline:
- * find the newest call recording, decode it, transcribe it on-device with
- * whisper.cpp, and hand the transcript to JS the same way the Termux flow
- * does (review screen at /call-transcript) — but without Termux or
- * MacroDroid. Started by TaskMindForegroundService a short delay after a
- * call ends.
+ * find the newest call recording, decode it to PCM, send to NVIDIA cloud ASR,
+ * and hand the transcript to the JS review screen.
  */
 class CallTranscriptionService : Service() {
 
@@ -57,8 +54,13 @@ class CallTranscriptionService : Service() {
         val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("call_transcription_enabled", false)) return
 
-        // Some recorder apps take longer than the initial delay to flush the file to
-        // disk (WhatsApp ~15 s, VoIP recorders up to 25 s after the initial 30 s wait).
+        val apiKey = prefs.getString("nvidia_api_key", null).orEmpty()
+        if (apiKey.isBlank()) {
+            Log.w(TAG, "NVIDIA API key not set — skipping transcription")
+            return
+        }
+
+        // Some recorder apps take longer than the initial delay to flush the file.
         // Retry every 15 s for up to 90 s before giving up.
         var recording = CallRecordingFinder.findLatestUnprocessed(this)
         if (recording == null) {
@@ -73,11 +75,6 @@ class CallTranscriptionService : Service() {
             return
         }
 
-        if (!WhisperModelManager.isModelDownloaded(this)) {
-            Log.w(TAG, "Whisper model not downloaded — skipping transcription")
-            return
-        }
-
         val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
         if (pcm == null || pcm.isEmpty()) {
             Log.w(TAG, "Failed to decode ${recording.absolutePath}")
@@ -85,24 +82,17 @@ class CallTranscriptionService : Service() {
             return
         }
 
-        val modelPath = WhisperModelManager.modelFile(this).absolutePath
-        val result = WhisperTranscriber.transcribe(modelPath, pcm)
-        // Mark processed regardless of outcome so a permanently-failing file
-        // doesn't get retried on every subsequent call.
+        val result = NvidiaAsrClient.transcribe(apiKey, pcm)
         CallRecordingFinder.markProcessed(this, recording)
 
         val text = when (result) {
-            is WhisperTranscriber.Result.Success -> result.text
-            WhisperTranscriber.Result.EngineNotBuilt -> {
-                Log.w(TAG, "whisper.cpp native engine not built into this APK")
+            is NvidiaAsrClient.Result.Success -> result.text
+            is NvidiaAsrClient.Result.Error -> {
+                Log.w(TAG, "NVIDIA ASR failed: ${result.message}")
                 return
             }
-            WhisperTranscriber.Result.ModelMissing -> {
-                Log.w(TAG, "whisper model failed to load")
-                return
-            }
-            WhisperTranscriber.Result.TranscriptionFailed -> {
-                Log.w(TAG, "Transcription produced no text")
+            NvidiaAsrClient.Result.NoApiKey -> {
+                Log.w(TAG, "NVIDIA API key missing at transcription time")
                 return
             }
         }
@@ -113,8 +103,6 @@ class CallTranscriptionService : Service() {
             ?: "Unknown"
         val callTime = callInfo?.endedAt ?: recording.lastModified()
 
-        // Persist transcript so the app can pick it up when it resumes from background
-        // (sendCallTranscriptReady's sendEvent is a no-op if the JS bridge isn't active).
         getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE).edit()
             .putString("pending_transcript_text", text)
             .putLong("pending_transcript_time", callTime)
@@ -146,7 +134,7 @@ class CallTranscriptionService : Service() {
             "Call Transcription",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Shown briefly while a call recording is transcribed on-device."
+            description = "Shown briefly while a call is being transcribed."
             setShowBadge(false)
         }
         notificationManager.createNotificationChannel(channel)

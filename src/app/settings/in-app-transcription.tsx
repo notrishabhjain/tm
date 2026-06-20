@@ -1,5 +1,14 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, Switch, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  Switch,
+  Pressable,
+  TextInput,
+} from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/ui/theme';
@@ -14,20 +23,20 @@ const DEFAULT_STATUS: CallTranscriptionStatus = {
   hasPhoneStatePermission: false,
   hasCallLogPermission: false,
   hasAllFilesAccess: false,
-  modelDownloaded: false,
-  engineBuilt: false,
-  modelName: 'ggml-medium-q5_0.bin',
+  apiKeySet: false,
 };
 
 export default function InAppTranscriptionScreen(): React.JSX.Element {
   const theme = useTheme();
   const router = useRouter();
   const [status, setStatus] = useState<CallTranscriptionStatus>(DEFAULT_STATUS);
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [apiKey, setApiKey] = useState('');
+  const [savingKey, setSavingKey] = useState(false);
+  const [keyMasked, setKeyMasked] = useState(true);
 
   const refresh = useCallback(() => {
     void NotificationListener.getCallTranscriptionStatus().then(setStatus);
+    void NotificationListener.getNvidiaApiKey().then(setApiKey);
   }, []);
 
   useFocusEffect(
@@ -36,20 +45,10 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     }, [refresh])
   );
 
-  React.useEffect(() => {
-    const sub = NotificationListener.addModelDownloadProgressListener(({ progress: p }) => {
-      setProgress(p);
-    });
-    return () => sub.remove();
-  }, []);
-
   const requestPhonePermissions = async (): Promise<void> => {
     const granted = await NotificationListener.requestCallTranscriptionPermissions();
     refresh();
     if (granted) {
-      // Restart the foreground service so CallStateMonitor can register now
-      // that READ_PHONE_STATE is available — the service start triggers the
-      // else-branch in onStartCommand which calls CallStateMonitor.start().
       try {
         await NotificationListener.startService();
       } catch {
@@ -58,7 +57,7 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     } else {
       Alert.alert(
         'Permission needed',
-        'Phone & call-log access was not granted. If the dialog didn\'t appear, you may have denied it before — open App Settings → Permissions and enable "Phone" and "Call logs" manually.',
+        "Phone & call-log access was not granted. If the dialog didn't appear, you may have denied it before — open App Settings and enable Phone and Call logs manually.",
         [
           { text: 'Not now', style: 'cancel' },
           { text: 'Open App Settings', onPress: () => void NotificationListener.openAppSettings() },
@@ -71,24 +70,27 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     await NotificationListener.openAllFilesAccessSettings();
   };
 
-  const downloadModel = async (): Promise<void> => {
-    setDownloading(true);
-    setProgress(0);
+  const saveApiKey = async (): Promise<void> => {
+    const trimmed = apiKey.trim();
+    if (!trimmed.startsWith('nvapi-')) {
+      Alert.alert(
+        'Invalid key',
+        'NVIDIA API keys start with "nvapi-". Get yours at build.nvidia.com.'
+      );
+      return;
+    }
+    setSavingKey(true);
     try {
-      const ok = await NotificationListener.downloadWhisperModel();
-      if (!ok) {
-        Alert.alert('Download failed', 'Check your connection and try again.');
-      }
-    } catch {
-      Alert.alert('Download failed', 'Check your connection and try again.');
-    } finally {
-      setDownloading(false);
+      await NotificationListener.setNvidiaApiKey(trimmed);
       refresh();
+    } finally {
+      setSavingKey(false);
     }
   };
 
-  const deleteModel = async (): Promise<void> => {
-    await NotificationListener.deleteWhisperModel();
+  const clearApiKey = async (): Promise<void> => {
+    await NotificationListener.setNvidiaApiKey('');
+    setApiKey('');
     refresh();
   };
 
@@ -97,15 +99,10 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
     setStatus((s) => ({ ...s, enabled: value }));
   };
 
-  const ready =
-    status.engineBuilt &&
-    status.modelDownloaded &&
-    status.hasPhoneStatePermission &&
-    status.hasAllFilesAccess;
+  const ready = status.apiKeySet && status.hasPhoneStatePermission && status.hasAllFilesAccess;
 
   const steps = [
-    { ok: status.engineBuilt, label: 'On-device engine (ships in the app)' },
-    { ok: status.modelDownloaded, label: `Model downloaded · ${status.modelName}` },
+    { ok: status.apiKeySet, label: 'NVIDIA API key saved' },
     { ok: status.hasPhoneStatePermission, label: 'Phone & call-log access' },
     { ok: status.hasAllFilesAccess, label: 'All-files access (to read recordings)' },
   ];
@@ -117,7 +114,7 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={[styles.intro, { color: theme.onSurfaceVariant }]}>
           TaskMind detects when a call ends, finds the recording your phone saved, and transcribes
-          it on-device — fully inside the app. No Termux, no MacroDroid, no computer needed.
+          it via NVIDIA cloud ASR (Whisper Large V3). Fast, accurate, handles Hindi/Hinglish.
         </Text>
 
         {/* Progress summary */}
@@ -142,27 +139,59 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
           ))}
         </View>
 
-        {/* Engine note — only if somehow missing from this build */}
-        {!status.engineBuilt && (
-          <View
-            style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.outline }]}
-          >
-            <View style={styles.cardHead}>
-              <Ionicons name="information-circle" size={22} color={Colors.primary500} />
-              <Text style={[styles.cardTitle, { color: theme.onSurface }]}>
-                Engine not detected
-              </Text>
+        {/* Step 1 — API key */}
+        <Card theme={theme} step="1" title="Enter NVIDIA API key">
+          <Text style={[styles.body, { color: theme.onSurface }]}>
+            Get a free key at <Text style={{ color: theme.primary }}>build.nvidia.com</Text> (free
+            tier gives 1 000 API calls/month). Keys start with "nvapi-".
+          </Text>
+          {status.apiKeySet ? (
+            <View style={styles.keyRow}>
+              <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
+              <Text style={[styles.body, { color: Colors.success, flex: 1 }]}>API key saved</Text>
+              <Pressable onPress={() => void clearApiKey()} style={styles.clearBtn}>
+                <Text style={[styles.clearBtnText, { color: Colors.urgentFg }]}>Clear</Text>
+              </Pressable>
             </View>
-            <Text style={[styles.body, { color: theme.onSurface }]}>
-              The transcription engine is compiled into the app automatically. This build doesn't
-              include it — install the latest TaskMind build (the newest APK from your releases) and
-              this step will complete on its own. Nothing to do on your phone.
-            </Text>
-          </View>
-        )}
+          ) : (
+            <>
+              <View
+                style={[
+                  styles.inputRow,
+                  { borderColor: theme.outline, backgroundColor: theme.surfaceVariant },
+                ]}
+              >
+                <TextInput
+                  style={[styles.input, { color: theme.onSurface }]}
+                  placeholder="nvapi-..."
+                  placeholderTextColor={theme.onSurfaceVariant}
+                  value={apiKey}
+                  onChangeText={setApiKey}
+                  secureTextEntry={keyMasked}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable onPress={() => setKeyMasked((m) => !m)} style={styles.eyeBtn}>
+                  <Ionicons
+                    name={keyMasked ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={theme.onSurfaceVariant}
+                  />
+                </Pressable>
+              </View>
+              <Button
+                label={savingKey ? 'Saving…' : 'Save API key'}
+                loading={savingKey}
+                onPress={() => void saveApiKey()}
+                fullWidth
+                disabled={!apiKey.trim()}
+              />
+            </>
+          )}
+        </Card>
 
-        {/* Permissions */}
-        <Card theme={theme} step="1" title="Grant permissions">
+        {/* Step 2 — Permissions */}
+        <Card theme={theme} step="2" title="Grant permissions">
           <PermLine
             theme={theme}
             label="Phone & call log"
@@ -193,42 +222,12 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
             style={styles.linkBtn}
           >
             <Text style={[styles.link, { color: theme.primary }]}>
-              Permissions not sticking? Open App Settings ›
+              Permissions not sticking? Open App Settings
             </Text>
           </Pressable>
         </Card>
 
-        {/* Model */}
-        <Card theme={theme} step="2" title="Download the model">
-          <Text style={[styles.body, { color: theme.onSurface }]}>
-            medium-q5_0 (~530 MB) gives much better accuracy on Hindi/Hinglish and accented speech
-            than the small model. Downloaded once, over Wi-Fi, and stored on your device.
-          </Text>
-          {status.modelDownloaded ? (
-            <Button
-              label="Delete model"
-              variant="destructive"
-              onPress={() => void deleteModel()}
-              fullWidth
-            />
-          ) : (
-            <>
-              <Button
-                label={downloading ? `Downloading… ${progress}%` : 'Download model (~530 MB)'}
-                loading={downloading}
-                onPress={() => void downloadModel()}
-                fullWidth
-              />
-              {downloading && (
-                <View style={[styles.progressTrack, { backgroundColor: theme.outline }]}>
-                  <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                </View>
-              )}
-            </>
-          )}
-        </Card>
-
-        {/* Enable */}
+        {/* Step 3 — Enable */}
         <Card theme={theme} step="3" title="Enable">
           <View style={styles.enableRow}>
             <Text style={[styles.body, styles.flex1, { color: theme.onSurface }]}>
@@ -252,8 +251,8 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
         <Text style={[styles.howTitle, { color: theme.onSurfaceVariant }]}>HOW IT WORKS</Text>
         <Text style={[styles.body, { color: theme.onSurfaceVariant, paddingHorizontal: 4 }]}>
           When a call ends, TaskMind waits ~15s for your recorder to save the file, finds the newest
-          recording, and transcribes it on-device — audio never leaves your phone. The transcript
-          opens the review screen where AI extracts action items with correct dates.
+          recording, decodes it, and sends the audio to NVIDIA cloud ASR. Whisper Large V3 returns a
+          transcript in seconds — the review screen then opens so AI can extract action items.
         </Text>
 
         <Pressable
@@ -347,6 +346,20 @@ const styles = StyleSheet.create({
   note: { fontSize: 13, lineHeight: 19 },
   flex1: { flex: 1 },
 
+  keyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  clearBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  clearBtnText: { fontSize: 13, fontWeight: '600' },
+
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+  },
+  input: { flex: 1, fontSize: 14, paddingVertical: 12, fontFamily: 'monospace' },
+  eyeBtn: { padding: 6 },
+
   permLine: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   permLabel: { fontSize: 14, flex: 1 },
   permStatus: { fontSize: 13, fontWeight: '600' },
@@ -354,8 +367,6 @@ const styles = StyleSheet.create({
   link: { fontSize: 14, fontWeight: '600' },
 
   enableRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: 6, backgroundColor: Colors.primary500 },
 
   howTitle: {
     fontSize: 13,

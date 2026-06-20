@@ -6,13 +6,13 @@ import android.os.Build
 import android.os.Environment
 import androidx.core.content.ContextCompat
 import java.io.File
+import java.net.InetSocketAddress
+import java.net.Socket
 
 /**
  * Produces a step-by-step picture of the in-app call-transcription pipeline so
- * the debug screen can show exactly which stage fails — trigger registration,
- * recording discovery, file access, decode, or transcription. Nothing here
- * mutates pipeline state (it never marks a recording processed), so it is safe
- * to run repeatedly while diagnosing.
+ * the debug screen can show exactly which stage fails. Nothing here mutates
+ * pipeline state, so it is safe to run repeatedly while diagnosing.
  */
 object CallTranscriptionDiagnostics {
 
@@ -28,6 +28,11 @@ object CallTranscriptionDiagnostics {
         } else {
             hasPermission(context, android.Manifest.permission.READ_EXTERNAL_STORAGE)
         }
+
+    private fun apiKeySet(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+        return prefs.getString("nvidia_api_key", null).orEmpty().isNotBlank()
+    }
 
     /** Fast inspection — prerequisites, trigger state, and what files are visible. */
     fun inspect(context: Context): Map<String, Any?> {
@@ -49,7 +54,6 @@ object CallTranscriptionDiagnostics {
             )
         }
 
-        // Newest 10 audio files across every candidate dir, with age + size.
         val now = System.currentTimeMillis()
         val allFiles = mutableListOf<File>()
         for (path in CallRecordingFinder.candidateDirs(context)) {
@@ -83,8 +87,7 @@ object CallTranscriptionDiagnostics {
             "hasPhoneStatePermission" to hasPermission(context, android.Manifest.permission.READ_PHONE_STATE),
             "hasCallLogPermission" to hasPermission(context, android.Manifest.permission.READ_CALL_LOG),
             "hasAllFilesAccess" to hasAllFilesAccess(context),
-            "modelDownloaded" to WhisperModelManager.isModelDownloaded(context),
-            "engineBuilt" to (WhisperJNI.ensureLoaded() && WhisperJNI.isReal()),
+            "apiKeySet" to apiKeySet(context),
             "lastProcessedPath" to prefs.getString("call_transcription_last_recording", null),
             "latestUnprocessedPath" to latest?.absolutePath,
             "latestUnprocessedAgeMs" to latest?.let { (now - it.lastModified()).toDouble() },
@@ -94,11 +97,9 @@ object CallTranscriptionDiagnostics {
     }
 
     /**
-     * Runs the full decode + transcribe pipeline on the newest recording found,
-     * ignoring both the "enabled" flag and the last-processed marker so it can be
-     * triggered on demand. [onLog] is called at each stage with a stage key and a
-     * human-readable message — callers can forward these to the JS bridge for
-     * real-time display. Heavy — call off the main thread.
+     * Runs the full decode + cloud-transcribe pipeline on the newest recording
+     * found. Ignores both the "enabled" flag and the last-processed marker.
+     * [onLog] is called at each stage for real-time display. Call off the main thread.
      */
     fun runFullTest(
         context: Context,
@@ -128,35 +129,46 @@ object CallTranscriptionDiagnostics {
                 "ok" to false,
                 "stage" to "find",
                 "error" to "No audio recording found in any candidate folder. " +
-                    "Check that all-files access is granted and that your recorder saves to one of the listed folders."
+                    "Check that all-files access is granted and your recorder saves to one of the listed folders."
             )
         }
 
         val ageSec = (now - recording.lastModified()) / 1000
         val sizeKb = recording.length() / 1024
-        onLog?.invoke("find", "Found: ${recording.name} (${sizeKb} KB, ${ageSec}s old)")
+        onLog?.invoke("find", "Found: ${recording.name} ($sizeKb KB, ${ageSec}s old)")
 
-        if (!WhisperModelManager.isModelDownloaded(context)) {
-            onLog?.invoke("model", "FAILED — model not downloaded")
+        // Check API key
+        val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+        val apiKey = prefs.getString("nvidia_api_key", null).orEmpty()
+        if (apiKey.isBlank()) {
+            onLog?.invoke("apikey", "FAILED — NVIDIA API key not set")
             return mapOf(
                 "ok" to false,
-                "stage" to "model",
+                "stage" to "apikey",
                 "recordingPath" to recording.absolutePath,
-                "error" to "Whisper model is not downloaded."
+                "error" to "NVIDIA API key is not set. Enter it in the Call Transcription settings."
             )
         }
-        onLog?.invoke("model", "Model OK: ${WhisperModelManager.MODEL_FILENAME}")
+        onLog?.invoke("apikey", "API key present (${apiKey.take(8)}…)")
 
-        if (!(WhisperJNI.ensureLoaded() && WhisperJNI.isReal())) {
-            onLog?.invoke("engine", "FAILED — engine not built into this APK")
+        // Check network reachability to NVIDIA endpoint
+        onLog?.invoke("network", "Checking connectivity to grpc.nvcf.nvidia.com:443…")
+        val reachable = try {
+            Socket().use { s ->
+                s.connect(InetSocketAddress("grpc.nvcf.nvidia.com", 443), 5_000)
+                true
+            }
+        } catch (_: Exception) { false }
+        if (!reachable) {
+            onLog?.invoke("network", "FAILED — cannot reach grpc.nvcf.nvidia.com:443")
             return mapOf(
                 "ok" to false,
-                "stage" to "engine",
+                "stage" to "network",
                 "recordingPath" to recording.absolutePath,
-                "error" to "On-device whisper engine is not built into this APK."
+                "error" to "Cannot reach grpc.nvcf.nvidia.com:443. Check internet connection."
             )
         }
-        onLog?.invoke("engine", "Engine loaded OK")
+        onLog?.invoke("network", "Network OK")
 
         onLog?.invoke("decode", "Decoding ${recording.name}…")
         val decodeStart = System.currentTimeMillis()
@@ -175,26 +187,16 @@ object CallTranscriptionDiagnostics {
         }
 
         val durationSec = pcm.size / 16000.0
-        onLog?.invoke(
-            "decode",
-            "Decoded %.1fs of audio in %dms".format(durationSec, decodeMs)
-        )
+        onLog?.invoke("decode", "Decoded %.1fs of audio in %dms".format(durationSec, decodeMs))
 
-        val estSec = (durationSec * 15).toInt().coerceAtLeast(5)
-        onLog?.invoke(
-            "transcribe",
-            "Transcribing %.1fs of audio — estimated ~%ds on this device. Keep screen on.".format(
-                durationSec, estSec
-            )
-        )
+        onLog?.invoke("transcribe", "Sending %.1fs of audio to NVIDIA cloud ASR…".format(durationSec))
 
-        val modelPath = WhisperModelManager.modelFile(context).absolutePath
         val transcribeStart = System.currentTimeMillis()
-        val result = WhisperTranscriber.transcribe(modelPath, pcm)
+        val result = NvidiaAsrClient.transcribe(apiKey, pcm)
         val transcribeMs = System.currentTimeMillis() - transcribeStart
 
         return when (result) {
-            is WhisperTranscriber.Result.Success -> {
+            is NvidiaAsrClient.Result.Success -> {
                 onLog?.invoke(
                     "transcribe",
                     "Done in %.1fs. Preview: %s".format(
@@ -213,36 +215,24 @@ object CallTranscriptionDiagnostics {
                     "transcript" to result.text
                 )
             }
-            WhisperTranscriber.Result.EngineNotBuilt -> {
-                onLog?.invoke("transcribe", "FAILED — engine not built")
+            is NvidiaAsrClient.Result.Error -> {
+                onLog?.invoke("transcribe", "FAILED — ${result.message}")
                 mapOf(
-                    "ok" to false, "stage" to "transcribe",
-                    "recordingPath" to recording.absolutePath,
-                    "error" to "Engine not built."
-                )
-            }
-            WhisperTranscriber.Result.ModelMissing -> {
-                onLog?.invoke("transcribe", "FAILED — model failed to load from disk")
-                mapOf(
-                    "ok" to false, "stage" to "transcribe",
-                    "recordingPath" to recording.absolutePath,
-                    "error" to "Model failed to load."
-                )
-            }
-            WhisperTranscriber.Result.TranscriptionFailed -> {
-                onLog?.invoke(
-                    "transcribe",
-                    "FAILED after %.1fs — no text produced (silent or unintelligible audio)".format(
-                        transcribeMs / 1000.0
-                    )
-                )
-                mapOf(
-                    "ok" to false, "stage" to "transcribe",
+                    "ok" to false,
+                    "stage" to "transcribe",
                     "recordingPath" to recording.absolutePath,
                     "decodedSamples" to pcm.size.toDouble(),
                     "decodeMs" to decodeMs.toDouble(),
                     "transcribeMs" to transcribeMs.toDouble(),
-                    "error" to "Transcription produced no text (silent or unintelligible audio)."
+                    "error" to result.message
+                )
+            }
+            NvidiaAsrClient.Result.NoApiKey -> {
+                onLog?.invoke("apikey", "FAILED — API key disappeared during test")
+                mapOf(
+                    "ok" to false,
+                    "stage" to "apikey",
+                    "error" to "API key not set."
                 )
             }
         }
