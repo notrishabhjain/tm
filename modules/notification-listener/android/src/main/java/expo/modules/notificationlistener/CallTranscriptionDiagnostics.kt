@@ -151,30 +151,48 @@ object CallTranscriptionDiagnostics {
         }
         onLog?.invoke("apikey", "API key present (${apiKey.take(8)}…)")
 
-        // Check network reachability to NVIDIA REST endpoint
-        onLog?.invoke("network", "Checking connectivity to integrate.api.nvidia.com:443…")
+        // Check network reachability to NVIDIA gRPC endpoint
+        onLog?.invoke("network", "Checking connectivity to ${NvidiaAsrClient.HOST}:${NvidiaAsrClient.PORT}…")
         val reachable = try {
             Socket().use { s ->
-                s.connect(InetSocketAddress("integrate.api.nvidia.com", 443), 5_000)
+                s.connect(InetSocketAddress(NvidiaAsrClient.HOST, NvidiaAsrClient.PORT), 5_000)
                 true
             }
         } catch (_: Exception) { false }
         if (!reachable) {
-            onLog?.invoke("network", "FAILED — cannot reach integrate.api.nvidia.com:443")
+            onLog?.invoke("network", "FAILED — cannot reach ${NvidiaAsrClient.HOST}:${NvidiaAsrClient.PORT}")
             return mapOf(
                 "ok" to false,
                 "stage" to "network",
                 "recordingPath" to recording.absolutePath,
-                "error" to "Cannot reach integrate.api.nvidia.com:443. Check internet connection."
+                "error" to "Cannot reach ${NvidiaAsrClient.HOST}:${NvidiaAsrClient.PORT}. Check internet connection."
             )
         }
         onLog?.invoke("network", "Network OK")
 
-        val fileSizeKb = recording.length() / 1024
-        onLog?.invoke("transcribe", "Uploading ${recording.name} (${fileSizeKb} KB) to NVIDIA cloud ASR…")
+        onLog?.invoke("decode", "Decoding ${recording.name}…")
+        val decodeStart = System.currentTimeMillis()
+        val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
+        val decodeMs = System.currentTimeMillis() - decodeStart
+
+        if (pcm == null || pcm.isEmpty()) {
+            onLog?.invoke("decode", "FAILED — could not decode audio (unsupported codec or unreadable file)")
+            return mapOf(
+                "ok" to false,
+                "stage" to "decode",
+                "recordingPath" to recording.absolutePath,
+                "recordingAgeMs" to (now - recording.lastModified()).toDouble(),
+                "error" to "Failed to decode audio (unsupported codec or unreadable file)."
+            )
+        }
+
+        val durationSec = pcm.size / 16000.0
+        onLog?.invoke("decode", "Decoded %.1fs of audio in %dms".format(durationSec, decodeMs))
+
+        onLog?.invoke("transcribe", "Sending %.1fs of audio to NVIDIA cloud ASR…".format(durationSec))
 
         val transcribeStart = System.currentTimeMillis()
-        val result = NvidiaAsrClient.transcribeFile(apiKey, recording)
+        val result = NvidiaAsrClient.transcribe(apiKey, pcm)
         val transcribeMs = System.currentTimeMillis() - transcribeStart
 
         return when (result) {
@@ -191,6 +209,8 @@ object CallTranscriptionDiagnostics {
                     "stage" to "transcribe",
                     "recordingPath" to recording.absolutePath,
                     "recordingAgeMs" to (now - recording.lastModified()).toDouble(),
+                    "decodedSamples" to pcm.size.toDouble(),
+                    "decodeMs" to decodeMs.toDouble(),
                     "transcribeMs" to transcribeMs.toDouble(),
                     "transcript" to result.text
                 )
@@ -201,6 +221,8 @@ object CallTranscriptionDiagnostics {
                     "ok" to false,
                     "stage" to "transcribe",
                     "recordingPath" to recording.absolutePath,
+                    "decodedSamples" to pcm.size.toDouble(),
+                    "decodeMs" to decodeMs.toDouble(),
                     "transcribeMs" to transcribeMs.toDouble(),
                     "error" to result.message
                 )

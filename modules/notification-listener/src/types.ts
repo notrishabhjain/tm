@@ -88,7 +88,7 @@ export interface CallDiagnostics {
 
 export interface CallTranscriptionTestResult {
   ok: boolean;
-  stage: 'find' | 'apikey' | 'network' | 'transcribe';
+  stage: 'find' | 'apikey' | 'network' | 'decode' | 'transcribe';
   recordingPath?: string;
   recordingAgeMs?: number;
   decodedSamples?: number;

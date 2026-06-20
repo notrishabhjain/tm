@@ -18,4 +18,13 @@ dependencies {
 
   implementation 'com.google.mlkit:text-recognition:16.0.1'
   implementation 'com.google.mlkit:text-recognition-devanagari:16.0.1'
+
+  // gRPC for NVIDIA cloud ASR (Riva over NVCF — gRPC only, no REST endpoint)
+  implementation('io.grpc:grpc-okhttp:1.65.0') {
+    exclude group: 'com.google.guava', module: 'listenablefuture'
+  }
+  implementation('io.grpc:grpc-stub:1.65.0') {
+    exclude group: 'com.google.guava', module: 'listenablefuture'
+    exclude module: 'annotations'
+  }
 }
