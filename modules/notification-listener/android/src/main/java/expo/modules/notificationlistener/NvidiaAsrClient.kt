@@ -33,7 +33,11 @@ object NvidiaAsrClient {
     // Full Riva ASR offline-recognize method.
     private const val METHOD = "nvidia.riva.asr.RivaSpeechRecognition/Recognize"
     private const val SAMPLE_RATE = 16000
-    private const val TIMEOUT_SECONDS = 180L
+    // 60 s is generous for a cloud ASR call; the old 180 s caused the UI to hang for 3 minutes.
+    private const val TIMEOUT_SECONDS = 60L
+    // Cap audio at 15 minutes — longer calls are truncated so the gRPC payload stays manageable
+    // and we don't risk OOM on low-RAM devices.
+    private const val MAX_AUDIO_SAMPLES = 15 * 60 * SAMPLE_RATE
 
     private val KEY_AUTH = Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER)
     private val KEY_FUNC = Metadata.Key.of("function-id", Metadata.ASCII_STRING_MARSHALLER)
@@ -53,7 +57,11 @@ object NvidiaAsrClient {
     fun transcribe(apiKey: String, pcm: FloatArray, language: String = "multi"): Result {
         if (apiKey.isBlank()) return Result.NoApiKey
         return try {
-            val wavBytes = pcm16ToWav(floatToPcm16Le(pcm), SAMPLE_RATE)
+            val clipped = if (pcm.size > MAX_AUDIO_SAMPLES) {
+                Log.i(TAG, "Audio truncated from ${pcm.size / SAMPLE_RATE}s to ${MAX_AUDIO_MINUTES}min")
+                pcm.copyOf(MAX_AUDIO_SAMPLES)
+            } else pcm
+            val wavBytes = pcm16ToWav(floatToPcm16Le(clipped), SAMPLE_RATE)
             val requestBytes = encodeRecognizeRequest(wavBytes, language)
 
             val headers = Metadata().also {

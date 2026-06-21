@@ -60,12 +60,14 @@ class CallTranscriptionService : Service() {
             return
         }
 
-        // Some recorder apps take longer than the initial delay to flush the file.
-        // Retry every 15 s for up to 90 s before giving up.
+        // Most recorder apps flush within a few seconds of the call ending.
+        // Short back-off (3 s / 6 s / 10 s ≈ 19 s total) instead of the old
+        // fixed 15 s × 6 = 90 s — keeps the foreground service shorter-lived.
         var recording = CallRecordingFinder.findLatestUnprocessed(this)
         if (recording == null) {
-            for (attempt in 1..6) {
-                Thread.sleep(15_000)
+            val retryDelaysMs = longArrayOf(3_000, 6_000, 10_000)
+            for (delayMs in retryDelaysMs) {
+                Thread.sleep(delayMs)
                 recording = CallRecordingFinder.findLatestUnprocessed(this)
                 if (recording != null) break
             }
