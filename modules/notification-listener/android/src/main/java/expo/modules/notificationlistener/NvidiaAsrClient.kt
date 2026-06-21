@@ -58,7 +58,7 @@ object NvidiaAsrClient {
         if (apiKey.isBlank()) return Result.NoApiKey
         return try {
             val clipped = if (pcm.size > MAX_AUDIO_SAMPLES) {
-                Log.i(TAG, "Audio truncated from ${pcm.size / SAMPLE_RATE}s to ${MAX_AUDIO_MINUTES}min")
+                Log.i(TAG, "Audio truncated from ${pcm.size / SAMPLE_RATE}s to ${MAX_AUDIO_SAMPLES / SAMPLE_RATE / 60}min")
                 pcm.copyOf(MAX_AUDIO_SAMPLES)
             } else pcm
             val wavBytes = pcm16ToWav(floatToPcm16Le(clipped), SAMPLE_RATE)
