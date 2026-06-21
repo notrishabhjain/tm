@@ -349,6 +349,15 @@ function extractDeadline(text: string): number | null {
     }
   }
 
+  // ── Hindi urgency: "aaj tak", "kal tak", "abhi", "turant" ────────────────
+  if (/\b(aaj tak|aaj hi)\b/i.test(lower)) deadlines.push(eod(now));
+  if (/\bkal tak\b/i.test(lower)) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    deadlines.push(eod(d));
+  }
+  if (/\b(abhi|turant|foran|isi waqt|abhi abhi)\b/i.test(lower)) deadlines.push(nowMs + 3_600_000);
+
   return deadlines.length > 0 ? Math.min(...deadlines) : null;
 }
 
@@ -467,7 +476,7 @@ function hasUrl(text: string): boolean {
 }
 
 const ACTION_VERBS =
-  'send|share|submit|review|check|call|update|prepare|confirm|fill|upload|forward|reply|provide|schedule|fix|complete|attend|join|arrange|handle|ensure|finalize|approve|sign|book|pay|order|email|draft|verify|coordinate|follow up';
+  'send|share|submit|review|check|call|update|prepare|confirm|fill|upload|forward|reply|provide|schedule|fix|complete|attend|join|arrange|handle|ensure|finalize|approve|sign|book|pay|order|email|draft|verify|coordinate|follow up|resolve|close|track|test|install|download|read|write|note|plan|respond|assign|delegate|escalate';
 
 // ── Priority derivation ───────────────────────────────────────────────────────
 
@@ -512,18 +521,21 @@ function evalPositiveSignals(
 ): void {
   const wc = wordCount(latestMessage);
 
-  // direct_imperative_en
+  // direct_imperative_en — polite/direct English requests
   if (
-    /\b(please|pls|kindly)\b.{0,80}(send|share|submit|review|check|call|update|prepare|confirm|fill|upload|forward|reply|provide|schedule|fix|complete|attend|join|arrange|handle|ensure)\b/i.test(
+    /\b(please|pls|kindly)\b.{0,80}(send|share|submit|review|check|call|update|prepare|confirm|fill|upload|forward|reply|provide|schedule|fix|complete|attend|join|arrange|handle|ensure|resolve|read|plan|respond|assign|book)\b/i.test(
+      latestMessage
+    ) ||
+    /\b(need you to|i need you to|make sure (you|to)|don'?t forget to|remember to|take care of|get back to me|get back to us|please handle|you need to|ensure that you|action (required|needed))\b/i.test(
       latestMessage
     )
   ) {
     applySignal(acc, 'direct_imperative_en', 0.45);
   }
 
-  // direct_hi_verb
+  // direct_hi_verb — Hindi action commands (transliterated)
   if (
-    /\b(bhej do|bhej dena|dekh lo|dekh lena|kar do|kar dena|bata do|bata dena|de do|dena|aa jao|aa jana|call kar|check kar|share kar|submit kar|forward kar|jama kar|bhar do)\b/i.test(
+    /\b(bhej do|bhej dena|dekh lo|dekh lena|kar do|kar dena|bata do|bata dena|de do|dena|aa jao|aa jana|call kar|check kar|share kar|submit kar|forward kar|jama kar|bhar do|suno|sun lo|sun lena|padh lo|padh lena|likh do|likh dena|mil lo|milo|arrange kar|arrange karo|plan kar|plan karo|book kar|book karo|note kar|note karo|bhejo|karo|batao|yaad karo|yaad rakhna|dhyan do|dhyan rakhna|follow up karo|confirm kar|confirm karo|inform kar|inform karo|update karo|resolve kar|resolve karo|fix kar|fix karo|handle kar|handle karo|complete kar|complete karo|finish kar|finish karo)\b/i.test(
       latestMessage
     )
   ) {
@@ -539,9 +551,9 @@ function evalPositiveSignals(
     applySignal(acc, 'schedule_change', 0.4);
   }
 
-  // deadline_en
+  // deadline_en — explicit time constraints
   if (
-    /\b(today|tonight|tomorrow|asap|eod|cob|end of day|monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week)\b/i.test(
+    /\b(today|tonight|tomorrow|asap|eod|cob|end of day|monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week|immediately|right now|urgent(?:ly)?|action required|action needed|time[- ]sensitive|due today|due tomorrow|overdue)\b/i.test(
       latestMessage
     ) ||
     /\b(?:by|before|till?)\s+(?:the\s+)?\d{1,2}(?:st|nd|rd|th)\b/i.test(latestMessage) ||
@@ -596,10 +608,10 @@ function evalPositiveSignals(
     applySignal(acc, 'role_addressed', 0.3);
   }
 
-  // bare_imperative_hi
+  // bare_imperative_hi — short Hindi imperative sentences
   if (
     wc <= 8 &&
-    /\b(dekho|bhejo|karo|batao|bolo|aao|jao|bhejo|padho|likho|check karo|call karo)\b/i.test(
+    /\b(dekho|bhejo|karo|batao|bolo|aao|jao|padho|likho|suno|milo|check karo|call karo|arrange karo|plan karo|book karo|note karo|confirm karo|update karo|fix karo|resolve karo|reply karo|bata do|bhej do|kar do)\b/i.test(
       latestMessage
     )
   ) {
@@ -649,9 +661,9 @@ function evalPositiveSignals(
     applySignal(acc, 'thread_context_boost', 0.2);
   }
 
-  // deadline_hi — stronger Hindi deadline signals
+  // deadline_hi — Hindi urgency and deadline signals
   if (
-    /\b(aaj tak|aaj hi|kal tak|abhi|jaldi karo|is hafte|agle hafte|turant|jaldi|abhi bhejo|aaj bhejna)\b/i.test(
+    /\b(aaj tak|aaj hi|kal tak|abhi|jaldi karo|is hafte|agle hafte|turant|jaldi|abhi bhejo|aaj bhejna|isi waqt|abhi abhi|bilkul abhi|foran|phoran|jaldi se|ek dum se|urgent hai|zaruri hai|zaroor|zaroor karo|shaam tak|subah tak|raat tak|aaj raat tak)\b/i.test(
       latestMessage
     )
   ) {
@@ -688,11 +700,16 @@ function evalPositiveSignals(
     applySignal(acc, 'approval_request', 0.3);
   }
 
-  // hinglish_action — Hindi verb suffix attached to English action word
-  // e.g. "send kar do", "review kar lo", "submit karna", "share karo"
+  // hinglish_action — English verb + Hindi conjugation suffix
+  // e.g. "send kar do", "review kar lo", "submit karna", "share karo", "fix kr do"
   if (
     new RegExp(
-      `\\b(${ACTION_VERBS})\\s+(kar\\s?(do|lo|na|dena|len?a|o)|kr\\s?do|krna)\\b`,
+      `\\b(${ACTION_VERBS})\\s+(kar\\s?(do|lo|na|dena|len?a|o|denge|deti|deta)|kr\\s?(do|lo|na|dena)|karo|karna|koge|kogi|kenge)\\b`,
+      'i'
+    ).test(latestMessage) ||
+    // Also catch: "mujhe X karna hai", "aapko X karna hai", "tumhe X karna hai"
+    new RegExp(
+      `\\b(mujhe|tumhe|aapko|hume|humko)\\b.{0,30}\\b(${ACTION_VERBS})\\b.{0,20}\\b(karna|karna hai|karo|karna padega|karna padhega)\\b`,
       'i'
     ).test(latestMessage)
   ) {

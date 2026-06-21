@@ -193,19 +193,25 @@ async function getValidAccessToken(): Promise<string | null> {
   const accessToken = getSetting('google_tasks_access_token');
   if (accessToken && Date.now() < expiry - 60_000) return accessToken;
 
-  // Refresh
+  // Refresh — fall back to bundled credentials if stored values were cleared
+  // (e.g. after a disconnect/reconnect that didn't re-store them). Desktop app
+  // credentials are public by design; the fallback is safe.
   const refreshToken = getSetting('google_tasks_refresh_token');
-  const clientId = getSetting('google_tasks_client_id');
-  const clientSecret = getSetting('google_tasks_client_secret');
-  if (!refreshToken || !clientId) return null;
+  const clientId = getSetting('google_tasks_client_id') || GOOGLE_CLIENT_ID;
+  const clientSecret = getSetting('google_tasks_client_secret') || GOOGLE_CLIENT_SECRET;
+  if (!refreshToken) {
+    // eslint-disable-next-line no-console
+    console.warn('[GoogleTasks] token refresh skipped — no refresh_token stored');
+    return null;
+  }
 
   try {
     const refreshParams: Record<string, string> = {
       refresh_token: refreshToken,
       client_id: clientId,
+      client_secret: clientSecret,
       grant_type: 'refresh_token',
     };
-    if (clientSecret) refreshParams['client_secret'] = clientSecret;
 
     const resp = await fetch(TOKEN_URL, {
       method: 'POST',
@@ -213,11 +219,20 @@ async function getValidAccessToken(): Promise<string | null> {
       body: new URLSearchParams(refreshParams).toString(),
     });
     if (!resp.ok) {
-      // A revoked/expired refresh token can never recover — clear the stored
-      // tokens so the settings screen shows "not connected" instead of silently
-      // no-opping on every sync forever.
-      const err = (await resp.json().catch(() => ({}))) as { error?: string };
+      const err = (await resp.json().catch(() => ({}))) as {
+        error?: string;
+        error_description?: string;
+      };
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[GoogleTasks] token refresh failed',
+        resp.status,
+        err.error,
+        err.error_description
+      );
       if (err.error === 'invalid_grant') {
+        // Refresh token revoked / expired — auto-disconnect so the settings screen
+        // shows "not connected" rather than silently no-opping on every sync.
         setSetting('google_tasks_access_token', '');
         setSetting('google_tasks_refresh_token', '');
         setSetting('google_tasks_token_expiry', 0);
@@ -227,9 +242,15 @@ async function getValidAccessToken(): Promise<string | null> {
     }
     const tokens = (await resp.json()) as { access_token: string; expires_in: number };
     setSetting('google_tasks_access_token', tokens.access_token);
+    // Re-store client credentials alongside the refreshed token so they survive
+    // a future disconnect/reconnect cycle.
+    setSetting('google_tasks_client_id', clientId);
+    setSetting('google_tasks_client_secret', clientSecret);
     setSetting('google_tasks_token_expiry', Date.now() + tokens.expires_in * 1000);
     return tokens.access_token;
-  } catch {
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[GoogleTasks] token refresh error', e);
     return null;
   }
 }
@@ -272,10 +293,25 @@ export async function createGoogleTask(task: GoogleTaskInput): Promise<string | 
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[GoogleTasks] createGoogleTask failed',
+        resp.status,
+        await resp.text().catch(() => '')
+      );
+      // If the stored list ID is stale (e.g. user deleted that list), retry once
+      // against @default so we don't permanently fail future syncs.
+      if (resp.status === 404 && listId !== '@default') {
+        setSetting('google_tasks_list_id', '');
+      }
+      return null;
+    }
     const created = (await resp.json()) as { id: string };
     return created.id ?? null;
-  } catch {
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[GoogleTasks] createGoogleTask error', e);
     return null;
   }
 }
