@@ -112,6 +112,29 @@ export const trainingLog = sqliteTable('training_log', {
   createdAt: integer('created_at').notNull(),
 });
 
+// Rolling conversation history — persists WhatsApp/messaging thread messages so the
+// AI classifier can see full conversation context beyond the OS-delivered thread window.
+export const conversationMessages = sqliteTable(
+  'conversation_messages',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    // Identifies a single chat: "<packageName>::<chatTitle>" e.g. "com.whatsapp::Rahul"
+    conversationKey: text('conversation_key').notNull(),
+    sender: text('sender').notNull(),
+    text: text('text').notNull(),
+    timestamp: integer('timestamp').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => ({
+    convKeyIdx: index('idx_conv_msgs_key').on(table.conversationKey),
+    convKeyTsIdx: uniqueIndex('idx_conv_msgs_key_ts_sender').on(
+      table.conversationKey,
+      table.timestamp,
+      table.sender
+    ),
+  })
+);
+
 export const discardedLog = sqliteTable('discarded_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   notificationId: text('notification_id').notNull().default(''),

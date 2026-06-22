@@ -112,9 +112,10 @@ function parseResult(raw: string, referenceTime?: number): TranscriptTask[] | nu
 // callers must offer a retry instead of reporting "no action items".
 export async function extractTasksFromTranscript(
   text: string,
-  ctx?: TranscriptContext
+  ctx?: TranscriptContext,
+  apiKey?: string
 ): Promise<TranscriptTask[] | null> {
-  const key = getSetting('ai_api_key');
+  const key = apiKey ?? getSetting('ai_api_key');
   const model = getSetting('ai_model');
   if (!key) return null;
 

@@ -138,6 +138,17 @@ export function initializeDatabase(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_llm_metrics_created_at ON llm_metrics (created_at);
     CREATE INDEX IF NOT EXISTS idx_llm_metrics_model ON llm_metrics (model_id);
+
+    CREATE TABLE IF NOT EXISTS conversation_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      conversation_key TEXT NOT NULL,
+      sender TEXT NOT NULL,
+      text TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_conv_msgs_key ON conversation_messages (conversation_key);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_conv_msgs_key_ts_sender ON conversation_messages (conversation_key, timestamp, sender);
   `);
 
   // Safe incremental migrations for existing installs.

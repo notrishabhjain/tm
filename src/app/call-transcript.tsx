@@ -22,6 +22,7 @@ import { consumeCallTranscript } from '@/services/call-transcript-stash';
 import type { CallTranscriptPayload } from '@/services/call-transcript-stash';
 import { extractTasksFromTranscript } from '@/services/transcript-extractor';
 import type { TranscriptTask } from '@/services/transcript-extractor';
+import NotificationListener from '../../modules/notification-listener/src';
 
 const taskRepo = new TaskRepository(db);
 
@@ -75,9 +76,20 @@ export default function CallTranscriptScreen(): React.JSX.Element {
 
   const run = async (): Promise<void> => {
     setState('loading');
-    if (!getSetting('ai_enabled') || !getSetting('ai_api_key')) {
+
+    // Resolve API key: prefer explicit Cloud AI key; fall back to the NVIDIA key
+    // used for call transcription (same platform, different service endpoint).
+    let resolvedApiKey: string = getSetting('ai_api_key') ?? '';
+    if (!resolvedApiKey) {
+      try {
+        resolvedApiKey = (await NotificationListener.getNvidiaApiKey()) ?? '';
+      } catch {
+        resolvedApiKey = '';
+      }
+    }
+    if (!resolvedApiKey) {
       setErrorMsg(
-        'Cloud AI is required to analyse call transcripts.\n\nEnable it in Settings → Intelligence → Cloud AI.'
+        'An NVIDIA API key is required to analyse call transcripts.\n\nAdd one in Settings → Call Transcription → NVIDIA API Key.'
       );
       setCanRetry(false);
       setState('error');
@@ -104,10 +116,11 @@ export default function CallTranscriptScreen(): React.JSX.Element {
       return;
     }
 
-    const extracted = await extractTasksFromTranscript(text, {
-      referenceTime: payload.callTime,
-      callerLabel: payload.callerLabel,
-    });
+    const extracted = await extractTasksFromTranscript(
+      text,
+      { referenceTime: payload.callTime, callerLabel: payload.callerLabel },
+      resolvedApiKey
+    );
     if (extracted === null) {
       setErrorMsg(
         'The AI could not analyse the transcript (network or service error).\n\nYour transcript is safe — tap Retry.'
