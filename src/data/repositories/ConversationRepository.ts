@@ -39,7 +39,10 @@ export class ConversationRepository {
 
   // Returns the most recent messages for a conversation, oldest-first so the
   // AI prompt reads chronologically (just like a chat thread).
-  async getHistory(conversationKey: string, limit = HISTORY_CONTEXT_LIMIT): Promise<StoredMessage[]> {
+  async getHistory(
+    conversationKey: string,
+    limit = HISTORY_CONTEXT_LIMIT
+  ): Promise<StoredMessage[]> {
     // Fetch newest `limit` rows, then reverse so oldest is first
     const rows = await this.db
       .select({

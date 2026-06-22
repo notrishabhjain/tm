@@ -22,14 +22,39 @@ import { getSetting } from '@/data/storage/settings';
 // Phrases that indicate the other party (or the user) completed a previously
 // committed action — used to auto-complete matching open tasks.
 const COMPLETION_PHRASES_EN = [
-  'done', 'completed', 'finished', 'sent', 'paid', 'checked', 'will do',
-  'already sent', 'already done', 'just sent', 'just did', 'just paid',
-  'have sent', 'has been sent', 'was sent',
+  'done',
+  'completed',
+  'finished',
+  'sent',
+  'paid',
+  'checked',
+  'will do',
+  'already sent',
+  'already done',
+  'just sent',
+  'just did',
+  'just paid',
+  'have sent',
+  'has been sent',
+  'was sent',
 ];
 const COMPLETION_PHRASES_HI = [
-  'kar diya', 'bhej diya', 'ho gaya', 'ho gayi', 'dekh liya', 'pay kar diya',
-  'kar dunga', 'karke bhejta', 'haan kar', 'kal tak kar', 'submit kar diya',
-  'confirm kar diya', 'kiya', 'de diya', 'aa gaya', 'mil gaya',
+  'kar diya',
+  'bhej diya',
+  'ho gaya',
+  'ho gayi',
+  'dekh liya',
+  'pay kar diya',
+  'kar dunga',
+  'karke bhejta',
+  'haan kar',
+  'kal tak kar',
+  'submit kar diya',
+  'confirm kar diya',
+  'kiya',
+  'de diya',
+  'aa gaya',
+  'mil gaya',
 ];
 
 function detectsCompletion(text: string): boolean {
@@ -202,7 +227,9 @@ async function _handleNotification(notification: NotificationData): Promise<void
       notification.thread as Array<{ sender?: string; text?: string; timestamp?: number }>,
       notification.postTime || Date.now()
     );
-    await convRepo.saveMessages(convKey, threadMessages).catch(() => {/* non-fatal */});
+    await convRepo.saveMessages(convKey, threadMessages).catch(() => {
+      /* non-fatal */
+    });
     conversationHistory = await convRepo.getHistory(convKey).catch(() => []);
 
     // ── Completion detection ────────────────────────────────────────────────────

@@ -108,9 +108,7 @@ function buildUserMessage(
       : null;
 
   if (historyMsgs) {
-    const lines = historyMsgs
-      .map((m) => `  ${m.sender}: ${m.text}`)
-      .join('\n');
+    const lines = historyMsgs.map((m) => `  ${m.sender}: ${m.text}`).join('\n');
     parts.push(`Conversation history (${historyMsgs.length} messages, oldest first):\n${lines}`);
   } else if (threadMsgs) {
     // Fallback when no DB history yet — use current OS thread
