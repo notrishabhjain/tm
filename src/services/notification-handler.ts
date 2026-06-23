@@ -7,6 +7,8 @@ import { MonitoredAppRepository } from '@/data/repositories/MonitoredAppReposito
 import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogRepository';
 import { SenderStatsRepository } from '@/data/repositories/SenderStatsRepository';
 import { LearnedKeywordRepository } from '@/data/repositories/LearnedKeywordRepository';
+import { ConversationRepository } from '@/data/repositories/ConversationRepository';
+import type { StoredMessage } from '@/data/repositories/ConversationRepository';
 import { logCapturedNotification, logExtractionDecision } from './diagnostics-logger';
 import { extractNgrams, languageForText } from './ngram-extractor';
 import { scoreNotification, buildSenderKey } from './signal-scorer';
@@ -16,6 +18,73 @@ import { classifyNotification } from './ai-classifier';
 import { createGoogleTask } from './google-tasks';
 import { appDisplayName } from './app-name-map';
 import { getSetting } from '@/data/storage/settings';
+
+// Phrases that indicate the other party (or the user) completed a previously
+// committed action — used to auto-complete matching open tasks.
+const COMPLETION_PHRASES_EN = [
+  'done',
+  'completed',
+  'finished',
+  'sent',
+  'paid',
+  'checked',
+  'will do',
+  'already sent',
+  'already done',
+  'just sent',
+  'just did',
+  'just paid',
+  'have sent',
+  'has been sent',
+  'was sent',
+];
+const COMPLETION_PHRASES_HI = [
+  'kar diya',
+  'bhej diya',
+  'ho gaya',
+  'ho gayi',
+  'dekh liya',
+  'pay kar diya',
+  'kar dunga',
+  'karke bhejta',
+  'haan kar',
+  'kal tak kar',
+  'submit kar diya',
+  'confirm kar diya',
+  'kiya',
+  'de diya',
+  'aa gaya',
+  'mil gaya',
+];
+
+function detectsCompletion(text: string): boolean {
+  const lower = text.toLowerCase();
+  return (
+    COMPLETION_PHRASES_EN.some((p) => lower.includes(p)) ||
+    COMPLETION_PHRASES_HI.some((p) => lower.includes(p))
+  );
+}
+
+// Build a stable conversation key from a package name and the chat title (sender field).
+function makeConversationKey(packageName: string, chatTitle: string): string {
+  return `${packageName}::${chatTitle}`;
+}
+
+// Extract StoredMessage array from a MessagingStyle thread, filling in timestamps
+// for messages that lack one (use current time as best-effort).
+function threadToMessages(
+  thread: Array<{ sender?: string; text?: string; timestamp?: number }>,
+  defaultTs: number
+): StoredMessage[] {
+  return thread
+    .filter((m) => m.text && m.text.trim().length > 0)
+    .map((m, i) => ({
+      sender: m.sender ?? 'them',
+      text: m.text!,
+      // If timestamps are missing, space them 1 s apart ending at defaultTs
+      timestamp: m.timestamp ?? defaultTs - (thread.length - 1 - i) * 1000,
+    }));
+}
 
 // In-memory guard: prevents concurrent processing of the same notification when Android
 // re-delivers it before the first DB write completes (common with messaging apps).
@@ -146,6 +215,43 @@ async function _handleNotification(notification: NotificationData): Promise<void
   }
   logCapturedNotification(notification, 'PASSED');
 
+  // ── Conversation memory ───────────────────────────────────────────────────────
+  // Persist the current MessagingStyle thread so the AI can see full chat context
+  // on subsequent notifications from the same conversation.
+  const convRepo = new ConversationRepository(db);
+  const chatTitle = notification.title ?? '';
+  let conversationHistory: StoredMessage[] = [];
+  if (chatTitle && Array.isArray(notification.thread) && notification.thread.length > 0) {
+    const convKey = makeConversationKey(notification.packageName, chatTitle);
+    const threadMessages = threadToMessages(
+      notification.thread as Array<{ sender?: string; text?: string; timestamp?: number }>,
+      notification.postTime || Date.now()
+    );
+    await convRepo.saveMessages(convKey, threadMessages).catch(() => {
+      /* non-fatal */
+    });
+    conversationHistory = await convRepo.getHistory(convKey).catch(() => []);
+
+    // ── Completion detection ────────────────────────────────────────────────────
+    // If the newest message in the thread signals task completion, auto-complete
+    // any matching open tasks from this sender.
+    const newestMsg = threadMessages[threadMessages.length - 1];
+    if (newestMsg && detectsCompletion(newestMsg.text)) {
+      try {
+        const taskRepoForCompletion = new TaskRepository(db);
+        const senderTasks = await taskRepoForCompletion.getRecentBySenderAndApp(
+          chatTitle,
+          notification.packageName
+        );
+        for (const t of senderTasks) {
+          await taskRepoForCompletion.completeTask(t.id);
+        }
+      } catch {
+        /* non-fatal */
+      }
+    }
+  }
+
   // ── VIP fast-path ────────────────────────────────────────────────────────────
   const vipRepo = new VipContactRepository(db);
   const allVipIds = await vipRepo.getAllIdentifiers();
@@ -173,7 +279,13 @@ async function _handleNotification(notification: NotificationData): Promise<void
       const senderStatsForVip = new SenderStatsRepository(db);
       const vipSenderKey = buildSenderKey(notification.packageName, notification.title ?? '');
       const vipSenderCtx = await senderStatsForVip.get(vipSenderKey);
-      const aiResult = await classifyNotification(notification, vipSenderCtx ?? undefined);
+      const aiResult = await classifyNotification(
+        notification,
+        vipSenderCtx ?? undefined,
+        undefined,
+        undefined,
+        conversationHistory.length > 0 ? conversationHistory : undefined
+      );
       // Only adopt AI refinements when it actually saw a task — an isTask=false
       // result must not rewrite the VIP task's title or attach a due date.
       if (aiResult !== null && aiResult.isTask) {
@@ -237,7 +349,13 @@ async function _handleNotification(notification: NotificationData): Promise<void
     const senderStatsRepo2 = new SenderStatsRepository(db);
     const aiSenderKey = buildSenderKey(notification.packageName, notification.title ?? '');
     const aiSenderCtx = await senderStatsRepo2.get(aiSenderKey);
-    const aiResult = await classifyNotification(notification, aiSenderCtx ?? undefined);
+    const aiResult = await classifyNotification(
+      notification,
+      aiSenderCtx ?? undefined,
+      undefined,
+      undefined,
+      conversationHistory.length > 0 ? conversationHistory : undefined
+    );
     if (aiResult !== null) {
       const taskRepo2 = new TaskRepository(db);
       const messageText2 = notification.bigText || notification.text || notification.title;

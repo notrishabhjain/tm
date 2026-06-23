@@ -1,6 +1,7 @@
 import type { NotificationData } from '../../modules/notification-listener/src/types';
 import { getSetting } from '@/data/storage/settings';
 import { appDisplayName, isMessagingApp, isNoiseApp } from './app-name-map';
+import type { StoredMessage } from '@/data/repositories/ConversationRepository';
 
 export interface AIClassifierResult {
   isTask: boolean;
@@ -82,7 +83,11 @@ function formatNow(): string {
   });
 }
 
-function buildUserMessage(notification: NotificationData, senderCtx?: SenderContext): string {
+function buildUserMessage(
+  notification: NotificationData,
+  senderCtx?: SenderContext,
+  history?: StoredMessage[]
+): string {
   const appName = appDisplayName(notification.packageName);
   const parts: string[] = [
     `Current date: ${formatNow()} — resolve every relative date/time against this moment.`,
@@ -94,14 +99,25 @@ function buildUserMessage(notification: NotificationData, senderCtx?: SenderCont
   const text = notification.bigText || notification.text;
   if (text) parts.push(`Message: ${text}`);
 
-  // Include thread context when available (MessagingStyle conversations)
-  if (Array.isArray(notification.thread) && notification.thread.length > 1) {
-    const threadLines = notification.thread
-      .slice(-4) // last 4 messages for context
+  // Build conversation context: prefer persistent DB history (richer, up to 50 msgs)
+  // over the ephemeral OS-delivered thread (only last few messages).
+  const historyMsgs = history && history.length > 0 ? history : null;
+  const threadMsgs =
+    Array.isArray(notification.thread) && notification.thread.length > 1
+      ? notification.thread
+      : null;
+
+  if (historyMsgs) {
+    const lines = historyMsgs.map((m) => `  ${m.sender}: ${m.text}`).join('\n');
+    parts.push(`Conversation history (${historyMsgs.length} messages, oldest first):\n${lines}`);
+  } else if (threadMsgs) {
+    // Fallback when no DB history yet — use current OS thread
+    const threadLines = threadMsgs
+      .slice(-8)
       .map((m: { sender?: string; text?: string }) => `  ${m.sender ?? 'them'}: ${m.text ?? ''}`)
       .join('\n');
     parts.push(
-      `Conversation context (last ${Math.min(notification.thread.length, 4)} messages):\n${threadLines}`
+      `Conversation context (last ${Math.min(threadMsgs.length, 8)} messages):\n${threadLines}`
     );
   }
 
@@ -188,7 +204,8 @@ export async function classifyNotification(
   notification: NotificationData,
   senderCtx?: SenderContext,
   apiKey?: string,
-  model?: string
+  model?: string,
+  history?: StoredMessage[]
 ): Promise<AIClassifierResult | null> {
   const key = apiKey ?? getSetting('ai_api_key');
   const mdl = model ?? getSetting('ai_model');
@@ -235,7 +252,7 @@ export async function classifyNotification(
         model: mdl,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildUserMessage(notification, senderCtx) },
+          { role: 'user', content: buildUserMessage(notification, senderCtx, history) },
         ],
         max_tokens: 400,
         temperature: 0.05,
