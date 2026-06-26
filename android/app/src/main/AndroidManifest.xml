@@ -62,6 +62,17 @@
         <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
       </intent-filter>
     </receiver>
+    <!-- Static phone-state receiver: triggers call transcription even when the
+         foreground service has been killed by OEM battery optimisers. The
+         android.intent.action.PHONE_STATE broadcast is exempt from Android 8+
+         implicit-broadcast restrictions, so this static declaration is safe. -->
+    <receiver
+        android:name="expo.modules.notificationlistener.PhoneStateReceiver"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.PHONE_STATE"/>
+      </intent-filter>
+    </receiver>
     <receiver android:name="expo.modules.notificationlistener.QuickActionReceiver" android:exported="false"/>
 <service
         android:name="expo.modules.notificationlistener.TaskMindAccessibilityService"

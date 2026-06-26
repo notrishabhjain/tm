@@ -16,7 +16,7 @@ import { resolveCancellation } from './cancellation-resolver';
 import { extractTitle } from './title-extractor';
 import { classifyNotification } from './ai-classifier';
 import { createGoogleTask } from './google-tasks';
-import { appDisplayName } from './app-name-map';
+import { appDisplayName, isMessagingApp } from './app-name-map';
 import { getSetting } from '@/data/storage/settings';
 
 // Phrases that indicate the other party (or the user) completed a previously
@@ -341,10 +341,12 @@ async function _handleNotification(notification: NotificationData): Promise<void
   }
 
   // ── Cloud AI classifier (primary decision layer when enabled) ───────────────
-  // Every non-VIP notification is routed through AI first. AI decides:
-  //   isTask=false           → discard
-  //   isTask, certainty high → create the task directly
-  //   isTask, certainty med/low → create but flag for user confirmation
+  // Decision logic:
+  //   isTask=true,  certainty high     → create directly (no confirmation)
+  //   isTask=true,  certainty med/low  → create flagged for user confirmation
+  //   isTask=false, certainty high     → hard discard (unambiguous noise)
+  //   isTask=false, certainty med/low  → fall through to heuristic for messaging
+  //                                       apps; hard discard for everything else
   if (getSetting('ai_enabled') && getSetting('ai_api_key')) {
     const senderStatsRepo2 = new SenderStatsRepository(db);
     const aiSenderKey = buildSenderKey(notification.packageName, notification.title ?? '');
@@ -359,6 +361,7 @@ async function _handleNotification(notification: NotificationData): Promise<void
     if (aiResult !== null) {
       const taskRepo2 = new TaskRepository(db);
       const messageText2 = notification.bigText || notification.text || notification.title;
+
       if (aiResult.isTask) {
         const title2 =
           aiResult.title ??
@@ -417,7 +420,17 @@ async function _handleNotification(notification: NotificationData): Promise<void
               /* non-fatal */
             });
         }
-      } else {
+        await refreshPersistentNotification(taskRepo2);
+        return;
+      }
+
+      // AI says not a task — decide whether to hard-discard or let heuristic decide.
+      // For messaging apps (WhatsApp, Telegram, SMS…) where the AI is anything less
+      // than certain, route to the signal scorer instead of silently dropping. This
+      // prevents legitimate Hindi/Hinglish requests from being thrown away.
+      const messagingApp = isMessagingApp(notification.packageName);
+      if (!messagingApp || aiResult.certainty === 'high') {
+        // Hard discard: AI is confident, or it's not a person-to-person messaging app.
         const discardedRepo2 = new DiscardedLogRepository(db);
         await discardedRepo2.insert({
           notificationId: `${notification.packageName}-${notification.postTime}`,
@@ -430,11 +443,12 @@ async function _handleNotification(notification: NotificationData): Promise<void
           createdAt: Date.now(),
         });
         logCapturedNotification(notification, 'FILTERED');
+        await refreshPersistentNotification(taskRepo2);
+        return;
       }
-      await refreshPersistentNotification(taskRepo2);
-      return;
+      // Messaging app + AI uncertain → fall through to heuristic for second opinion.
     }
-    // AI call failed (no key, timeout, error) → fall through to heuristic safety net
+    // AI call failed (no key, timeout, error) OR messaging-app fallthrough → heuristic
   }
 
   // ── Cancellation resolver ────────────────────────────────────────────────────
@@ -574,13 +588,20 @@ async function refreshPersistentNotification(taskRepo: TaskRepository): Promise<
   try {
     const pending = await taskRepo.getPendingTasks();
     const urgent = pending.filter((t) => t.priority === 'URGENT');
+    const needsReview = pending.filter((t) => t.needsConfirmation);
     const sorted = [...pending].sort(
       (a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3)
     );
+    // Prepend confirmation-needed tasks in the text list so they're visible at the top.
+    const reviewTitles = needsReview.slice(0, 2).map((t) => `[Review] ${t.title}`);
+    const otherTitles = sorted
+      .filter((t) => !t.needsConfirmation)
+      .slice(0, 5 - reviewTitles.length)
+      .map((t) => t.title);
     await NotificationListener.updatePersistentNotification({
       pendingCount: pending.length,
-      urgentCount: urgent.length,
-      taskTexts: sorted.slice(0, 5).map((t) => t.title),
+      urgentCount: urgent.length + needsReview.length,
+      taskTexts: [...reviewTitles, ...otherTitles],
     });
   } catch {
     /* ForegroundService may not be running — non-fatal */

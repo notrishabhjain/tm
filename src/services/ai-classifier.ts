@@ -26,8 +26,6 @@ const TIMEOUT_MS = 12_000;
 
 const SYSTEM_PROMPT = `You are a notification filter for a task manager used by an Indian professional. Decide whether an Android notification requires the recipient to personally take a specific action.
 
-Your threshold for isTask=true is HIGH — only clear, actionable personal requests create tasks.
-
 Respond with ONLY valid JSON, no markdown:
 {
   "isTask": true|false,
@@ -39,8 +37,8 @@ Respond with ONLY valid JSON, no markdown:
   "estimatedMinutes": <integer minutes estimate, or null>
 }
 
-NEVER a task — always isTask=false:
-- OTPs, 2FA codes, login verification
+NEVER a task — always isTask=false, certainty=high:
+- OTPs, 2FA codes, login verification codes
 - Payment receipts, UPI/bank transaction alerts, balance updates
 - Order or delivery status ("out for delivery", "dispatched", "delivered")
 - Promotional offers, discounts, cashback, sale announcements
@@ -50,14 +48,21 @@ NEVER a task — always isTask=false:
 - App update available
 - Marketing emails, newsletters, weekly/daily digests
 - Automated reminders with no human asking (weather, step count, sleep summary)
+- Pure FYI messages with no ask ("Meeting at 3pm" with no action required)
 
 ALWAYS a task — isTask=true when:
-- A specific person asks the user to do something: "please send", "can you review", "bhej do", "kar dena", "dekh lo", "bata do", "confirm kar"
-- A work tool assigns something: Jira ticket, GitHub review request, Asana task, Trello card
+- A specific person asks the user to do something: "please send", "can you review", "bhej do", "kar dena", "dekh lo", "bata do", "confirm kar", "share kar", "pay kar"
+- A work tool assigns something: Jira ticket, GitHub review request, Asana task, Trello card, Linear issue
 - A calendar invite or meeting reminder the user must attend or respond to
 - A direct message ending with a question or request the user is expected to answer
 - A deadline is attached to an action the user must take
-- Hinglish requests: "send kar do", "review kar lo", "kal tak bhej", "aaj confirm karo"
+- Hinglish/Hindi requests (CRITICAL — do not miss these): "send kar do", "bhej do", "bhej dena", "kar dena", "dekh lo", "dekh lena", "bata do", "bata dena", "review kar lo", "confirm karo", "kal tak bhej", "aaj confirm karo", "zaroor bhej", "jaldi karo", "turant karo", "abhi bhej", "call karo", "meeting rakh", "forward kar", "submit kar", "pay kar do", "check kar lo"
+
+MESSAGING APPS RULE (WhatsApp, Telegram, Signal, Messenger, SMS):
+These apps carry direct personal communication. Apply a LOWER threshold:
+- When a human is clearly asking the user to do something → isTask=true, certainty=high
+- When the message MIGHT be asking for action but you're not 100% sure → isTask=true, certainty=medium (let the user decide — never silently discard ambiguous messages from messaging apps)
+- Only set isTask=false for messaging apps when the content is OBVIOUSLY not a request (forwarded news, memes, group announcements with no personal ask, delivery/payment OTP)
 
 Certainty:
 - high: unambiguous personal request or assigned task → auto-add without asking user
@@ -221,7 +226,20 @@ export async function classifyNotification(
       text.includes('urgent') ||
       text.includes('asap') ||
       text.includes('reminder:') ||
-      text.includes('due');
+      text.includes('due') ||
+      // Hindi/Hinglish imperative patterns
+      text.includes('bhej') ||
+      text.includes('kar do') ||
+      text.includes('kar dena') ||
+      text.includes('dekh lo') ||
+      text.includes('bata do') ||
+      text.includes('confirm') ||
+      text.includes('kal tak') ||
+      text.includes('aaj tak') ||
+      text.includes('abhi') ||
+      text.includes('jaldi') ||
+      text.includes('zaroor') ||
+      text.includes('turant');
     if (!hasPersonalSignal) {
       return {
         isTask: false,
