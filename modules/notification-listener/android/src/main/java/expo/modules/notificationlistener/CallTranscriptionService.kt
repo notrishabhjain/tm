@@ -61,11 +61,12 @@ class CallTranscriptionService : Service() {
         }
 
         // Most recorder apps flush within a few seconds of the call ending.
-        // Short back-off (3 s / 6 s / 10 s ≈ 19 s total) instead of the old
-        // fixed 15 s × 6 = 90 s — keeps the foreground service shorter-lived.
+        // When the static PhoneStateReceiver fires (no pre-delay), a longer retry
+        // window covers MIUI / slow-flush recording apps (up to ~30 s).
+        // Back-off: 3 s / 6 s / 10 s / 20 s ≈ 39 s total.
         var recording = CallRecordingFinder.findLatestUnprocessed(this)
         if (recording == null) {
-            val retryDelaysMs = longArrayOf(3_000, 6_000, 10_000)
+            val retryDelaysMs = longArrayOf(3_000, 6_000, 10_000, 20_000)
             for (delayMs in retryDelaysMs) {
                 Thread.sleep(delayMs)
                 recording = CallRecordingFinder.findLatestUnprocessed(this)
