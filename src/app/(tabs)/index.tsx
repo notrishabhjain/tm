@@ -20,6 +20,7 @@ import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
+import { completeTaskEverywhere, deleteTaskEverywhere } from '@/services/task-actions';
 import NotificationListener from '../../../modules/notification-listener/src';
 import type { Task, Priority } from '@/domain/types';
 import { useTaskStore } from '@/state/taskStore';
@@ -93,7 +94,7 @@ export default function HomeScreen(): React.JSX.Element {
   });
 
   const completeMutation = useMutation({
-    mutationFn: (id: string) => taskRepo.completeTask(id),
+    mutationFn: (id: string) => completeTaskEverywhere(id),
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: ['tasks', 'pending'] });
       const previous = queryClient.getQueryData<Task[]>(['tasks', 'pending']);
@@ -112,7 +113,7 @@ export default function HomeScreen(): React.JSX.Element {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => taskRepo.deleteTask(id),
+    mutationFn: (id: string) => deleteTaskEverywhere(id),
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: ['tasks', 'pending'] });
       const previous = queryClient.getQueryData<Task[]>(['tasks', 'pending']);

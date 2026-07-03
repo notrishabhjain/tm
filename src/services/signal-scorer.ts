@@ -40,6 +40,53 @@ export function buildSenderKey(packageName: string, sender: string): string {
   return `${packageName}::${normalizedSender}`;
 }
 
+/**
+ * App-level stats key. Every confirm/reject/auto-accept is recorded twice:
+ * once for the individual sender and once under this key, giving the engine
+ * per-app intelligence — e.g. "the user confirms 80% of Slack suggestions but
+ * rejects most Instagram ones" shifts that app's thresholds accordingly.
+ */
+export function buildAppKey(packageName: string): string {
+  return `${packageName}::__app__`;
+}
+
+// ── Per-app learned threshold adjustment ─────────────────────────────────────
+
+interface AppAdjustment {
+  createDelta: number;
+  discardDelta: number;
+  signal: string | null;
+}
+
+const NO_APP_ADJUSTMENT: AppAdjustment = { createDelta: 0, discardDelta: 0, signal: null };
+
+async function loadAppAdjustment(packageName: string): Promise<AppAdjustment> {
+  try {
+    const rows = await db
+      .select()
+      .from(senderStats)
+      .where(eq(senderStats.senderKey, buildAppKey(packageName)))
+      .limit(1);
+    const row = rows[0] as typeof senderStats.$inferSelect | undefined;
+    if (!row) return NO_APP_ADJUSTMENT;
+    const positive = row.confirmCount + row.autoAcceptCount;
+    const total = positive + row.rejectCount;
+    if (total < 5) return NO_APP_ADJUSTMENT; // not enough data for this app yet
+    const appTrust = positive / total;
+    if (appTrust >= 0.7) {
+      // User usually keeps tasks from this app — lower the bar slightly.
+      return { createDelta: -0.05, discardDelta: -0.05, signal: 'app_trust_boost' };
+    }
+    if (appTrust <= 0.3) {
+      // User usually rejects tasks from this app — raise the bar.
+      return { createDelta: 0.1, discardDelta: 0.05, signal: 'app_trust_penalty' };
+    }
+    return NO_APP_ADJUSTMENT;
+  } catch {
+    return NO_APP_ADJUSTMENT;
+  }
+}
+
 // ── Sender DB lookup ─────────────────────────────────────────────────────────
 
 async function loadSenderInfo(senderKey: string): Promise<SenderInfo> {
@@ -978,10 +1025,11 @@ export async function scoreNotification(notification: NotificationData): Promise
   const hasTitle = !!notification.title && notification.title.trim().length > 0;
   const senderKey = buildSenderKey(notification.packageName, notification.title ?? '');
 
-  const [senderInfo, activeKws, hasThreadCtx] = await Promise.all([
+  const [senderInfo, activeKws, hasThreadCtx, appAdj] = await Promise.all([
     hasTitle ? loadSenderInfo(senderKey) : Promise.resolve(unknownSender()),
     loadActiveKeywords(),
     hasTitle ? hasRecentThreadTask(notification.title ?? '', notification.packageName) : false,
+    loadAppAdjustment(notification.packageName),
   ]);
 
   const acc: SignalAccumulator = { score: 0, signals: [] };
@@ -1020,12 +1068,18 @@ export async function scoreNotification(notification: NotificationData): Promise
 
   const forceInbox = checkForceInbox(latestMessage, acc.signals, senderInfo.effectiveTrust);
 
+  // Per-app learned adjustment: shift this app's thresholds by the user's
+  // historical confirm/reject behaviour for the app as a whole.
+  if (appAdj.signal) acc.signals.push(appAdj.signal);
+  const createThreshold = senderInfo.thresholds.createThreshold + appAdj.createDelta;
+  const discardThreshold = senderInfo.thresholds.discardThreshold + appAdj.discardDelta;
+
   let decision: 'CREATE' | 'CONFIRM' | 'DISCARD';
   if (senderInfo.isUnknown || forceInbox) {
     decision = 'CONFIRM';
-  } else if (finalScore >= senderInfo.thresholds.createThreshold) {
+  } else if (finalScore >= createThreshold) {
     decision = 'CREATE';
-  } else if (finalScore <= senderInfo.thresholds.discardThreshold) {
+  } else if (finalScore <= discardThreshold) {
     decision = 'DISCARD';
   } else {
     decision = 'CONFIRM';

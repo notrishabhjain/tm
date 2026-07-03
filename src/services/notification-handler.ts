@@ -11,11 +11,12 @@ import { ConversationRepository } from '@/data/repositories/ConversationReposito
 import type { StoredMessage } from '@/data/repositories/ConversationRepository';
 import { logCapturedNotification, logExtractionDecision } from './diagnostics-logger';
 import { extractNgrams, languageForText } from './ngram-extractor';
-import { scoreNotification, buildSenderKey } from './signal-scorer';
+import { scoreNotification, buildSenderKey, buildAppKey } from './signal-scorer';
 import { resolveCancellation } from './cancellation-resolver';
 import { extractTitle } from './title-extractor';
 import { classifyNotification } from './ai-classifier';
 import { createGoogleTask } from './google-tasks';
+import { completeTaskEverywhere } from './task-actions';
 import { appDisplayName, isMessagingApp } from './app-name-map';
 import { getSetting } from '@/data/storage/settings';
 
@@ -244,7 +245,8 @@ async function _handleNotification(notification: NotificationData): Promise<void
           notification.packageName
         );
         for (const t of senderTasks) {
-          await taskRepoForCompletion.completeTask(t.id);
+          // Completes locally, in Google Tasks, and refreshes the widget.
+          await completeTaskEverywhere(t.id);
         }
       } catch {
         /* non-fatal */
@@ -564,6 +566,8 @@ async function _handleNotification(notification: NotificationData): Promise<void
 
   if (!needsConfirmation) {
     await senderStatsRepo.incrementAutoAccept(senderKey);
+    // App-level learning counterpart of the per-sender stat
+    await senderStatsRepo.incrementAutoAccept(buildAppKey(notification.packageName));
 
     // N-gram learning
     const learnedRepo = new LearnedKeywordRepository(db);
@@ -602,6 +606,9 @@ async function refreshPersistentNotification(taskRepo: TaskRepository): Promise<
       urgentCount: urgent.length + needsReview.length,
       taskTexts: [...reviewTitles, ...otherTitles],
     });
+    // Keep the home-screen widget in sync with the same data. Without this the
+    // widget only refreshed on reboot/re-add (updatePeriodMillis is 0).
+    await NotificationListener.updateWidget().catch(() => {});
   } catch {
     /* ForegroundService may not be running — non-fatal */
   }

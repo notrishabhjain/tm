@@ -16,6 +16,7 @@ import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { stashCallTranscript } from '@/services/call-transcript-stash';
 import { stashShare } from '@/services/share-stash';
 import { syncPendingGoogleTasks } from '@/services/google-tasks-sync';
+import { completeTaskEverywhere } from '@/services/task-actions';
 import NotificationListener from '../../modules/notification-listener/src';
 
 // Subject marker the Termux hand-off script stamps on the share intent:
@@ -209,7 +210,7 @@ export default function RootLayout(): React.JSX.Element {
             (a, b) => (order[a.priority] ?? 3) - (order[b.priority] ?? 3)
           )[0];
           if (!top) return;
-          await taskRepo.completeTask(top.id);
+          await completeTaskEverywhere(top.id);
           await queryClient.invalidateQueries({ queryKey: ['tasks'] });
           const remaining = await taskRepo.getPendingTasks();
           const urgent = remaining.filter((t) => t.priority === 'URGENT');

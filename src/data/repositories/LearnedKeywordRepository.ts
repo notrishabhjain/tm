@@ -48,9 +48,12 @@ export class LearnedKeywordRepository {
             : newCount >= PROMOTION_THRESHOLD
               ? 'ACTIVE'
               : 'PENDING';
+        // Positive reinforcement: each confirm nudges weight up (capped at 0.8)
+        // so a keyword previously penalised by rejections can recover.
+        const newWeight = Math.min(0.8, existing[0].weight + 0.1);
         await this.db
           .update(learnedKeywords)
-          .set({ occurrenceCount: newCount, status: newStatus, updatedAt: now })
+          .set({ occurrenceCount: newCount, status: newStatus, weight: newWeight, updatedAt: now })
           .where(eq(learnedKeywords.id, existing[0].id));
       } else {
         await this.db.insert(learnedKeywords).values({
@@ -59,6 +62,45 @@ export class LearnedKeywordRepository {
           weight: 0.5,
           occurrenceCount: 1,
           status: 'PENDING',
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    }
+  }
+
+  /**
+   * Negative learning: called when the user REJECTS a task. Each ngram in the
+   * rejected message loses weight; once weight goes negative the scorer's
+   * learned_keyword_reject branch actively penalises future messages that
+   * contain it. Keywords the user has repeatedly confirmed recover quickly
+   * because recordNgrams keeps re-promoting them.
+   */
+  async penalizeNgrams(ngrams: string[], language: string): Promise<void> {
+    const now = Date.now();
+    for (const ngram of ngrams) {
+      const existing = await this.db
+        .select()
+        .from(learnedKeywords)
+        .where(and(eq(learnedKeywords.ngram, ngram), eq(learnedKeywords.language, language)))
+        .limit(1);
+
+      if (existing[0]) {
+        const newWeight = Math.max(-0.3, existing[0].weight - 0.25);
+        // Negative-weight keywords must stay ACTIVE — the scorer only loads
+        // ACTIVE rows, and the reject branch triggers on weight < 0.
+        const newStatus = newWeight < 0 ? 'ACTIVE' : existing[0].status;
+        await this.db
+          .update(learnedKeywords)
+          .set({ weight: newWeight, status: newStatus, updatedAt: now })
+          .where(eq(learnedKeywords.id, existing[0].id));
+      } else {
+        await this.db.insert(learnedKeywords).values({
+          ngram,
+          language,
+          weight: -0.25,
+          occurrenceCount: 1,
+          status: 'ACTIVE',
           createdAt: now,
           updatedAt: now,
         });
