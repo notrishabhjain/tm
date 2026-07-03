@@ -117,6 +117,30 @@ export class TaskRepository {
     return rows.map(mapRow);
   }
 
+  /**
+   * Confirmed, non-deleted tasks that were never synced to Google Tasks
+   * (googleTaskId is null). Used by the sync outbox to retry syncs that
+   * failed or were cut short when the background JS context was killed.
+   */
+  async getUnsyncedForGoogle(maxAgeMs = 7 * 24 * 60 * 60 * 1000): Promise<Task[]> {
+    const cutoff = Date.now() - maxAgeMs;
+    const rows = await this.db
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.status, 'PENDING'),
+          eq(tasks.needsConfirmation, false),
+          isNull(tasks.deletedAt),
+          isNull(tasks.googleTaskId),
+          gte(tasks.createdAt, cutoff)
+        )
+      )
+      .orderBy(desc(tasks.createdAt))
+      .limit(25);
+    return rows.map(mapRow);
+  }
+
   async getCompletedTasks(): Promise<Task[]> {
     const rows = await this.db
       .select()

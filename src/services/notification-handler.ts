@@ -319,22 +319,23 @@ async function _handleNotification(notification: NotificationData): Promise<void
       decision: 'CREATE',
       timestamp: Date.now(),
     });
-    // Sync to Google Tasks (non-blocking, fire-and-forget)
+    // Sync to Google Tasks. AWAITED: in a headless (background) JS context a
+    // fire-and-forget fetch is killed with the context, losing the sync. The
+    // fetch has its own 15 s timeout, and the outbox sweep retries failures.
     if (getSetting('google_tasks_enabled')) {
       const notesLines: string[] = [];
       notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
       if (vipTask.body) notesLines.push(`\nContext:\n${vipTask.body.slice(0, 500)}`);
-      void createGoogleTask({
-        title: vipTask.title,
-        notes: notesLines.join('\n'),
-        dueDate: vipTask.dueDate,
-      })
-        .then((googleTaskId) => {
-          if (googleTaskId) void taskRepo.setGoogleTaskId(vipTask.id, googleTaskId);
-        })
-        .catch(() => {
-          /* non-fatal */
+      try {
+        const googleTaskId = await createGoogleTask({
+          title: vipTask.title,
+          notes: notesLines.join('\n'),
+          dueDate: vipTask.dueDate,
         });
+        if (googleTaskId) await taskRepo.setGoogleTaskId(vipTask.id, googleTaskId);
+      } catch {
+        /* non-fatal — outbox sweep retries */
+      }
     }
     await refreshPersistentNotification(taskRepo);
     return;
@@ -399,7 +400,7 @@ async function _handleNotification(notification: NotificationData): Promise<void
           decision: needsConfirmation ? 'CONFIRM' : 'CREATE',
           timestamp: Date.now(),
         });
-        // Sync to Google Tasks (non-blocking, fire-and-forget). Tasks awaiting
+        // Sync to Google Tasks (awaited — see VIP path comment). Tasks awaiting
         // user confirmation are synced after the user confirms, not before.
         if (!needsConfirmation && getSetting('google_tasks_enabled')) {
           const notesLines: string[] = [];
@@ -408,17 +409,16 @@ async function _handleNotification(notification: NotificationData): Promise<void
             notesLines.push(`Estimated time: ${aiResult.estimatedMinutes} min`);
           notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
           if (aiTask.body) notesLines.push(`\nContext:\n${aiTask.body.slice(0, 500)}`);
-          void createGoogleTask({
-            title: aiTask.title,
-            notes: notesLines.join('\n'),
-            dueDate: aiTask.dueDate,
-          })
-            .then((googleTaskId) => {
-              if (googleTaskId) void taskRepo2.setGoogleTaskId(aiTask.id, googleTaskId);
-            })
-            .catch(() => {
-              /* non-fatal */
+          try {
+            const googleTaskId = await createGoogleTask({
+              title: aiTask.title,
+              notes: notesLines.join('\n'),
+              dueDate: aiTask.dueDate,
             });
+            if (googleTaskId) await taskRepo2.setGoogleTaskId(aiTask.id, googleTaskId);
+          } catch {
+            /* non-fatal — outbox sweep retries */
+          }
         }
         await refreshPersistentNotification(taskRepo2);
         return;
@@ -544,23 +544,22 @@ async function _handleNotification(notification: NotificationData): Promise<void
     createdAt: notification.postTime || Date.now(),
   });
 
-  // Sync to Google Tasks (non-blocking, fire-and-forget). Tasks awaiting
+  // Sync to Google Tasks (awaited — see VIP path comment). Tasks awaiting
   // user confirmation are synced after the user confirms, not before.
   if (!needsConfirmation && getSetting('google_tasks_enabled')) {
     const notesLines: string[] = [];
     notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
     if (heuristicTask.body) notesLines.push(`\nContext:\n${heuristicTask.body.slice(0, 500)}`);
-    void createGoogleTask({
-      title: heuristicTask.title,
-      notes: notesLines.join('\n'),
-      dueDate: heuristicTask.dueDate,
-    })
-      .then((googleTaskId) => {
-        if (googleTaskId) void taskRepo.setGoogleTaskId(heuristicTask.id, googleTaskId);
-      })
-      .catch(() => {
-        /* non-fatal */
+    try {
+      const googleTaskId = await createGoogleTask({
+        title: heuristicTask.title,
+        notes: notesLines.join('\n'),
+        dueDate: heuristicTask.dueDate,
       });
+      if (googleTaskId) await taskRepo.setGoogleTaskId(heuristicTask.id, googleTaskId);
+    } catch {
+      /* non-fatal — outbox sweep retries */
+    }
   }
 
   if (!needsConfirmation) {

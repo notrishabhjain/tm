@@ -52,6 +52,21 @@ export interface GoogleTaskInput {
   dueDate?: number | null; // timestamp ms
 }
 
+// All Google network calls get a hard timeout. Without one, a hung fetch in a
+// headless (background) JS context stalls the whole pipeline until Android
+// kills the context — which also silently aborts the sync.
+const FETCH_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // PKCE helpers — use Web Crypto when available (Hermes/RN 0.76+ New Arch),
 // fall back to Math.random + plain PKCE method on older runtimes.
 
@@ -213,7 +228,7 @@ async function getValidAccessToken(): Promise<string | null> {
       grant_type: 'refresh_token',
     };
 
-    const resp = await fetch(TOKEN_URL, {
+    const resp = await fetchWithTimeout(TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams(refreshParams).toString(),
@@ -259,7 +274,7 @@ export async function getDefaultListId(accessToken: string): Promise<string> {
   const saved = getSetting('google_tasks_list_id');
   if (saved) return saved;
   try {
-    const resp = await fetch(`${TASKS_API}/users/@me/lists?maxResults=1`, {
+    const resp = await fetchWithTimeout(`${TASKS_API}/users/@me/lists?maxResults=1`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!resp.ok) return '@default';
@@ -288,7 +303,7 @@ export async function createGoogleTask(task: GoogleTaskInput): Promise<string | 
     const dueTs = task.dueDate ?? Date.now();
     const d = new Date(dueTs);
     body['due'] = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
-    const resp = await fetch(`${TASKS_API}/lists/${listId}/tasks`, {
+    const resp = await fetchWithTimeout(`${TASKS_API}/lists/${listId}/tasks`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -323,7 +338,7 @@ export async function completeGoogleTask(googleTaskId: string): Promise<void> {
 
   try {
     const listId = getSetting('google_tasks_list_id') || '@default';
-    await fetch(`${TASKS_API}/lists/${listId}/tasks/${googleTaskId}`, {
+    await fetchWithTimeout(`${TASKS_API}/lists/${listId}/tasks/${googleTaskId}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'completed' }),
