@@ -1,5 +1,6 @@
 import { Linking } from 'react-native';
 import { getSetting, setSetting } from '@/data/storage/settings';
+import { appDisplayName } from './app-name-map';
 
 const TASKS_API = 'https://tasks.googleapis.com/tasks/v1';
 const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -270,21 +271,96 @@ async function getValidAccessToken(): Promise<string | null> {
   }
 }
 
-export async function getDefaultListId(accessToken: string): Promise<string> {
-  const saved = getSetting('google_tasks_list_id');
+const TASKMIND_LIST_TITLE = 'TaskMind';
+
+/**
+ * Resolves (or creates) the dedicated "TaskMind" list so synced tasks don't
+ * pollute the user's personal default list. Cached under a NEW settings key —
+ * the old google_tasks_list_id (which pointed at the user's first list) is
+ * deliberately ignored so existing installs migrate on their next sync.
+ */
+export async function getTaskMindListId(accessToken: string): Promise<string> {
+  const saved = getSetting('google_tasks_taskmind_list_id');
   if (saved) return saved;
   try {
-    const resp = await fetchWithTimeout(`${TASKS_API}/users/@me/lists?maxResults=1`, {
+    const resp = await fetchWithTimeout(`${TASKS_API}/users/@me/lists?maxResults=100`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!resp.ok) return '@default';
-    const data = (await resp.json()) as { items?: { id: string }[] };
-    const id = data.items?.[0]?.id ?? '@default';
-    setSetting('google_tasks_list_id', id);
-    return id;
+    if (resp.ok) {
+      const data = (await resp.json()) as { items?: { id: string; title: string }[] };
+      const existing = data.items?.find((l) => l.title === TASKMIND_LIST_TITLE);
+      if (existing) {
+        setSetting('google_tasks_taskmind_list_id', existing.id);
+        return existing.id;
+      }
+    }
+    // No TaskMind list yet — create it.
+    const createResp = await fetchWithTimeout(`${TASKS_API}/users/@me/lists`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: TASKMIND_LIST_TITLE }),
+    });
+    if (createResp.ok) {
+      const created = (await createResp.json()) as { id: string };
+      if (created.id) {
+        setSetting('google_tasks_taskmind_list_id', created.id);
+        return created.id;
+      }
+    }
+    return '@default';
   } catch {
     return '@default';
   }
+}
+
+export interface GoogleTaskNotesInput {
+  priority?: string | null;
+  sender?: string | null;
+  sourceApp?: string | null;
+  howTo?: string | null;
+  estimatedMinutes?: number | null;
+  dueDate?: number | null;
+  body?: string | null;
+}
+
+/**
+ * Single structured notes builder used by EVERY sync call site, so all task
+ * metadata reaches Google Tasks consistently. Google's API has no fields for
+ * priority/sender/etc., and drops the time portion of `due` — so they're
+ * encoded here in a readable form.
+ */
+export function buildGoogleTaskNotes(input: GoogleTaskNotesInput): string {
+  const lines: string[] = [];
+  if (input.priority) lines.push(`Priority: ${input.priority}`);
+  if (input.sender || input.sourceApp) {
+    const from = [input.sender, input.sourceApp ? appDisplayName(input.sourceApp) : null]
+      .filter(Boolean)
+      .join(' · ');
+    lines.push(`From: ${from}`);
+  }
+  // Google Tasks only keeps the DATE of `due` — preserve the time-of-day in
+  // notes when the deadline has one (anything other than local midnight).
+  if (input.dueDate) {
+    const d = new Date(input.dueDate);
+    if (d.getHours() !== 0 || d.getMinutes() !== 0) {
+      lines.push(
+        `Due: ${d.toLocaleString('en-IN', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          hour: 'numeric',
+          minute: '2-digit',
+        })}`
+      );
+    }
+  }
+  if (input.howTo) lines.push(`How to: ${input.howTo}`);
+  if (input.estimatedMinutes) lines.push(`Estimated: ${input.estimatedMinutes} min`);
+  if (input.body) {
+    if (lines.length > 0) lines.push('---');
+    lines.push(input.body.slice(0, 500));
+  }
+  return lines.join('\n');
 }
 
 export async function createGoogleTask(task: GoogleTaskInput): Promise<string | null> {
@@ -293,7 +369,7 @@ export async function createGoogleTask(task: GoogleTaskInput): Promise<string | 
   if (!token) return null;
 
   try {
-    const listId = await getDefaultListId(token);
+    const listId = await getTaskMindListId(token);
     const body: Record<string, string> = { title: task.title };
     if (task.notes) body['notes'] = task.notes;
     // Always set a due date — use the extracted one or default to today.
@@ -315,10 +391,10 @@ export async function createGoogleTask(task: GoogleTaskInput): Promise<string | 
         resp.status,
         await resp.text().catch(() => '')
       );
-      // If the stored list ID is stale (e.g. user deleted that list), retry once
-      // against @default so we don't permanently fail future syncs.
+      // If the stored list ID is stale (e.g. user deleted the TaskMind list),
+      // clear the cache so the next sync re-resolves/re-creates it.
       if (resp.status === 404 && listId !== '@default') {
-        setSetting('google_tasks_list_id', '');
+        setSetting('google_tasks_taskmind_list_id', '');
       }
       return null;
     }
@@ -337,11 +413,31 @@ export async function completeGoogleTask(googleTaskId: string): Promise<void> {
   if (!token) return;
 
   try {
-    const listId = getSetting('google_tasks_list_id') || '@default';
+    const listId = getSetting('google_tasks_taskmind_list_id') || '@default';
     await fetchWithTimeout(`${TASKS_API}/lists/${listId}/tasks/${googleTaskId}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'completed' }),
+    });
+  } catch {
+    /* non-fatal */
+  }
+}
+
+/**
+ * Deletes the Google copy of a task. Called when the user deletes/rejects a
+ * task in TaskMind so the two lists never drift apart.
+ */
+export async function deleteGoogleTask(googleTaskId: string): Promise<void> {
+  if (!getSetting('google_tasks_enabled')) return;
+  const token = await getValidAccessToken();
+  if (!token) return;
+
+  try {
+    const listId = getSetting('google_tasks_taskmind_list_id') || '@default';
+    await fetchWithTimeout(`${TASKS_API}/lists/${listId}/tasks/${googleTaskId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
     });
   } catch {
     /* non-fatal */
@@ -354,5 +450,6 @@ export function disconnectGoogleTasks(): void {
   setSetting('google_tasks_refresh_token', '');
   setSetting('google_tasks_token_expiry', 0);
   setSetting('google_tasks_list_id', '');
+  setSetting('google_tasks_taskmind_list_id', '');
   setSetting('google_tasks_client_secret', '');
 }

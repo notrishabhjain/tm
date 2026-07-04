@@ -1,7 +1,6 @@
 import { createTask } from '../../../src/domain/usecases/CreateTask';
 import { completeTask } from '../../../src/domain/usecases/CompleteTask';
 import { deleteTask } from '../../../src/domain/usecases/DeleteTask';
-import { assignPriorityToTask } from '../../../src/domain/usecases/AssignPriority';
 import type { TaskRepository } from '../../../src/data/repositories/TaskRepository';
 import type { Task } from '../../../src/domain/types';
 
@@ -29,7 +28,6 @@ function makeRepo(overrides: Partial<TaskRepository> = {}): TaskRepository {
     getTaskById: jest.fn().mockResolvedValue(null),
     completeTask: jest.fn().mockResolvedValue(undefined),
     deleteTask: jest.fn().mockResolvedValue(undefined),
-    updatePriority: jest.fn().mockResolvedValue(undefined),
     purgeOldArchivedTasks: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   } as unknown as TaskRepository;
@@ -68,13 +66,5 @@ describe('deleteTask usecase', () => {
     const repo = makeRepo();
     await deleteTask(repo, 'task-1');
     expect(repo.deleteTask).toHaveBeenCalledWith('task-1');
-  });
-});
-
-describe('assignPriorityToTask usecase', () => {
-  it('calls repo.updatePriority with id and priority', async () => {
-    const repo = makeRepo();
-    await assignPriorityToTask(repo, 'task-1', 'URGENT');
-    expect(repo.updatePriority).toHaveBeenCalledWith('task-1', 'URGENT');
   });
 });

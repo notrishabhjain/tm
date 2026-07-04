@@ -14,7 +14,6 @@ import expo.modules.interfaces.permissions.Permissions
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import org.json.JSONObject
 
 class NotificationListenerModule : Module() {
 
@@ -27,9 +26,7 @@ class NotificationListenerModule : Module() {
         Events(
             "onNotification",
             "onQuickActionDoneTop",
-            "onQuickActionOpen",
             "onCallRecordReady",
-            "onManualTrigger",
             "onCallTranscriptReady",
             "onCallTranscriptionTestLog"
         )
@@ -116,32 +113,6 @@ class NotificationListenerModule : Module() {
             }
         }
 
-        AsyncFunction("getPendingCapture") {
-            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
-            val json = prefs.getString("pending_accessibility_capture", null) ?: return@AsyncFunction null
-            try {
-                val obj = JSONObject(json)
-                mapOf(
-                    "extractedText" to obj.optString("extractedText", ""),
-                    "sender" to obj.optString("sender", ""),
-                    "packageName" to obj.optString("packageName", ""),
-                    "screenshotPath" to obj.optString("screenshotPath", ""),
-                    "timestamp" to obj.optLong("timestamp", 0L),
-                )
-            } catch (_: Exception) {
-                null
-            }
-        }
-
-        AsyncFunction("clearPendingCapture") {
-            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
-            prefs.edit().remove("pending_accessibility_capture").apply()
-        }
-
-        AsyncFunction("getLastShareIntent") {
-            popShareIntent()
-        }
-
         AsyncFunction("peekShareIntent") {
             peekShareIntentData()
         }
@@ -166,15 +137,6 @@ class NotificationListenerModule : Module() {
                 .remove("pending_transcript_time")
                 .remove("pending_transcript_caller")
                 .apply()
-        }
-
-        AsyncFunction("getLatestScreenshot") {
-            val file = java.io.File(context.filesDir, "taskmind_share_screenshot.jpg")
-            if (file.exists()) file.absolutePath else null
-        }
-
-        AsyncFunction("clearLatestScreenshot") {
-            java.io.File(context.filesDir, "taskmind_share_screenshot.jpg").delete()
         }
 
         AsyncFunction("scanActiveNotifications") {
@@ -432,14 +394,6 @@ class NotificationListenerModule : Module() {
             pendingShareSubject = subject
         }
 
-        fun popShareIntent(): Map<String, String?>? {
-            val text = pendingShareText ?: return null
-            val subject = pendingShareSubject
-            pendingShareText = null
-            pendingShareSubject = null
-            return mapOf("text" to text, "subject" to subject)
-        }
-
         fun peekShareIntentData(): Map<String, String?>? {
             val text = pendingShareText ?: return null
             return mapOf("text" to text, "subject" to pendingShareSubject)
@@ -456,22 +410,6 @@ class NotificationListenerModule : Module() {
 
         fun sendQuickActionDoneTop() {
             instance?.sendEvent("onQuickActionDoneTop", emptyMap<String, Any>())
-        }
-
-        fun sendQuickActionOpen() {
-            instance?.sendEvent("onQuickActionOpen", emptyMap<String, Any>())
-        }
-
-        fun sendManualTriggerEvent(packageName: String, extractedText: String, sender: String, screenshotPath: String?) {
-            instance?.sendEvent(
-                "onManualTrigger",
-                mapOf(
-                    "packageName" to packageName,
-                    "extractedText" to extractedText,
-                    "sender" to sender,
-                    "screenshotPath" to (screenshotPath ?: ""),
-                )
-            )
         }
 
         /** Writes the one-shot nav route consumed by popPendingNavRoute. */

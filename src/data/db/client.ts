@@ -45,7 +45,6 @@ export function initializeDatabase(): void {
       needs_confirmation INTEGER NOT NULL DEFAULT 0,
       calendar_event_id TEXT,
       due_date INTEGER,
-      screenshot_path TEXT,
       created_at INTEGER NOT NULL,
       completed_at INTEGER,
       deleted_at INTEGER

@@ -15,9 +15,9 @@ import { scoreNotification, buildSenderKey, buildAppKey } from './signal-scorer'
 import { resolveCancellation } from './cancellation-resolver';
 import { extractTitle } from './title-extractor';
 import { classifyNotification } from './ai-classifier';
-import { createGoogleTask } from './google-tasks';
+import { createGoogleTask, buildGoogleTaskNotes } from './google-tasks';
 import { completeTaskEverywhere } from './task-actions';
-import { appDisplayName, isMessagingApp } from './app-name-map';
+import { isMessagingApp } from './app-name-map';
 import { getSetting } from '@/data/storage/settings';
 
 // Phrases that indicate the other party (or the user) completed a previously
@@ -325,13 +325,16 @@ async function _handleNotification(notification: NotificationData): Promise<void
     // fire-and-forget fetch is killed with the context, losing the sync. The
     // fetch has its own 15 s timeout, and the outbox sweep retries failures.
     if (getSetting('google_tasks_enabled')) {
-      const notesLines: string[] = [];
-      notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
-      if (vipTask.body) notesLines.push(`\nContext:\n${vipTask.body.slice(0, 500)}`);
       try {
         const googleTaskId = await createGoogleTask({
           title: vipTask.title,
-          notes: notesLines.join('\n'),
+          notes: buildGoogleTaskNotes({
+            priority: vipTask.priority,
+            sender: vipTask.sender,
+            sourceApp: vipTask.sourceApp,
+            dueDate: vipTask.dueDate,
+            body: vipTask.body,
+          }),
           dueDate: vipTask.dueDate,
         });
         if (googleTaskId) await taskRepo.setGoogleTaskId(vipTask.id, googleTaskId);
@@ -405,16 +408,18 @@ async function _handleNotification(notification: NotificationData): Promise<void
         // Sync to Google Tasks (awaited — see VIP path comment). Tasks awaiting
         // user confirmation are synced after the user confirms, not before.
         if (!needsConfirmation && getSetting('google_tasks_enabled')) {
-          const notesLines: string[] = [];
-          if (aiResult.howTo) notesLines.push(`How to complete: ${aiResult.howTo}`);
-          if (aiResult.estimatedMinutes)
-            notesLines.push(`Estimated time: ${aiResult.estimatedMinutes} min`);
-          notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
-          if (aiTask.body) notesLines.push(`\nContext:\n${aiTask.body.slice(0, 500)}`);
           try {
             const googleTaskId = await createGoogleTask({
               title: aiTask.title,
-              notes: notesLines.join('\n'),
+              notes: buildGoogleTaskNotes({
+                priority: aiTask.priority,
+                sender: aiTask.sender,
+                sourceApp: aiTask.sourceApp,
+                howTo: aiTask.howTo,
+                estimatedMinutes: aiTask.estimatedMinutes,
+                dueDate: aiTask.dueDate,
+                body: aiTask.body,
+              }),
               dueDate: aiTask.dueDate,
             });
             if (googleTaskId) await taskRepo2.setGoogleTaskId(aiTask.id, googleTaskId);
@@ -549,13 +554,16 @@ async function _handleNotification(notification: NotificationData): Promise<void
   // Sync to Google Tasks (awaited — see VIP path comment). Tasks awaiting
   // user confirmation are synced after the user confirms, not before.
   if (!needsConfirmation && getSetting('google_tasks_enabled')) {
-    const notesLines: string[] = [];
-    notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
-    if (heuristicTask.body) notesLines.push(`\nContext:\n${heuristicTask.body.slice(0, 500)}`);
     try {
       const googleTaskId = await createGoogleTask({
         title: heuristicTask.title,
-        notes: notesLines.join('\n'),
+        notes: buildGoogleTaskNotes({
+          priority: heuristicTask.priority,
+          sender: heuristicTask.sender,
+          sourceApp: heuristicTask.sourceApp,
+          dueDate: heuristicTask.dueDate,
+          body: heuristicTask.body,
+        }),
         dueDate: heuristicTask.dueDate,
       });
       if (googleTaskId) await taskRepo.setGoogleTaskId(heuristicTask.id, googleTaskId);

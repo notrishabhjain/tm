@@ -5,8 +5,7 @@ import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogReposito
 import { LearnedKeywordRepository } from '@/data/repositories/LearnedKeywordRepository';
 import { extractNgrams, languageForText } from './ngram-extractor';
 import { buildSenderKey, buildAppKey } from './signal-scorer';
-import { createGoogleTask } from './google-tasks';
-import { appDisplayName } from './app-name-map';
+import { createGoogleTask, deleteGoogleTask, buildGoogleTaskNotes } from './google-tasks';
 import { getSetting } from '@/data/storage/settings';
 import type { Task } from '@/domain/types';
 
@@ -35,11 +34,17 @@ export async function confirmReviewTask(task: Task): Promise<void> {
     }
   }
   if (getSetting('google_tasks_enabled') && !task.googleTaskId) {
-    const notesLines: string[] = [`Source: ${appDisplayName(task.sourceApp)}`];
-    if (task.body) notesLines.push(`\nContext:\n${task.body.slice(0, 500)}`);
     void createGoogleTask({
       title: task.title,
-      notes: notesLines.join('\n'),
+      notes: buildGoogleTaskNotes({
+        priority: task.priority,
+        sender: task.sender,
+        sourceApp: task.sourceApp,
+        howTo: task.howTo,
+        estimatedMinutes: task.estimatedMinutes,
+        dueDate: task.dueDate,
+        body: task.body,
+      }),
       dueDate: task.dueDate,
     })
       .then((googleTaskId) => {
@@ -77,6 +82,9 @@ export async function rejectReviewTask(task: Task): Promise<void> {
     } catch {
       // Non-fatal
     }
+  }
+  if (task.googleTaskId) {
+    void deleteGoogleTask(task.googleTaskId).catch(() => {});
   }
   await taskRepo.deleteTask(task.id);
 }

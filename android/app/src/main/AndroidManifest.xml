@@ -75,6 +75,20 @@
       </intent-filter>
     </receiver>
     <receiver android:name="expo.modules.notificationlistener.QuickActionReceiver" android:exported="false"/>
+    <!-- Home-screen widget. This block mirrors app.plugin.js — it was missing
+         from the committed manifest, which is why the widget never appeared in
+         the launcher's widget picker. -->
+    <receiver
+        android:name="expo.modules.notificationlistener.TaskWidgetProvider"
+        android:exported="true"
+        android:label="TaskMind Tasks">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+      </intent-filter>
+      <meta-data
+          android:name="android.appwidget.provider"
+          android:resource="@xml/task_widget_info"/>
+    </receiver>
 <service
         android:name="expo.modules.notificationlistener.TaskMindAccessibilityService"
         android:exported="true"

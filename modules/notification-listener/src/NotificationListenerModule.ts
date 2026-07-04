@@ -75,14 +75,6 @@ const NotificationListenerModule = {
     return NativeModule.updateWidget() as Promise<void>;
   },
 
-  getLastShareIntent(): Promise<{ text: string; subject: string | null } | null> {
-    if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.getLastShareIntent() as Promise<{
-      text: string;
-      subject: string | null;
-    } | null>;
-  },
-
   peekShareIntent(): Promise<{ text: string; subject: string | null } | null> {
     if (!NativeModule) return Promise.resolve(null);
     return NativeModule.peekShareIntent() as Promise<{
@@ -94,16 +86,6 @@ const NotificationListenerModule = {
   clearShareIntent(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.clearShareIntent() as Promise<void>;
-  },
-
-  getLatestScreenshot(): Promise<string | null> {
-    if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.getLatestScreenshot() as Promise<string | null>;
-  },
-
-  clearLatestScreenshot(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.clearLatestScreenshot() as Promise<void>;
   },
 
   scanActiveNotifications(): Promise<void> {
@@ -170,12 +152,6 @@ const NotificationListenerModule = {
     if (!emitter) return { remove: () => undefined };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (emitter as any).addListener('onQuickActionDoneTop', listener) as { remove: () => void };
-  },
-
-  addQuickActionOpenListener(listener: () => void) {
-    if (!emitter) return { remove: () => undefined };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (emitter as any).addListener('onQuickActionOpen', listener) as { remove: () => void };
   },
 
   // ── In-app call transcription (replaces Termux + MacroDroid) ─────────────

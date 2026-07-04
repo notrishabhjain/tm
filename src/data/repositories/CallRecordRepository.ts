@@ -79,7 +79,6 @@ export class CallRecordRepository {
       confidence: row.confidence,
       needsConfirmation: row.needsConfirmation ?? false,
       dueDate: row.dueDate ?? null,
-      screenshotPath: row.screenshotPath ?? null,
       notificationKey: row.notificationKey ?? null,
       googleTaskId: row.googleTaskId ?? null,
       howTo: row.howTo ?? null,

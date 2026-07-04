@@ -18,7 +18,6 @@ export const tasks = sqliteTable(
     needsConfirmation: integer('needs_confirmation', { mode: 'boolean' }).notNull().default(false),
     calendarEventId: text('calendar_event_id'),
     dueDate: integer('due_date'),
-    screenshotPath: text('screenshot_path'),
     notificationKey: text('notification_key'),
     googleTaskId: text('google_task_id'),
     howTo: text('how_to'),
