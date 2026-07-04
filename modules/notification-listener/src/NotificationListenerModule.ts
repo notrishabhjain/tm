@@ -70,6 +70,11 @@ const NotificationListenerModule = {
     return NativeModule.hidePersistentNotification() as Promise<void>;
   },
 
+  updateWidget(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.updateWidget() as Promise<void>;
+  },
+
   getLastShareIntent(): Promise<{ text: string; subject: string | null } | null> {
     if (!NativeModule) return Promise.resolve(null);
     return NativeModule.getLastShareIntent() as Promise<{

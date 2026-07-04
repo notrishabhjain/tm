@@ -12,8 +12,9 @@ import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogReposito
 import { LearnedKeywordRepository } from '@/data/repositories/LearnedKeywordRepository';
 import { db } from '@/data/db/client';
 import { extractNgrams, languageForText } from '@/services/ngram-extractor';
-import { buildSenderKey } from '@/services/signal-scorer';
+import { buildSenderKey, buildAppKey } from '@/services/signal-scorer';
 import { createGoogleTask } from '@/services/google-tasks';
+import { refreshWidget } from '@/services/task-actions';
 import { appDisplayName } from '@/services/app-name-map';
 import { getSetting } from '@/data/storage/settings';
 import type { Task } from '@/domain/types';
@@ -37,6 +38,8 @@ export default function ConfirmationsScreen(): React.JSX.Element {
       await taskRepo.confirmTask(task.id);
       const senderKey = buildSenderKey(task.sourceApp, task.sender ?? '');
       await senderStatsRepo.incrementConfirm(senderKey);
+      // App-level learning: confirms lower this app's future thresholds
+      await senderStatsRepo.incrementConfirm(buildAppKey(task.sourceApp));
       const text = task.body ?? task.title;
       const ngrams = extractNgrams(text, 'EN');
       if (ngrams.length > 0) {
@@ -78,6 +81,7 @@ export default function ConfirmationsScreen(): React.JSX.Element {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      refreshWidget();
     },
   });
 
@@ -95,6 +99,19 @@ export default function ConfirmationsScreen(): React.JSX.Element {
       });
       const senderKey = buildSenderKey(task.sourceApp, task.sender ?? '');
       await senderStatsRepo.incrementReject(senderKey);
+      // App-level learning: rejects raise this app's future thresholds
+      await senderStatsRepo.incrementReject(buildAppKey(task.sourceApp));
+      // Negative keyword learning: penalise the ngrams of the rejected message
+      // so similar messages score lower next time.
+      const rejectedText = task.body ?? task.title;
+      const rejectedNgrams = extractNgrams(rejectedText, 'EN');
+      if (rejectedNgrams.length > 0) {
+        try {
+          await learnedKwRepo.penalizeNgrams(rejectedNgrams, languageForText('EN'));
+        } catch {
+          // Non-fatal
+        }
+      }
       await taskRepo.deleteTask(task.id);
     },
     onMutate: async (task: Task) => {
@@ -114,6 +131,7 @@ export default function ConfirmationsScreen(): React.JSX.Element {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
       void queryClient.invalidateQueries({ queryKey: ['discarded-log'] });
+      refreshWidget();
     },
   });
 

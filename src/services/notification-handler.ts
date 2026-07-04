@@ -11,11 +11,12 @@ import { ConversationRepository } from '@/data/repositories/ConversationReposito
 import type { StoredMessage } from '@/data/repositories/ConversationRepository';
 import { logCapturedNotification, logExtractionDecision } from './diagnostics-logger';
 import { extractNgrams, languageForText } from './ngram-extractor';
-import { scoreNotification, buildSenderKey } from './signal-scorer';
+import { scoreNotification, buildSenderKey, buildAppKey } from './signal-scorer';
 import { resolveCancellation } from './cancellation-resolver';
 import { extractTitle } from './title-extractor';
 import { classifyNotification } from './ai-classifier';
 import { createGoogleTask } from './google-tasks';
+import { completeTaskEverywhere } from './task-actions';
 import { appDisplayName, isMessagingApp } from './app-name-map';
 import { getSetting } from '@/data/storage/settings';
 
@@ -244,7 +245,8 @@ async function _handleNotification(notification: NotificationData): Promise<void
           notification.packageName
         );
         for (const t of senderTasks) {
-          await taskRepoForCompletion.completeTask(t.id);
+          // Completes locally, in Google Tasks, and refreshes the widget.
+          await completeTaskEverywhere(t.id);
         }
       } catch {
         /* non-fatal */
@@ -319,22 +321,23 @@ async function _handleNotification(notification: NotificationData): Promise<void
       decision: 'CREATE',
       timestamp: Date.now(),
     });
-    // Sync to Google Tasks (non-blocking, fire-and-forget)
+    // Sync to Google Tasks. AWAITED: in a headless (background) JS context a
+    // fire-and-forget fetch is killed with the context, losing the sync. The
+    // fetch has its own 15 s timeout, and the outbox sweep retries failures.
     if (getSetting('google_tasks_enabled')) {
       const notesLines: string[] = [];
       notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
       if (vipTask.body) notesLines.push(`\nContext:\n${vipTask.body.slice(0, 500)}`);
-      void createGoogleTask({
-        title: vipTask.title,
-        notes: notesLines.join('\n'),
-        dueDate: vipTask.dueDate,
-      })
-        .then((googleTaskId) => {
-          if (googleTaskId) void taskRepo.setGoogleTaskId(vipTask.id, googleTaskId);
-        })
-        .catch(() => {
-          /* non-fatal */
+      try {
+        const googleTaskId = await createGoogleTask({
+          title: vipTask.title,
+          notes: notesLines.join('\n'),
+          dueDate: vipTask.dueDate,
         });
+        if (googleTaskId) await taskRepo.setGoogleTaskId(vipTask.id, googleTaskId);
+      } catch {
+        /* non-fatal — outbox sweep retries */
+      }
     }
     await refreshPersistentNotification(taskRepo);
     return;
@@ -399,7 +402,7 @@ async function _handleNotification(notification: NotificationData): Promise<void
           decision: needsConfirmation ? 'CONFIRM' : 'CREATE',
           timestamp: Date.now(),
         });
-        // Sync to Google Tasks (non-blocking, fire-and-forget). Tasks awaiting
+        // Sync to Google Tasks (awaited — see VIP path comment). Tasks awaiting
         // user confirmation are synced after the user confirms, not before.
         if (!needsConfirmation && getSetting('google_tasks_enabled')) {
           const notesLines: string[] = [];
@@ -408,17 +411,16 @@ async function _handleNotification(notification: NotificationData): Promise<void
             notesLines.push(`Estimated time: ${aiResult.estimatedMinutes} min`);
           notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
           if (aiTask.body) notesLines.push(`\nContext:\n${aiTask.body.slice(0, 500)}`);
-          void createGoogleTask({
-            title: aiTask.title,
-            notes: notesLines.join('\n'),
-            dueDate: aiTask.dueDate,
-          })
-            .then((googleTaskId) => {
-              if (googleTaskId) void taskRepo2.setGoogleTaskId(aiTask.id, googleTaskId);
-            })
-            .catch(() => {
-              /* non-fatal */
+          try {
+            const googleTaskId = await createGoogleTask({
+              title: aiTask.title,
+              notes: notesLines.join('\n'),
+              dueDate: aiTask.dueDate,
             });
+            if (googleTaskId) await taskRepo2.setGoogleTaskId(aiTask.id, googleTaskId);
+          } catch {
+            /* non-fatal — outbox sweep retries */
+          }
         }
         await refreshPersistentNotification(taskRepo2);
         return;
@@ -544,27 +546,28 @@ async function _handleNotification(notification: NotificationData): Promise<void
     createdAt: notification.postTime || Date.now(),
   });
 
-  // Sync to Google Tasks (non-blocking, fire-and-forget). Tasks awaiting
+  // Sync to Google Tasks (awaited — see VIP path comment). Tasks awaiting
   // user confirmation are synced after the user confirms, not before.
   if (!needsConfirmation && getSetting('google_tasks_enabled')) {
     const notesLines: string[] = [];
     notesLines.push(`Source: ${appDisplayName(notification.packageName)}`);
     if (heuristicTask.body) notesLines.push(`\nContext:\n${heuristicTask.body.slice(0, 500)}`);
-    void createGoogleTask({
-      title: heuristicTask.title,
-      notes: notesLines.join('\n'),
-      dueDate: heuristicTask.dueDate,
-    })
-      .then((googleTaskId) => {
-        if (googleTaskId) void taskRepo.setGoogleTaskId(heuristicTask.id, googleTaskId);
-      })
-      .catch(() => {
-        /* non-fatal */
+    try {
+      const googleTaskId = await createGoogleTask({
+        title: heuristicTask.title,
+        notes: notesLines.join('\n'),
+        dueDate: heuristicTask.dueDate,
       });
+      if (googleTaskId) await taskRepo.setGoogleTaskId(heuristicTask.id, googleTaskId);
+    } catch {
+      /* non-fatal — outbox sweep retries */
+    }
   }
 
   if (!needsConfirmation) {
     await senderStatsRepo.incrementAutoAccept(senderKey);
+    // App-level learning counterpart of the per-sender stat
+    await senderStatsRepo.incrementAutoAccept(buildAppKey(notification.packageName));
 
     // N-gram learning
     const learnedRepo = new LearnedKeywordRepository(db);
@@ -603,6 +606,9 @@ async function refreshPersistentNotification(taskRepo: TaskRepository): Promise<
       urgentCount: urgent.length + needsReview.length,
       taskTexts: [...reviewTitles, ...otherTitles],
     });
+    // Keep the home-screen widget in sync with the same data. Without this the
+    // widget only refreshed on reboot/re-add (updatePeriodMillis is 0).
+    await NotificationListener.updateWidget().catch(() => {});
   } catch {
     /* ForegroundService may not be running — non-fatal */
   }

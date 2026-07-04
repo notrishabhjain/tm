@@ -11,7 +11,7 @@ import { Button } from '@/ui/components/Button';
 import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
-import { completeGoogleTask } from '@/services/google-tasks';
+import { completeTaskEverywhere, deleteTaskEverywhere } from '@/services/task-actions';
 
 const taskRepo = new TaskRepository(db);
 
@@ -72,18 +72,15 @@ export default function TaskDetailScreen(): React.JSX.Element {
   });
 
   const completeMutation = useMutation({
-    mutationFn: () => taskRepo.completeTask(id ?? ''),
+    mutationFn: () => completeTaskEverywhere(id ?? ''),
     onSuccess: () => {
-      if (task?.googleTaskId) {
-        void completeGoogleTask(task.googleTaskId);
-      }
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
       router.back();
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => taskRepo.deleteTask(id ?? ''),
+    mutationFn: () => deleteTaskEverywhere(id ?? ''),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
       router.back();

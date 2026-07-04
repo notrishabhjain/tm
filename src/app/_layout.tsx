@@ -15,6 +15,8 @@ import { runDailyDigestIfNeeded } from '@/services/ai-digest';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { stashCallTranscript } from '@/services/call-transcript-stash';
 import { stashShare } from '@/services/share-stash';
+import { syncPendingGoogleTasks } from '@/services/google-tasks-sync';
+import { completeTaskEverywhere } from '@/services/task-actions';
 import NotificationListener from '../../modules/notification-listener/src';
 
 // Subject marker the Termux hand-off script stamps on the share intent:
@@ -208,7 +210,7 @@ export default function RootLayout(): React.JSX.Element {
             (a, b) => (order[a.priority] ?? 3) - (order[b.priority] ?? 3)
           )[0];
           if (!top) return;
-          await taskRepo.completeTask(top.id);
+          await completeTaskEverywhere(top.id);
           await queryClient.invalidateQueries({ queryKey: ['tasks'] });
           const remaining = await taskRepo.getPendingTasks();
           const urgent = remaining.filter((t) => t.priority === 'URGENT');
@@ -256,6 +258,17 @@ export default function RootLayout(): React.JSX.Element {
     });
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Google Tasks sync outbox: retry any task that never made it to Google
+  // (background context killed mid-sync, transient network failure). Runs on
+  // launch and every time the app returns to the foreground.
+  useEffect(() => {
+    void syncPendingGoogleTasks();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void syncPendingGoogleTasks();
+    });
+    return () => sub.remove();
   }, []);
 
   // Share intent: open share screen when app is brought to foreground with a shared text.

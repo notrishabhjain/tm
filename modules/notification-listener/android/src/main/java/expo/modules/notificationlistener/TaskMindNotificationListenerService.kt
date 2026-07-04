@@ -27,6 +27,8 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         private const val DEDUP_WINDOW_MS = 60_000L
         private const val DEDUP_CACHE_MAX = 100
         private const val MAX_THREAD_MESSAGES = 10
+        private const val KEY_PENDING_QUEUE = "pending_notification_queue"
+        private const val MAX_PENDING_QUEUE = 50
 
         private val CARRIER_SENDER_REGEX = Regex("""^[A-Z]{2,3}-[A-Z0-9]{3,8}$""")
         private val OTP_DIGIT_REGEX = Regex("""\b\d{4,8}\b""")
@@ -98,6 +100,23 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         super.onListenerConnected()
         val serviceIntent = Intent(this, TaskMindForegroundService::class.java)
         startForegroundService(serviceIntent)
+        // If any notifications were queued while the binding was down, replay them.
+        drainPendingQueue()
+    }
+
+    // Android periodically tears down the notification-listener binding (memory
+    // pressure, app update, OEM policy). Without an explicit rebind request the
+    // listener stays dead until reboot or a manual permission toggle — the #1
+    // cause of "app suddenly stopped capturing notifications".
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            try {
+                requestRebind(
+                    android.content.ComponentName(this, TaskMindNotificationListenerService::class.java)
+                )
+            } catch (_: Exception) { }
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -181,6 +200,9 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
     // notification keep working without the user opening the app.
     private fun dispatchNotificationData(data: Map<String, Any>) {
         if (NotificationListenerModule.instance != null) {
+            // JS is alive — first flush anything that was queued while it was dead,
+            // then deliver the current notification.
+            drainPendingQueue()
             NotificationListenerModule.sendNotificationEvent(data)
             return
         }
@@ -205,9 +227,87 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
             startService(intent)
             HeadlessJsTaskService.acquireWakeLockNow(this)
         } catch (_: Exception) {
-            // Background-start restrictions or context unavailable — drop silently.
-            // The next time the app opens, scanActiveNotifications() reconciles.
+            // Background-start restrictions or context unavailable. Previously this
+            // dropped the notification silently; now it's persisted to a durable
+            // queue and replayed the next time the JS context is available.
+            enqueuePending(data)
         }
+    }
+
+    // ── Durable pending queue ────────────────────────────────────────────────
+    // Notifications that could not be dispatched (headless start blocked by
+    // background restrictions) are stored as JSON in SharedPreferences and
+    // replayed when JS becomes reachable. Capped at 50 — oldest dropped first.
+
+    private fun enqueuePending(data: Map<String, Any>) {
+        try {
+            val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            val arr = org.json.JSONArray(prefs.getString(KEY_PENDING_QUEUE, "[]") ?: "[]")
+            val obj = org.json.JSONObject().apply {
+                put("packageName", data["packageName"] as? String ?: "")
+                put("appName", data["appName"] as? String ?: "")
+                put("title", data["title"] as? String ?: "")
+                put("text", data["text"] as? String ?: "")
+                put("bigText", data["bigText"] as? String ?: "")
+                put("subText", data["subText"] as? String ?: "")
+                put("postTime", (data["postTime"] as? Long) ?: 0L)
+                put("notificationKey", data["notificationKey"] as? String ?: "")
+                put("isGroup", (data["isGroup"] as? Boolean) ?: false)
+                put("category", data["category"] as? String ?: "")
+                put("channelId", data["channelId"] as? String ?: "")
+                put("importance", (data["importance"] as? Int) ?: 3)
+                put("thread", org.json.JSONArray(threadToJson(data["thread"])))
+            }
+            arr.put(obj)
+            val trimmed = if (arr.length() > MAX_PENDING_QUEUE) {
+                org.json.JSONArray().also { t ->
+                    for (i in arr.length() - MAX_PENDING_QUEUE until arr.length()) t.put(arr.get(i))
+                }
+            } else arr
+            prefs.edit().putString(KEY_PENDING_QUEUE, trimmed.toString()).apply()
+        } catch (_: Exception) { }
+    }
+
+    private fun drainPendingQueue() {
+        if (NotificationListenerModule.instance == null) return
+        try {
+            val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            val raw = prefs.getString(KEY_PENDING_QUEUE, null) ?: return
+            val arr = org.json.JSONArray(raw)
+            if (arr.length() == 0) return
+            prefs.edit().remove(KEY_PENDING_QUEUE).apply()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val thread = mutableListOf<Map<String, Any>>()
+                val tArr = obj.optJSONArray("thread") ?: org.json.JSONArray()
+                for (j in 0 until tArr.length()) {
+                    val m = tArr.getJSONObject(j)
+                    thread.add(
+                        mapOf(
+                            "sender" to m.optString("sender", ""),
+                            "text" to m.optString("text", ""),
+                            "timestamp" to m.optLong("timestamp", 0L)
+                        )
+                    )
+                }
+                val data = mapOf(
+                    "packageName" to obj.optString("packageName", ""),
+                    "appName" to obj.optString("appName", ""),
+                    "title" to obj.optString("title", ""),
+                    "text" to obj.optString("text", ""),
+                    "bigText" to obj.optString("bigText", ""),
+                    "subText" to obj.optString("subText", ""),
+                    "postTime" to obj.optLong("postTime", 0L),
+                    "notificationKey" to obj.optString("notificationKey", ""),
+                    "isGroup" to obj.optBoolean("isGroup", false),
+                    "thread" to thread,
+                    "category" to obj.optString("category", ""),
+                    "channelId" to obj.optString("channelId", ""),
+                    "importance" to obj.optInt("importance", 3)
+                )
+                NotificationListenerModule.sendNotificationEvent(data)
+            }
+        } catch (_: Exception) { }
     }
 
     @Suppress("UNCHECKED_CAST")
