@@ -155,7 +155,9 @@ function withNotificationListenerManifest(config) {
         },
         'intent-filter': [
           {
-            action: [{ $: { 'android:name': 'android.accessibilityservice.AccessibilityService' } }],
+            action: [
+              { $: { 'android:name': 'android.accessibilityservice.AccessibilityService' } },
+            ],
           },
         ],
         'meta-data': [
