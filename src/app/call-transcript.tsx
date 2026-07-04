@@ -16,7 +16,7 @@ import { PriorityChip } from '@/ui/components/PriorityChip';
 import { Button } from '@/ui/components/Button';
 import { db } from '@/data/db/client';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
-import { createGoogleTask } from '@/services/google-tasks';
+import { createGoogleTask, buildGoogleTaskNotes } from '@/services/google-tasks';
 import { getSetting } from '@/data/storage/settings';
 import { consumeCallTranscript } from '@/services/call-transcript-stash';
 import type { CallTranscriptPayload } from '@/services/call-transcript-stash';
@@ -162,6 +162,7 @@ export default function CallTranscriptScreen(): React.JSX.Element {
           title: t.title,
           body: taskBody,
           sourceApp: 'call.transcript',
+          sender: payloadRef.current?.callerLabel,
           priority: t.priority,
           confidence: 0.85,
           needsConfirmation: false,
@@ -172,7 +173,13 @@ export default function CallTranscriptScreen(): React.JSX.Element {
         if (getSetting('google_tasks_enabled')) {
           void createGoogleTask({
             title: task.title,
-            notes: taskBody,
+            notes: buildGoogleTaskNotes({
+              priority: task.priority,
+              sender: task.sender,
+              sourceApp: task.sourceApp,
+              dueDate: task.dueDate,
+              body: taskBody,
+            }),
             dueDate: task.dueDate,
           })
             .then((googleTaskId) => {

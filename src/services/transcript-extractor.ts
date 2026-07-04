@@ -2,8 +2,9 @@ import { getSetting } from '@/data/storage/settings';
 
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
 const TIMEOUT_MS = 30_000;
-// ~6 000 chars covers a 5-10 min call without exceeding typical context windows.
-const MAX_CHARS = 6_000;
+// ~8 000 chars covers a 10-12 min call — kept in parity with the native
+// pipeline's MAX_TRANSCRIPT_CHARS in CallTranscriptionService.kt.
+const MAX_CHARS = 8_000;
 
 export interface TranscriptTask {
   title: string;

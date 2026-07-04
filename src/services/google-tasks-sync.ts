@@ -1,7 +1,6 @@
 import { db } from '@/data/db/client';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
-import { createGoogleTask } from './google-tasks';
-import { appDisplayName } from './app-name-map';
+import { createGoogleTask, buildGoogleTaskNotes } from './google-tasks';
 import { getSetting } from '@/data/storage/settings';
 
 // Prevents overlapping sweeps when foreground events fire in quick succession.
@@ -29,12 +28,17 @@ export async function syncPendingGoogleTasks(force = false): Promise<number> {
     const taskRepo = new TaskRepository(db);
     const unsynced = await taskRepo.getUnsyncedForGoogle();
     for (const task of unsynced) {
-      const notesLines: string[] = [`Source: ${appDisplayName(task.sourceApp)}`];
-      if (task.howTo) notesLines.push(`How to complete: ${task.howTo}`);
-      if (task.body) notesLines.push(`\nContext:\n${task.body.slice(0, 500)}`);
       const googleTaskId = await createGoogleTask({
         title: task.title,
-        notes: notesLines.join('\n'),
+        notes: buildGoogleTaskNotes({
+          priority: task.priority,
+          sender: task.sender,
+          sourceApp: task.sourceApp,
+          howTo: task.howTo,
+          estimatedMinutes: task.estimatedMinutes,
+          dueDate: task.dueDate,
+          body: task.body,
+        }),
         dueDate: task.dueDate,
       });
       if (googleTaskId) {

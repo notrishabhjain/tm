@@ -14,7 +14,6 @@ import expo.modules.interfaces.permissions.Permissions
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import org.json.JSONObject
 
 class NotificationListenerModule : Module() {
 
@@ -27,8 +26,7 @@ class NotificationListenerModule : Module() {
         Events(
             "onNotification",
             "onQuickActionDoneTop",
-            "onQuickActionOpen",
-            "onManualTrigger",
+            "onCallRecordReady",
             "onCallTranscriptReady",
             "onCallTranscriptionTestLog"
         )
@@ -115,32 +113,6 @@ class NotificationListenerModule : Module() {
             }
         }
 
-        AsyncFunction("getPendingCapture") {
-            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
-            val json = prefs.getString("pending_accessibility_capture", null) ?: return@AsyncFunction null
-            try {
-                val obj = JSONObject(json)
-                mapOf(
-                    "extractedText" to obj.optString("extractedText", ""),
-                    "sender" to obj.optString("sender", ""),
-                    "packageName" to obj.optString("packageName", ""),
-                    "screenshotPath" to obj.optString("screenshotPath", ""),
-                    "timestamp" to obj.optLong("timestamp", 0L),
-                )
-            } catch (_: Exception) {
-                null
-            }
-        }
-
-        AsyncFunction("clearPendingCapture") {
-            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
-            prefs.edit().remove("pending_accessibility_capture").apply()
-        }
-
-        AsyncFunction("getLastShareIntent") {
-            popShareIntent()
-        }
-
         AsyncFunction("peekShareIntent") {
             peekShareIntentData()
         }
@@ -165,15 +137,6 @@ class NotificationListenerModule : Module() {
                 .remove("pending_transcript_time")
                 .remove("pending_transcript_caller")
                 .apply()
-        }
-
-        AsyncFunction("getLatestScreenshot") {
-            val file = java.io.File(context.filesDir, "taskmind_share_screenshot.jpg")
-            if (file.exists()) file.absolutePath else null
-        }
-
-        AsyncFunction("clearLatestScreenshot") {
-            java.io.File(context.filesDir, "taskmind_share_screenshot.jpg").delete()
         }
 
         AsyncFunction("scanActiveNotifications") {
@@ -274,6 +237,27 @@ class NotificationListenerModule : Module() {
                 .edit().putString("nvidia_api_key", key.trim()).apply()
         }
 
+        // Mirrors the MMKV Cloud-AI settings into SharedPreferences so the
+        // native call pipeline (CallTranscriptionService → NvidiaLlmClient)
+        // can run LLM extraction while the JS process is dead.
+        AsyncFunction("setAiCredentials") { key: String, model: String ->
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putString("ai_api_key", key.trim())
+                .putString("ai_model", model.trim())
+                .apply()
+        }
+
+        // One-shot navigation route written by the native pipeline (or
+        // MainActivity intent extras). JS peeks this on launch/foreground and
+        // routes to it — survives a cold start from a notification tap.
+        AsyncFunction("popPendingNavRoute") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            val route = prefs.getString("pending_nav_route", null)
+            if (route != null) prefs.edit().remove("pending_nav_route").apply()
+            route
+        }
+
         AsyncFunction("getNvidiaApiKey") {
             context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
                 .getString("nvidia_api_key", null).orEmpty()
@@ -303,7 +287,9 @@ class NotificationListenerModule : Module() {
                 appContext.permissions,
                 promise,
                 android.Manifest.permission.READ_PHONE_STATE,
-                android.Manifest.permission.READ_CALL_LOG
+                android.Manifest.permission.READ_CALL_LOG,
+                // Resolves caller numbers to contact names in CallerResolver
+                android.Manifest.permission.READ_CONTACTS
             )
         }
 
@@ -408,14 +394,6 @@ class NotificationListenerModule : Module() {
             pendingShareSubject = subject
         }
 
-        fun popShareIntent(): Map<String, String?>? {
-            val text = pendingShareText ?: return null
-            val subject = pendingShareSubject
-            pendingShareText = null
-            pendingShareSubject = null
-            return mapOf("text" to text, "subject" to subject)
-        }
-
         fun peekShareIntentData(): Map<String, String?>? {
             val text = pendingShareText ?: return null
             return mapOf("text" to text, "subject" to pendingShareSubject)
@@ -434,18 +412,20 @@ class NotificationListenerModule : Module() {
             instance?.sendEvent("onQuickActionDoneTop", emptyMap<String, Any>())
         }
 
-        fun sendQuickActionOpen() {
-            instance?.sendEvent("onQuickActionOpen", emptyMap<String, Any>())
+        /** Writes the one-shot nav route consumed by popPendingNavRoute. */
+        fun setPendingNavRoute(context: Context, route: String) {
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit().putString("pending_nav_route", route).apply()
         }
 
-        fun sendManualTriggerEvent(packageName: String, extractedText: String, sender: String, screenshotPath: String?) {
+        /** Live-app path: native pipeline finished a call record. */
+        fun sendCallRecordReady(recordId: String, callerLabel: String, taskCount: Int) {
             instance?.sendEvent(
-                "onManualTrigger",
+                "onCallRecordReady",
                 mapOf(
-                    "packageName" to packageName,
-                    "extractedText" to extractedText,
-                    "sender" to sender,
-                    "screenshotPath" to (screenshotPath ?: ""),
+                    "recordId" to recordId,
+                    "callerLabel" to callerLabel,
+                    "taskCount" to taskCount
                 )
             )
         }

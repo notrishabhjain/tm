@@ -18,11 +18,15 @@ class MainActivity : ReactActivity() {
     SplashScreenManager.registerOnActivity(this)
     super.onCreate(null)
     handleShareIntent(intent)
+    handleNavRouteExtra(intent)
   }
 
   override fun onNewIntent(intent: Intent?) {
     super.onNewIntent(intent)
-    intent?.let { handleShareIntent(it) }
+    intent?.let {
+      handleShareIntent(it)
+      handleNavRouteExtra(it)
+    }
   }
 
   private fun handleShareIntent(intent: Intent) {
@@ -30,6 +34,16 @@ class MainActivity : ReactActivity() {
       val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
       val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
       NotificationListenerModule.setShareIntent(text, subject)
+    }
+  }
+
+  // Notification taps and app shortcuts carry a target route as an extra.
+  // Stash it in prefs; JS peeks popPendingNavRoute on launch/foreground.
+  // (Covers the singleTask warm-start case where the cold-start pref written
+  // by CallTranscriptionService was already consumed.)
+  private fun handleNavRouteExtra(intent: Intent) {
+    intent.getStringExtra("taskmind_nav_route")?.let {
+      NotificationListenerModule.setPendingNavRoute(this, it)
     }
   }
 

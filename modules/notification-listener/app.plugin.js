@@ -121,6 +121,74 @@ function withNotificationListenerManifest(config) {
       });
     }
 
+    // PhoneStateReceiver — static call-ended trigger for call transcription.
+    // Must stay in sync with the hand-maintained android/ manifest.
+    const phoneStateExists = application.receiver.some(
+      (r) => r.$?.['android:name'] === 'expo.modules.notificationlistener.PhoneStateReceiver'
+    );
+    if (!phoneStateExists) {
+      application.receiver.push({
+        $: {
+          'android:name': 'expo.modules.notificationlistener.PhoneStateReceiver',
+          'android:exported': 'true',
+        },
+        'intent-filter': [
+          {
+            action: [{ $: { 'android:name': 'android.intent.action.PHONE_STATE' } }],
+          },
+        ],
+      });
+    }
+
+    // TaskMindAccessibilityService — focus-lock foreground-app detection.
+    const a11yExists = application.service.some(
+      (s) =>
+        s.$?.['android:name'] === 'expo.modules.notificationlistener.TaskMindAccessibilityService'
+    );
+    if (!a11yExists) {
+      application.service.push({
+        $: {
+          'android:name': 'expo.modules.notificationlistener.TaskMindAccessibilityService',
+          'android:exported': 'true',
+          'android:label': 'TaskMind Focus Service',
+          'android:permission': 'android.permission.BIND_ACCESSIBILITY_SERVICE',
+        },
+        'intent-filter': [
+          {
+            action: [
+              { $: { 'android:name': 'android.accessibilityservice.AccessibilityService' } },
+            ],
+          },
+        ],
+        'meta-data': [
+          {
+            $: {
+              'android:name': 'android.accessibilityservice',
+              'android:resource': '@xml/accessibility_service_config',
+            },
+          },
+        ],
+      });
+    }
+
+    // App shortcuts meta-data on MainActivity ("Voice task" long-press shortcut)
+    const activities = application.activity ?? [];
+    const mainActivity = activities.find((a) => a.$?.['android:name'] === '.MainActivity');
+    if (mainActivity) {
+      mainActivity['meta-data'] = mainActivity['meta-data'] ?? [];
+      const shortcutsExists = mainActivity['meta-data'].some(
+        (m) => m.$?.['android:name'] === 'android.app.shortcuts'
+      );
+      if (!shortcutsExists) {
+        mainActivity['meta-data'].push({
+          $: {
+            'android:name': 'android.app.shortcuts',
+            'android:resource': '@xml/shortcuts',
+          },
+        });
+      }
+    }
+
     return modConfig;
   });
 }

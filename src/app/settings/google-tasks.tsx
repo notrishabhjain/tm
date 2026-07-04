@@ -147,16 +147,20 @@ export default function GoogleTasksScreen(): React.JSX.Element {
           >
             <Text style={[styles.cardTitle, { color: theme.onSurfaceVariant }]}>What syncs</Text>
             <Text style={[styles.bodyText, { color: theme.onSurface }]}>
-              • Every new task captured from a notification is automatically created in Google Tasks
+              • Tasks are created in a dedicated “TaskMind” list (created automatically)
             </Text>
             <Text style={[styles.bodyText, { color: theme.onSurface }]}>
-              • AI-extracted details (how to complete, time estimate) are added to the task notes
+              • Full details go into the task notes: priority, sender & source app, how to complete,
+              time estimate, deadline time, and message context
             </Text>
             <Text style={[styles.bodyText, { color: theme.onSurface }]}>
               • Due dates are synced so Google Calendar shows reminders
             </Text>
             <Text style={[styles.bodyText, { color: theme.onSurface }]}>
-              • Completing a task in TaskMind marks it complete in Google Tasks too
+              • Completing a task in TaskMind marks it complete in Google Tasks
+            </Text>
+            <Text style={[styles.bodyText, { color: theme.onSurface }]}>
+              • Deleting or rejecting a task in TaskMind removes it from Google Tasks
             </Text>
           </View>
         )}

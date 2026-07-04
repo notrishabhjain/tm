@@ -40,7 +40,7 @@ export interface FocusState {
   lockActive: boolean; // lock currently in effect right now
 }
 
-export type NotificationEvent = 'onNotification' | 'onQuickActionDoneTop' | 'onQuickActionOpen';
+export type NotificationEvent = 'onNotification' | 'onQuickActionDoneTop';
 
 export interface CallTranscriptionStatus {
   enabled: boolean;

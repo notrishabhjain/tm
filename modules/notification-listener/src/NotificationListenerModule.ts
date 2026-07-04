@@ -75,14 +75,6 @@ const NotificationListenerModule = {
     return NativeModule.updateWidget() as Promise<void>;
   },
 
-  getLastShareIntent(): Promise<{ text: string; subject: string | null } | null> {
-    if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.getLastShareIntent() as Promise<{
-      text: string;
-      subject: string | null;
-    } | null>;
-  },
-
   peekShareIntent(): Promise<{ text: string; subject: string | null } | null> {
     if (!NativeModule) return Promise.resolve(null);
     return NativeModule.peekShareIntent() as Promise<{
@@ -94,16 +86,6 @@ const NotificationListenerModule = {
   clearShareIntent(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.clearShareIntent() as Promise<void>;
-  },
-
-  getLatestScreenshot(): Promise<string | null> {
-    if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.getLatestScreenshot() as Promise<string | null>;
-  },
-
-  clearLatestScreenshot(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.clearLatestScreenshot() as Promise<void>;
   },
 
   scanActiveNotifications(): Promise<void> {
@@ -172,12 +154,6 @@ const NotificationListenerModule = {
     return (emitter as any).addListener('onQuickActionDoneTop', listener) as { remove: () => void };
   },
 
-  addQuickActionOpenListener(listener: () => void) {
-    if (!emitter) return { remove: () => undefined };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (emitter as any).addListener('onQuickActionOpen', listener) as { remove: () => void };
-  },
-
   // ── In-app call transcription (replaces Termux + MacroDroid) ─────────────
 
   getCallTranscriptionStatus(): Promise<CallTranscriptionStatus> {
@@ -201,6 +177,28 @@ const NotificationListenerModule = {
   getNvidiaApiKey(): Promise<string> {
     if (!NativeModule) return Promise.resolve('');
     return NativeModule.getNvidiaApiKey() as Promise<string>;
+  },
+
+  // Mirrors the MMKV Cloud-AI settings into native SharedPreferences so the
+  // background call pipeline can run LLM extraction with the app dead.
+  setAiCredentials(key: string, model: string): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setAiCredentials(key, model) as Promise<void>;
+  },
+
+  // One-shot navigation route stashed by the native pipeline / notification
+  // taps. Returns the route and clears it, or null when there is none.
+  popPendingNavRoute(): Promise<string | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.popPendingNavRoute() as Promise<string | null>;
+  },
+
+  addCallRecordReadyListener(
+    listener: (data: { recordId: string; callerLabel: string; taskCount: number }) => void
+  ) {
+    if (!emitter) return { remove: () => undefined };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (emitter as any).addListener('onCallRecordReady', listener) as { remove: () => void };
   },
 
   setCallTranscriptionEnabled(enabled: boolean): Promise<void> {

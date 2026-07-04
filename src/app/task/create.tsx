@@ -18,6 +18,7 @@ import { Button } from '@/ui/components/Button';
 import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
+import { analyzeQuickText } from '@/services/quick-extract';
 import type { Priority } from '@/domain/types';
 
 const taskRepo = new TaskRepository(db);
@@ -34,6 +35,9 @@ export default function CreateTaskScreen(): React.JSX.Element {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Priority>('MEDIUM');
+  // Tracks whether the user manually chose a priority — extraction must not
+  // override an explicit choice.
+  const [priorityTouched, setPriorityTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const theme = useTheme();
@@ -47,14 +51,22 @@ export default function CreateTaskScreen(): React.JSX.Element {
     }
     setLoading(true);
     try {
+      // Rule-engine pass over the (possibly dictated) text: derives a cleaned
+      // imperative title, priority, and due date — same pipeline the share
+      // screen uses. Manual priority choice always wins.
+      const extracted = await analyzeQuickText(trimmed);
+      const finalTitle = extracted.title || trimmed;
+      const finalPriority = priorityTouched ? priority : extracted.priority;
       await taskRepo.createTask({
-        title: trimmed,
+        title: finalTitle,
+        body: extracted.title && extracted.title !== trimmed ? trimmed : undefined,
         sourceApp: 'manual',
-        priority,
+        priority: finalPriority,
         confidence: 1.0,
         needsConfirmation: false,
         matchedKeywords: ['manual_entry'],
         language: 'EN',
+        dueDate: extracted.dueDate,
       });
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
       router.back();
@@ -86,7 +98,7 @@ export default function CreateTaskScreen(): React.JSX.Element {
             ]}
             value={title}
             onChangeText={setTitle}
-            placeholder="Describe the task clearly…"
+            placeholder="Type or dictate the task… e.g. 'Send invoice to Rahul kal tak'"
             placeholderTextColor={theme.onSurfaceVariant}
             multiline
             autoFocus
@@ -110,7 +122,10 @@ export default function CreateTaskScreen(): React.JSX.Element {
                     { backgroundColor: theme.surface, borderColor: active ? color : theme.outline },
                     active && { backgroundColor: color + '12', borderWidth: 1.5 },
                   ]}
-                  onPress={() => setPriority(p.value)}
+                  onPress={() => {
+                    setPriority(p.value);
+                    setPriorityTouched(true);
+                  }}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
                 >

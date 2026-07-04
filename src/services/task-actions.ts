@@ -1,6 +1,6 @@
 import { db } from '@/data/db/client';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
-import { completeGoogleTask } from './google-tasks';
+import { completeGoogleTask, deleteGoogleTask } from './google-tasks';
 import NotificationListener from '../../modules/notification-listener/src';
 
 const taskRepo = new TaskRepository(db);
@@ -21,9 +21,16 @@ export async function completeTaskEverywhere(id: string): Promise<void> {
   void NotificationListener.updateWidget().catch(() => {});
 }
 
-/** Delete counterpart — refreshes the widget after removal. */
+/**
+ * Delete counterpart — removes the Google Tasks copy too (read the task BEFORE
+ * the local delete so googleTaskId is still available) and refreshes the widget.
+ */
 export async function deleteTaskEverywhere(id: string): Promise<void> {
+  const task = await taskRepo.getTaskById(id);
   await taskRepo.deleteTask(id);
+  if (task?.googleTaskId) {
+    void deleteGoogleTask(task.googleTaskId).catch(() => {});
+  }
   void NotificationListener.updateWidget().catch(() => {});
 }
 

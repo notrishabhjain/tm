@@ -45,6 +45,7 @@ export interface AppSettings {
   google_tasks_refresh_token: string;
   google_tasks_token_expiry: number;
   google_tasks_list_id: string;
+  google_tasks_taskmind_list_id: string;
   google_tasks_code_verifier: string;
   google_tasks_oauth_state: string;
 }
@@ -83,6 +84,7 @@ const DEFAULTS: AppSettings = {
   google_tasks_refresh_token: '',
   google_tasks_token_expiry: 0,
   google_tasks_list_id: '',
+  google_tasks_taskmind_list_id: '',
   google_tasks_code_verifier: '',
   google_tasks_oauth_state: '',
 };

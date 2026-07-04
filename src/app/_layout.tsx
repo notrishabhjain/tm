@@ -230,6 +230,51 @@ export default function RootLayout(): React.JSX.Element {
     return () => sub.remove();
   }, []);
 
+  // Background call pipeline: live-app event when the native service finishes
+  // analysing a call (summary + tasks already in the DB).
+  useEffect(() => {
+    const sub = NotificationListener.addCallRecordReadyListener((data) => {
+      router.push(`/call-review/${data.recordId}`);
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Nav-route stash: written by the native pipeline on success and by
+  // MainActivity when a notification tap / app shortcut carries a route extra.
+  // Checked BEFORE the pending-transcript peek so the success path wins.
+  useEffect(() => {
+    const checkNavRoute = (): void => {
+      void (async () => {
+        try {
+          const route = await NotificationListener.popPendingNavRoute();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (route) router.push(route as any);
+        } catch {
+          // Native module unavailable
+        }
+      })();
+    };
+    checkNavRoute();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkNavRoute();
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mirror the Cloud-AI credentials into native SharedPreferences on boot so
+  // existing installs get background LLM extraction without re-saving settings.
+  useEffect(() => {
+    try {
+      const key = getSetting('ai_api_key');
+      const model = getSetting('ai_model');
+      if (key) void NotificationListener.setAiCredentials(key, model || '').catch(() => {});
+    } catch {
+      /* non-fatal */
+    }
+  }, []);
+
   // Resume check: if the app was backgrounded/killed while CallTranscriptionService
   // was running, the live sendEvent would have been dropped. The service also writes
   // the transcript to SharedPreferences — pick it up here whenever the app gains focus.
@@ -355,6 +400,10 @@ export default function RootLayout(): React.JSX.Element {
                 <Stack.Screen name="settings/focus-lock" options={{ presentation: 'card' }} />
                 <Stack.Screen
                   name="call-transcript"
+                  options={{ presentation: 'modal', headerShown: false }}
+                />
+                <Stack.Screen
+                  name="call-review/[id]"
                   options={{ presentation: 'modal', headerShown: false }}
                 />
                 <Stack.Screen

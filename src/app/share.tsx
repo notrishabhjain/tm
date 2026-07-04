@@ -17,34 +17,8 @@ import { PriorityChip } from '@/ui/components/PriorityChip';
 import { db } from '@/data/db/client';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { consumeShare } from '@/services/share-stash';
-import { runExtractionPipeline } from '@/domain/extraction';
-import type { PipelineConfig } from '@/domain/extraction';
-import type { Keyword } from '@/domain/extraction/ruleEngine';
+import { analyzeQuickText } from '@/services/quick-extract';
 import type { Priority } from '@/domain/types';
-import seedKeywordsRaw from '../../assets/seed-keywords.json';
-
-type RawKeyword = { keyword: string; language: string; priority_hint: string };
-
-function priorityHintToCategory(hint: string): Keyword['category'] {
-  if (hint === 'URGENT') return 'URGENCY';
-  if (hint === 'HIGH') return 'IMPERATIVE';
-  if (hint === 'MEDIUM') return 'IMPERATIVE';
-  return 'ANTI_PATTERN';
-}
-
-const SEED_VOCABULARY: Keyword[] = (seedKeywordsRaw as RawKeyword[]).map((k) => ({
-  phrase: k.keyword,
-  category: priorityHintToCategory(k.priority_hint),
-  language: k.language as Keyword['language'],
-  weight: k.priority_hint === 'URGENT' ? 1.5 : k.priority_hint === 'HIGH' ? 1.2 : 1.0,
-}));
-
-const PIPELINE_CONFIG: PipelineConfig = {
-  vocabulary: SEED_VOCABULARY,
-  vipSenders: [],
-  ruleWeight: 1.0,
-  modelWeight: 0.0,
-};
 
 const taskRepo = new TaskRepository(db);
 
@@ -120,12 +94,9 @@ export default function ShareScreen(): React.JSX.Element {
       setParsed(effectiveParsed);
 
       if (rawText) {
-        const pipelineResult = await runExtractionPipeline(
-          { text: effectiveParsed.message, title: effectiveSender || undefined },
-          PIPELINE_CONFIG
-        );
+        const pipelineResult = await analyzeQuickText(effectiveParsed.message, effectiveSender);
         const suggestedTitle =
-          pipelineResult.extractedTitle ||
+          pipelineResult.title ||
           (effectiveSender
             ? `${effectiveSender}: ${effectiveParsed.message.slice(0, 60)}`
             : effectiveParsed.message.slice(0, 80));

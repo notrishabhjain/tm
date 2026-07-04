@@ -11,7 +11,6 @@ export function createTaskEntity(params: {
   confidence: number;
   needsConfirmation: boolean;
   dueDate: number | null;
-  screenshotPath: string | null;
   notificationKey?: string | null;
   googleTaskId?: string | null;
   howTo?: string | null;

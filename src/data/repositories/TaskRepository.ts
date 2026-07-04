@@ -20,7 +20,6 @@ export interface CreateTaskInput {
   matchedKeywords: string[];
   needsConfirmation: boolean;
   dueDate?: number | null;
-  screenshotPath?: string | null;
   notificationKey?: string | null;
   googleTaskId?: string | null;
   howTo?: string | null;
@@ -40,7 +39,6 @@ function mapRow(row: typeof tasks.$inferSelect): Task {
     confidence: row.confidence,
     needsConfirmation: row.needsConfirmation ?? false,
     dueDate: row.dueDate ?? null,
-    screenshotPath: row.screenshotPath ?? null,
     notificationKey: row.notificationKey ?? null,
     googleTaskId: row.googleTaskId ?? null,
     howTo: row.howTo ?? null,
@@ -72,7 +70,6 @@ export class TaskRepository {
       matchedKeywords: JSON.stringify(input.matchedKeywords),
       needsConfirmation: input.needsConfirmation,
       dueDate: input.dueDate ?? null,
-      screenshotPath: input.screenshotPath ?? null,
       notificationKey: input.notificationKey ?? null,
       googleTaskId: input.googleTaskId ?? null,
       howTo: input.howTo ?? null,
@@ -164,16 +161,8 @@ export class TaskRepository {
       .where(eq(tasks.id, id));
   }
 
-  async updatePriority(id: string, priority: Priority): Promise<void> {
-    await this.db.update(tasks).set({ priority }).where(eq(tasks.id, id));
-  }
-
   async confirmTask(id: string): Promise<void> {
     await this.db.update(tasks).set({ needsConfirmation: false }).where(eq(tasks.id, id));
-  }
-
-  async updateTitle(id: string, title: string): Promise<void> {
-    await this.db.update(tasks).set({ title }).where(eq(tasks.id, id));
   }
 
   async setCalendarEvent(id: string, calendarEventId: string): Promise<void> {
