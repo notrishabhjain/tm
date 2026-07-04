@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,19 +9,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { getPriorityColor } from '@/ui/theme/colors';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, getPriorityColor } from '@/ui/theme/colors';
 import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
 import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
 import { db } from '@/data/db/client';
 import { analyzeQuickText } from '@/services/quick-extract';
+import NotificationListener from '../../../modules/notification-listener/src';
 import type { Priority } from '@/domain/types';
 
 const taskRepo = new TaskRepository(db);
+
+type VoiceState = 'idle' | 'recording' | 'transcribing';
 
 const PRIORITIES: Array<{ value: Priority; label: string; desc: string }> = [
   { value: 'URGENT', label: 'Urgent', desc: 'Needs immediate attention' },
@@ -39,8 +44,77 @@ export default function CreateTaskScreen(): React.JSX.Element {
   // override an explicit choice.
   const [priorityTouched, setPriorityTouched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [recordSecs, setRecordSecs] = useState(0);
   const inputRef = useRef<TextInput>(null);
   const theme = useTheme();
+
+  // Recording timer
+  useEffect(() => {
+    if (voiceState !== 'recording') {
+      setRecordSecs(0);
+      return;
+    }
+    const t = setInterval(() => setRecordSecs((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [voiceState]);
+
+  // Stop any dangling recording when leaving the screen
+  useEffect(() => {
+    return () => {
+      void NotificationListener.cancelVoiceCapture().catch(() => {});
+    };
+  }, []);
+
+  // Voice capture: record with the mic, transcribe with the SAME Whisper ASR
+  // used for call recordings (free NVIDIA API, handles Hindi/English/Hinglish),
+  // then drop the text into the input for the extraction pipeline on save.
+  const handleMicPress = async (): Promise<void> => {
+    if (voiceState === 'transcribing') return;
+
+    if (voiceState === 'recording') {
+      setVoiceState('transcribing');
+      try {
+        const path = await NotificationListener.stopVoiceCapture();
+        if (!path) {
+          Alert.alert('Nothing recorded', 'The recording was too short. Try again.');
+          setVoiceState('idle');
+          return;
+        }
+        const result = await NotificationListener.transcribeFile(path);
+        if (result.ok && result.text) {
+          setTitle((prev) => (prev.trim() ? `${prev.trim()} ${result.text}` : (result.text ?? '')));
+        } else {
+          Alert.alert(
+            'Transcription failed',
+            result.error ?? 'Could not transcribe. Check your internet connection and try again.'
+          );
+        }
+      } finally {
+        setVoiceState('idle');
+      }
+      return;
+    }
+
+    // idle → start recording (ask mic permission first)
+    const perm = await NotificationListener.requestMicPermission().catch(() => ({
+      granted: false,
+    }));
+    // Expo permissions manager resolves with {granted} or {status:'granted'}
+    const granted =
+      (perm as { granted?: boolean; status?: string }).granted === true ||
+      (perm as { status?: string }).status === 'granted';
+    if (!granted) {
+      Alert.alert('Microphone needed', 'Allow microphone access to dictate tasks.');
+      return;
+    }
+    const started = await NotificationListener.startVoiceCapture();
+    if (!started) {
+      Alert.alert('Could not start recording', 'The microphone may be in use by another app.');
+      return;
+    }
+    setVoiceState('recording');
+  };
 
   const handleCreate = async (): Promise<void> => {
     const trimmed = title.trim();
@@ -105,6 +179,47 @@ export default function CreateTaskScreen(): React.JSX.Element {
             returnKeyType="done"
             blurOnSubmit
           />
+
+          {/* Voice capture — Whisper (Hindi/English/Hinglish) */}
+          <Pressable
+            onPress={() => void handleMicPress()}
+            style={({ pressed }) => [
+              styles.micBtn,
+              {
+                backgroundColor: voiceState === 'recording' ? Colors.urgentBgLight : theme.surface,
+                borderColor: voiceState === 'recording' ? Colors.urgentFg : theme.outline,
+              },
+              pressed && { opacity: 0.8 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              voiceState === 'recording' ? 'Stop recording' : 'Dictate task with voice'
+            }
+          >
+            {voiceState === 'transcribing' ? (
+              <>
+                <ActivityIndicator size="small" color={theme.primary} />
+                <Text style={[styles.micLabel, { color: theme.onSurfaceVariant }]}>
+                  Transcribing…
+                </Text>
+              </>
+            ) : voiceState === 'recording' ? (
+              <>
+                <Ionicons name="stop-circle" size={22} color={Colors.urgentFg} />
+                <Text style={[styles.micLabel, { color: Colors.urgentFg }]}>
+                  Recording {Math.floor(recordSecs / 60)}:{String(recordSecs % 60).padStart(2, '0')}{' '}
+                  — tap to stop
+                </Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="mic" size={20} color={theme.primary} />
+                <Text style={[styles.micLabel, { color: theme.primary }]}>
+                  Speak the task (Hindi / English)
+                </Text>
+              </>
+            )}
+          </Pressable>
 
           {/* Priority selector */}
           <Text style={[styles.label, { color: theme.onSurfaceVariant, marginTop: 24 }]}>
@@ -187,6 +302,17 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     lineHeight: 22,
   },
+  micBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    paddingVertical: 12,
+    marginTop: 10,
+  },
+  micLabel: { fontSize: 14, fontWeight: '600' },
   priorityGrid: { gap: 10 },
   priorityCard: {
     flexDirection: 'row',

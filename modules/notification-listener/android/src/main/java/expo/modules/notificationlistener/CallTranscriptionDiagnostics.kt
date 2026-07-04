@@ -31,7 +31,7 @@ object CallTranscriptionDiagnostics {
 
     private fun apiKeySet(context: Context): Boolean {
         val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
-        return prefs.getString("nvidia_api_key", null).orEmpty().isNotBlank()
+        return true // built-in default key (DefaultKeys) always available
     }
 
     /** Fast inspection — prerequisites, trigger state, and what files are visible. */
@@ -139,7 +139,7 @@ object CallTranscriptionDiagnostics {
 
         // Check API key
         val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("nvidia_api_key", null).orEmpty()
+        val apiKey = prefs.getString("nvidia_api_key", null).orEmpty().ifBlank { DefaultKeys.NVIDIA_ASR }
         if (apiKey.isBlank()) {
             onLog?.invoke("apikey", "FAILED — NVIDIA API key not set")
             return mapOf(

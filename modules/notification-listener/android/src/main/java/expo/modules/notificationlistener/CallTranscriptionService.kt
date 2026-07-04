@@ -36,7 +36,10 @@ class CallTranscriptionService : Service() {
         private const val MIN_ANALYSIS_DURATION_SEC = 60
         private const val MIN_ANALYSIS_TRANSCRIPT_CHARS = 150
         private const val MAX_TRANSCRIPT_CHARS = 8_000
-        private const val DEFAULT_MODEL = "meta/llama-3.1-8b-instruct"
+        // Calls are rare and accuracy-critical — use the strongest free-tier
+        // model regardless of the (high-volume, latency-sensitive) notification
+        // classifier's model choice. Override via the call_ai_model pref.
+        private const val DEFAULT_CALL_MODEL = "meta/llama-3.3-70b-instruct"
     }
 
     private lateinit var notificationManager: NotificationManager
@@ -72,10 +75,7 @@ class CallTranscriptionService : Service() {
         if (!prefs.getBoolean("call_transcription_enabled", false)) return
 
         val asrKey = prefs.getString("nvidia_api_key", null).orEmpty()
-        if (asrKey.isBlank()) {
-            Log.w(TAG, "NVIDIA API key not set — skipping transcription")
-            return
-        }
+            .ifBlank { DefaultKeys.NVIDIA_ASR }
 
         // Most recorder apps flush within a few seconds of the call ending.
         // When the static PhoneStateReceiver fires (no pre-delay), a longer retry
@@ -131,8 +131,9 @@ class CallTranscriptionService : Service() {
         // ── LLM analysis ─────────────────────────────────────────────────────
         // LLM key mirrored from MMKV by setAiCredentials; fall back to ASR key
         // (same NVIDIA platform).
-        val llmKey = prefs.getString("ai_api_key", null).orEmpty().ifBlank { asrKey }
-        val model = prefs.getString("ai_model", null).orEmpty().ifBlank { DEFAULT_MODEL }
+        val llmKey = prefs.getString("ai_api_key", null).orEmpty()
+            .ifBlank { DefaultKeys.NVIDIA_LLM }
+        val model = prefs.getString("call_ai_model", null).orEmpty().ifBlank { DEFAULT_CALL_MODEL }
         val capped = if (text.length > MAX_TRANSCRIPT_CHARS) {
             text.take(MAX_TRANSCRIPT_CHARS) + "\n[transcript truncated]"
         } else text
@@ -140,8 +141,15 @@ class CallTranscriptionService : Service() {
         val llmResult = NvidiaLlmClient.extract(llmKey, model, capped, callTime, caller.label)
 
         if (llmResult is NvidiaLlmClient.Result.Success) {
+            // Verification pass: re-check every candidate task against the
+            // transcript; drops hallucinated/duplicate tasks and fixes titles.
+            // On verify failure the pass-1 extraction is used as-is.
+            val verified = if (llmResult.extraction.tasks.isNotEmpty()) {
+                NvidiaLlmClient.verify(llmKey, model, capped, llmResult.extraction, callTime)
+            } else llmResult.extraction
+
             val inserted = CallRecordStore.insertCallRecordWithTasks(
-                this, caller, recording.absolutePath, text, llmResult.extraction, callTime
+                this, caller, recording.absolutePath, text, verified, callTime
             )
             if (inserted != null) {
                 val route = "/call-review/${inserted.callRecordId}"
@@ -151,6 +159,8 @@ class CallTranscriptionService : Service() {
                 NotificationListenerModule.sendCallRecordReady(
                     inserted.callRecordId, caller.label, inserted.taskIds.size
                 )
+                // Notification is always posted (fallback + heads-up), and when
+                // permitted we ALSO open the app directly on the review screen.
                 postResultNotification(
                     recordId = inserted.callRecordId,
                     title = "Call with ${caller.label}",
@@ -161,6 +171,7 @@ class CallTranscriptionService : Service() {
                     },
                     route = route
                 )
+                autoOpenApp(route)
                 TaskWidgetProvider.triggerUpdate(this)
                 return
             }
@@ -181,7 +192,37 @@ class CallTranscriptionService : Service() {
             text = "Transcript ready — tap to analyse",
             route = null // resume-check navigation reads the prefs stash
         )
+        // Auto-open here too — the resume-check picks up the stashed transcript.
+        autoOpenApp(route = null)
         TaskWidgetProvider.triggerUpdate(this)
+    }
+
+    /**
+     * Opens TaskMind directly on the review screen the moment analysis finishes.
+     * Android permits background activity launches when the app holds the
+     * SYSTEM_ALERT_WINDOW (display-over-other-apps) permission — which TaskMind
+     * already requests for Focus Lock, and FocusLockManager.launchApp proves
+     * the pattern works on this device class. Gated on the user-visible
+     * "Auto-open after call" toggle (default ON). The result notification is
+     * always posted regardless, as the fallback when the launch is blocked.
+     */
+    private fun autoOpenApp(route: String?) {
+        try {
+            val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("call_auto_open", true)) return
+            if (!android.provider.Settings.canDrawOverlays(this)) {
+                Log.d(TAG, "Auto-open skipped — overlay permission not granted")
+                return
+            }
+            val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            if (route != null) intent.putExtra("taskmind_nav_route", route)
+            startActivity(intent)
+            Log.d(TAG, "Auto-opened app on ${route ?: "(resume-check)"}")
+        } catch (e: Exception) {
+            // OEM blocked the background launch — the notification fallback covers it.
+            Log.w(TAG, "Auto-open failed: ${e.message}")
+        }
     }
 
     private fun postResultNotification(
@@ -207,6 +248,8 @@ class CallTranscriptionService : Service() {
                 .setContentTitle(title)
                 .setContentText(text)
                 .setContentIntent(pi)
+                // Locked phone / screen off: show the review screen on unlock.
+                .setFullScreenIntent(pi, true)
                 .setAutoCancel(true)
                 .build()
             notificationManager.notify(recordId.hashCode(), notification)

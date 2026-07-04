@@ -49,17 +49,18 @@ object NvidiaLlmClient {
         object NoApiKey : Result()
     }
 
-    private const val SYSTEM_PROMPT = """You are a phone-call analyst for a personal task manager used by an Indian professional. The transcript may be in Hindi, English, or Hinglish (mixed Hindi-English) and may contain speech-recognition errors — interpret the intended meaning, do not discard items because of imperfect transcription.
+    private const val SYSTEM_PROMPT = """You are a precise phone-call analyst for a personal task manager used by an Indian professional. The transcript may be in Hindi, English, or Hinglish (mixed Hindi-English) and may contain speech-recognition errors — interpret the intended meaning.
 
 You will be told the date and time the call took place ("Call date"). Resolve ALL relative date/time expressions — "kal", "parso", "tomorrow", "next Monday", "aaj shaam", "by Friday", "in an hour" — against that call date, NOT today's date.
 
-Return ONLY a valid JSON object, no markdown:
+Return ONLY a valid JSON object, no markdown. Fill "reasoning" FIRST — think through the call before extracting:
 {
+  "reasoning": "<briefly list each commitment you found, who made it, and its deadline — or state there are none>",
   "summary": "<2-3 sentence summary of what was discussed>",
   "topics": ["<short topic phrase>", ...],
   "tasks": [
     {
-      "title": "<imperative verb phrase ≤60 chars, e.g. 'Send invoice to Rahul by Friday'>",
+      "title": "<imperative verb phrase ≤60 chars quoting specifics from the call, e.g. 'Send GST invoice to Rahul by Friday'>",
       "priority": "URGENT|HIGH|MEDIUM|LOW",
       "dueDate": "<ISO 8601 date-time resolved from call date, or null>",
       "assignedToMe": <true if the person who recorded this call must act, false if the other party committed>,
@@ -68,13 +69,45 @@ Return ONLY a valid JSON object, no markdown:
   ]
 }
 
-Find EVERY commitment, task, follow-up, and action item mentioned by either party. Be comprehensive.
+PRECISION RULES (accuracy matters more than recall):
+- Only extract commitments that were ACTUALLY SPOKEN. Never invent, infer, or embellish a task.
+- Merge near-duplicate commitments into one task.
+- If the transcript is garbled or ambiguous in a section, skip that section rather than guessing.
+- Titles must reference concrete specifics from the call (names, amounts, documents) — never generic titles like "Follow up" alone.
+- Small talk, opinions, and general discussion are NOT tasks. A task requires someone agreeing or being asked to DO something specific.
 
 Priority: URGENT = within 24h of the call or urgent/ASAP/abhi/aaj tak; HIGH = 2-3 days or important/kal tak; MEDIUM = no stated urgency; LOW = optional/"jab time mile".
 
 Common Hindi/Hinglish action phrases: "bhej dena", "bhej do", "kar dena", "dekh lena", "bata dena", "call karna", "confirm karo", "meeting rakhna", "payment karna", "forward karna".
 
-If no action items exist, return "tasks": []. Always include summary and topics."""
+EXAMPLE
+Call date: Monday, 7 July 2025, 6:15 PM. Other party: Rahul.
+Transcript: "Haan Rahul bol... invoice ka kya hua? ... theek hai main aaj raat tak bhej dunga GST wala invoice ... aur suno, kal subah 10 baje meeting hai client ke saath, tum join kar lena ... haan haan main aa jaunga ... aur woh 25000 ka payment Sharma ji ko remind kar dena parso tak"
+Correct output:
+{
+  "reasoning": "Three commitments: (1) Rahul will send the GST invoice by tonight — his task, not mine. (2) I agreed to join the client meeting tomorrow 10 AM. (3) Rahul asked me to remind Sharma ji about the ₹25000 payment by day after tomorrow.",
+  "summary": "Rahul confirmed he will send the GST invoice tonight. A client meeting is scheduled for tomorrow 10 AM which I agreed to join. I need to remind Sharma ji about the ₹25000 payment.",
+  "topics": ["GST invoice", "Client meeting", "Sharma ji payment"],
+  "tasks": [
+    {"title": "Receive GST invoice from Rahul (he sends tonight)", "priority": "HIGH", "dueDate": "2025-07-07T23:59:00", "assignedToMe": false, "notes": "Rahul committed to send by tonight"},
+    {"title": "Join client meeting at 10 AM", "priority": "HIGH", "dueDate": "2025-07-08T10:00:00", "assignedToMe": true, "notes": null},
+    {"title": "Remind Sharma ji about ₹25000 payment", "priority": "MEDIUM", "dueDate": "2025-07-09T18:00:00", "assignedToMe": true, "notes": "Amount: ₹25000"}
+  ]
+}
+
+If no action items exist, return "tasks": []. Always include reasoning, summary and topics."""
+
+    private const val VERIFY_PROMPT = """You are a strict reviewer for tasks extracted from a phone-call transcript. You receive the transcript and a list of candidate tasks. For EACH candidate, check it against the transcript:
+- keep: the commitment was clearly spoken and the title/date are accurate
+- fix: the commitment is real but the title or dueDate needs correction — provide the corrected values
+- drop: it was NOT actually committed to in the call, is a duplicate of another task, or is small talk misread as a task
+
+Be strict: when in doubt, drop. Return ONLY valid JSON, no markdown:
+{
+  "verdicts": [
+    {"index": <candidate index starting at 0>, "verdict": "keep|fix|drop", "title": "<corrected title if fix, else null>", "dueDate": "<corrected ISO date-time if fix, else null>", "reason": "<one short phrase>"}
+  ]
+}"""
 
     /** Blocking — must be called off the main thread. */
     fun extract(
@@ -95,12 +128,99 @@ If no action items exist, return "tasks": []. Always include summary and topics.
             append("Call transcript:\n\n").append(transcript)
         }
 
+        return when (val content = chatCompletion(apiKey, model, SYSTEM_PROMPT, userMessage)) {
+            is ChatResult.Content -> {
+                val parsed = parseExtraction(content.text, callTimeMs)
+                    ?: return Result.Error("Unparseable LLM response")
+                Result.Success(parsed)
+            }
+            is ChatResult.Failure -> Result.Error(content.message)
+        }
+    }
+
+    /**
+     * Verification pass — re-checks every candidate task against the transcript
+     * and keeps / fixes / drops each one. On any failure, returns the input
+     * extraction unchanged (verification must never lose a successful pass 1).
+     * Blocking — call off the main thread.
+     */
+    fun verify(
+        apiKey: String,
+        model: String,
+        transcript: String,
+        extraction: CallExtraction,
+        callTimeMs: Long
+    ): CallExtraction {
+        if (extraction.tasks.isEmpty()) return extraction
+        return try {
+            val candidates = JSONArray().apply {
+                extraction.tasks.forEachIndexed { i, t ->
+                    put(JSONObject().apply {
+                        put("index", i)
+                        put("title", t.title)
+                        put("dueDate", t.dueDateMs?.let {
+                            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date(it))
+                        } ?: JSONObject.NULL)
+                        put("assignedToMe", t.assignedToMe)
+                    })
+                }
+            }
+            val userMessage = "Transcript:\n\n$transcript\n\nCandidate tasks:\n$candidates"
+            val content = chatCompletion(apiKey, model, VERIFY_PROMPT, userMessage)
+            if (content !is ChatResult.Content) return extraction
+
+            val start = content.text.indexOf('{')
+            val end = content.text.lastIndexOf('}')
+            if (start == -1 || end <= start) return extraction
+            val verdicts = JSONObject(content.text.substring(start, end + 1))
+                .optJSONArray("verdicts") ?: return extraction
+
+            // Default keep — a task without a verdict survives.
+            val kept = extraction.tasks.toMutableList()
+            val dropIndices = mutableSetOf<Int>()
+            for (i in 0 until verdicts.length()) {
+                val v = verdicts.optJSONObject(i) ?: continue
+                val idx = v.optInt("index", -1)
+                if (idx !in extraction.tasks.indices) continue
+                when (v.optString("verdict")) {
+                    "drop" -> dropIndices.add(idx)
+                    "fix" -> {
+                        val old = kept[idx]
+                        val newTitle = v.optString("title", "").trim()
+                            .takeIf { it.isNotEmpty() && it != "null" } ?: old.title
+                        val newDue = parseDueDate(v.optString("dueDate", ""), callTimeMs)
+                            ?: old.dueDateMs
+                        kept[idx] = old.copy(title = newTitle.take(120), dueDateMs = newDue)
+                    }
+                }
+            }
+            val filtered = kept.filterIndexed { i, _ -> i !in dropIndices }
+            Log.i(TAG, "Verify pass: ${extraction.tasks.size} candidates → ${filtered.size} kept")
+            extraction.copy(tasks = filtered)
+        } catch (e: Exception) {
+            Log.w(TAG, "Verify pass failed (${e.message}) — using pass-1 extraction")
+            extraction
+        }
+    }
+
+    private sealed class ChatResult {
+        data class Content(val text: String) : ChatResult()
+        data class Failure(val message: String) : ChatResult()
+    }
+
+    /** Shared chat-completion call with retry policy (429/5xx/IO only). */
+    private fun chatCompletion(
+        apiKey: String,
+        model: String,
+        systemPrompt: String,
+        userMessage: String
+    ): ChatResult {
         val body = JSONObject().apply {
             put("model", model)
             put("temperature", 0.1)
-            put("max_tokens", 1500)
+            put("max_tokens", 2000)
             put("messages", JSONArray().apply {
-                put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
+                put(JSONObject().put("role", "system").put("content", systemPrompt))
                 put(JSONObject().put("role", "user").put("content", userMessage))
             })
         }.toString()
@@ -113,23 +233,21 @@ If no action items exist, return "tasks": []. Always include summary and topics.
                     val content = JSONObject(response)
                         .optJSONArray("choices")?.optJSONObject(0)
                         ?.optJSONObject("message")?.optString("content")
-                    if (content.isNullOrBlank()) return Result.Error("Empty LLM response")
-                    val parsed = parseExtraction(content, callTimeMs)
-                        ?: return Result.Error("Unparseable LLM response")
-                    return Result.Success(parsed)
+                    return if (content.isNullOrBlank()) ChatResult.Failure("Empty LLM response")
+                    else ChatResult.Content(content)
                 }
                 lastError = "HTTP $status"
                 // Retry only on rate-limit / server errors; auth and bad-request are final.
-                if (status != 429 && status < 500) return Result.Error(lastError)
+                if (status != 429 && status < 500) return ChatResult.Failure(lastError)
             } catch (e: IOException) {
                 lastError = "IO: ${e.message}"
             } catch (e: Exception) {
-                return Result.Error("${e.javaClass.simpleName}: ${e.message}")
+                return ChatResult.Failure("${e.javaClass.simpleName}: ${e.message}")
             }
             if (attempt < MAX_ATTEMPTS) Thread.sleep(RETRY_BACKOFF_MS)
         }
-        Log.w(TAG, "LLM extraction failed after $MAX_ATTEMPTS attempts: $lastError")
-        return Result.Error(lastError)
+        Log.w(TAG, "LLM call failed after $MAX_ATTEMPTS attempts: $lastError")
+        return ChatResult.Failure(lastError)
     }
 
     private fun post(apiKey: String, body: String): Pair<Int, String> {

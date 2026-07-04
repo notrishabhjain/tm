@@ -164,9 +164,49 @@ const NotificationListenerModule = {
         hasCallLogPermission: false,
         hasAllFilesAccess: false,
         apiKeySet: false,
+        autoOpenEnabled: true,
+        hasOverlayPermission: false,
+        hasMicPermission: false,
       });
     }
     return NativeModule.getCallTranscriptionStatus() as Promise<CallTranscriptionStatus>;
+  },
+
+  // Auto-open the app on the review screen when call analysis finishes.
+  setCallAutoOpen(enabled: boolean): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setCallAutoOpen(enabled) as Promise<void>;
+  },
+
+  // ── Voice task capture (Whisper via the existing ASR pipeline) ───────────
+
+  requestMicPermission(): Promise<{ granted: boolean }> {
+    if (!NativeModule) return Promise.resolve({ granted: false });
+    return NativeModule.requestMicPermission() as Promise<{ granted: boolean }>;
+  },
+
+  startVoiceCapture(): Promise<boolean> {
+    if (!NativeModule) return Promise.resolve(false);
+    return NativeModule.startVoiceCapture() as Promise<boolean>;
+  },
+
+  stopVoiceCapture(): Promise<string | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.stopVoiceCapture() as Promise<string | null>;
+  },
+
+  cancelVoiceCapture(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.cancelVoiceCapture() as Promise<void>;
+  },
+
+  transcribeFile(path: string): Promise<{ ok: boolean; text?: string; error?: string }> {
+    if (!NativeModule) return Promise.resolve({ ok: false, error: 'Native module unavailable' });
+    return NativeModule.transcribeFile(path) as Promise<{
+      ok: boolean;
+      text?: string;
+      error?: string;
+    }>;
   },
 
   setNvidiaApiKey(key: string): Promise<void> {

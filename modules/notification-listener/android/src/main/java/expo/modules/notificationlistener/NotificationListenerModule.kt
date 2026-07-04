@@ -228,8 +228,67 @@ class NotificationListenerModule : Module() {
                 "hasPhoneStatePermission" to hasPermission(android.Manifest.permission.READ_PHONE_STATE),
                 "hasCallLogPermission" to hasPermission(android.Manifest.permission.READ_CALL_LOG),
                 "hasAllFilesAccess" to hasAllFilesAccess(),
-                "apiKeySet" to prefs.getString("nvidia_api_key", null).orEmpty().isNotBlank(),
+                "apiKeySet" to true, // built-in default key (DefaultKeys) always available
+                // Auto-open after call: enabled flag + the overlay permission that
+                // makes background activity launches possible.
+                "autoOpenEnabled" to prefs.getBoolean("call_auto_open", true),
+                "hasOverlayPermission" to FocusLockManager.hasOverlayPermission(context),
+                "hasMicPermission" to hasPermission(android.Manifest.permission.RECORD_AUDIO),
             )
+        }
+
+        AsyncFunction("setCallAutoOpen") { enabled: Boolean ->
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean("call_auto_open", enabled).apply()
+        }
+
+        // ── Voice task capture (Whisper via the existing ASR pipeline) ─────────
+
+        AsyncFunction("requestMicPermission") { promise: Promise ->
+            Permissions.askForPermissionsWithPermissionsManager(
+                appContext.permissions,
+                promise,
+                android.Manifest.permission.RECORD_AUDIO
+            )
+        }
+
+        AsyncFunction("startVoiceCapture") {
+            VoiceCapture.start(context)
+        }
+
+        AsyncFunction("stopVoiceCapture") {
+            VoiceCapture.stop()
+        }
+
+        AsyncFunction("cancelVoiceCapture") {
+            VoiceCapture.cancel()
+        }
+
+        // Transcribes ANY audio file (m4a/mp3/wav/…) with the same Whisper ASR
+        // used for call recordings. Blocking work runs on a worker thread.
+        AsyncFunction("transcribeFile") { path: String, promise: Promise ->
+            Thread {
+                try {
+                    val pcm = AudioDecoder.decodeToWhisperPcm(path)
+                    if (pcm == null || pcm.isEmpty()) {
+                        promise.resolve(mapOf("ok" to false, "error" to "Could not decode audio"))
+                        return@Thread
+                    }
+                    val key = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                        .getString("nvidia_api_key", null).orEmpty()
+                        .ifBlank { DefaultKeys.NVIDIA_ASR }
+                    when (val result = NvidiaAsrClient.transcribe(key, pcm)) {
+                        is NvidiaAsrClient.Result.Success ->
+                            promise.resolve(mapOf("ok" to true, "text" to result.text))
+                        is NvidiaAsrClient.Result.Error ->
+                            promise.resolve(mapOf("ok" to false, "error" to result.message))
+                        NvidiaAsrClient.Result.NoApiKey ->
+                            promise.resolve(mapOf("ok" to false, "error" to "API key missing"))
+                    }
+                } catch (e: Exception) {
+                    promise.resolve(mapOf("ok" to false, "error" to (e.message ?: "unknown")))
+                }
+            }.start()
         }
 
         AsyncFunction("setNvidiaApiKey") { key: String ->
@@ -261,6 +320,7 @@ class NotificationListenerModule : Module() {
         AsyncFunction("getNvidiaApiKey") {
             context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
                 .getString("nvidia_api_key", null).orEmpty()
+                .ifBlank { DefaultKeys.NVIDIA_ASR }
         }
 
         AsyncFunction("setCallTranscriptionEnabled") { enabled: Boolean ->
