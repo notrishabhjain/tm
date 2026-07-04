@@ -57,12 +57,6 @@ class PhoneStateReceiver : BroadcastReceiver() {
                     return
                 }
 
-                val apiKey = prefs.getString("nvidia_api_key", null).orEmpty()
-                if (apiKey.isBlank()) {
-                    Log.w(TAG, "NVIDIA API key not set — skipping transcription")
-                    return
-                }
-
                 try {
                     // Start immediately — the service's retry loop (3 + 6 + 10 + 20 s)
                     // handles the recording file not yet being flushed to disk.

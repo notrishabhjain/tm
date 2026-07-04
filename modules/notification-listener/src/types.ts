@@ -48,6 +48,9 @@ export interface CallTranscriptionStatus {
   hasCallLogPermission: boolean;
   hasAllFilesAccess: boolean;
   apiKeySet: boolean;
+  autoOpenEnabled: boolean;
+  hasOverlayPermission: boolean;
+  hasMicPermission: boolean;
 }
 
 export interface CallTranscriptReadyEvent {

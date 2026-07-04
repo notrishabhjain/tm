@@ -24,6 +24,9 @@ const DEFAULT_STATUS: CallTranscriptionStatus = {
   hasCallLogPermission: false,
   hasAllFilesAccess: false,
   apiKeySet: false,
+  autoOpenEnabled: true,
+  hasOverlayPermission: false,
+  hasMicPermission: false,
 };
 
 export default function InAppTranscriptionScreen(): React.JSX.Element {
@@ -97,6 +100,24 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
   const toggleEnabled = async (value: boolean): Promise<void> => {
     await NotificationListener.setCallTranscriptionEnabled(value);
     setStatus((s) => ({ ...s, enabled: value }));
+  };
+
+  const toggleAutoOpen = async (value: boolean): Promise<void> => {
+    await NotificationListener.setCallAutoOpen(value);
+    setStatus((s) => ({ ...s, autoOpenEnabled: value }));
+    if (value && !status.hasOverlayPermission) {
+      Alert.alert(
+        'One more permission',
+        'To open TaskMind automatically after a call, Android requires the "Display over other apps" permission.',
+        [
+          { text: 'Later', style: 'cancel' },
+          {
+            text: 'Grant now',
+            onPress: () => void NotificationListener.requestOverlayPermission(),
+          },
+        ]
+      );
+    }
   };
 
   const ready = status.apiKeySet && status.hasPhoneStatePermission && status.hasAllFilesAccess;
@@ -246,6 +267,36 @@ export default function InAppTranscriptionScreen(): React.JSX.Element {
               Finish the steps above to enable this.
             </Text>
           )}
+        </Card>
+
+        {/* Step 4 — Auto-open */}
+        <Card theme={theme} step="4" title="Auto-open after call">
+          <View style={styles.enableRow}>
+            <Text style={[styles.body, styles.flex1, { color: theme.onSurface }]}>
+              Open TaskMind automatically with the extracted tasks when the call ends
+            </Text>
+            <Switch
+              value={status.autoOpenEnabled}
+              onValueChange={(v) => void toggleAutoOpen(v)}
+              trackColor={{ true: Colors.primary500, false: theme.outline }}
+              thumbColor={Colors.white}
+            />
+          </View>
+          <View style={styles.enableRow}>
+            <Text style={[styles.note, styles.flex1, { color: theme.onSurfaceVariant }]}>
+              {status.hasOverlayPermission
+                ? '✓ "Display over other apps" granted — auto-open will work'
+                : 'Requires "Display over other apps" so the app can open itself'}
+            </Text>
+            {!status.hasOverlayPermission && (
+              <Pressable
+                onPress={() => void NotificationListener.requestOverlayPermission()}
+                style={styles.linkBtn}
+              >
+                <Text style={[styles.link, { color: theme.primary }]}>Grant</Text>
+              </Pressable>
+            )}
+          </View>
         </Card>
 
         <Text style={[styles.howTitle, { color: theme.onSurfaceVariant }]}>HOW IT WORKS</Text>

@@ -19,9 +19,14 @@ export interface TranscriptContext {
   callerLabel?: string; // phone number / name of the other party
 }
 
-const SYSTEM_PROMPT = `You are an action-item extractor for phone call transcripts. The transcript may be in Hindi, English, or Hinglish (mixed Hindi-English), and may contain speech-recognition errors — interpret the intended meaning, do not discard items because of imperfect transcription.
+const SYSTEM_PROMPT = `You are a precise action-item extractor for phone call transcripts. The transcript may be in Hindi, English, or Hinglish (mixed Hindi-English), and may contain speech-recognition errors — interpret the intended meaning.
 
-Find EVERY commitment, task, follow-up, and action item mentioned by either party. Be comprehensive.
+PRECISION RULES (accuracy matters more than recall):
+- Only extract commitments that were ACTUALLY SPOKEN. Never invent, infer, or embellish a task.
+- Merge near-duplicate commitments into one task.
+- If a section of the transcript is garbled or ambiguous, skip it rather than guessing.
+- Titles must reference concrete specifics from the call (names, amounts, documents).
+- Small talk, opinions, and general discussion are NOT tasks — a task requires someone agreeing or being asked to DO something specific.
 
 You will be told the date and time the call took place ("Call date"). Resolve ALL relative date/time expressions — "kal", "parso", "tomorrow", "next Monday", "aaj shaam", "by Friday", "in an hour", "end of week" — against that call date, NOT today's date. If no time or date is mentioned, set dueDate to null.
 
@@ -117,7 +122,9 @@ export async function extractTasksFromTranscript(
   apiKey?: string
 ): Promise<TranscriptTask[] | null> {
   const key = apiKey ?? getSetting('ai_api_key');
-  const model = getSetting('ai_model');
+  // Calls are rare and accuracy-critical — always use the strongest free-tier
+  // model here, independent of the high-volume notification classifier model.
+  const model = 'meta/llama-3.3-70b-instruct';
   if (!key) return null;
 
   const truncated =
