@@ -203,6 +203,28 @@ const NotificationListenerModule = {
     return NativeModule.getNvidiaApiKey() as Promise<string>;
   },
 
+  // Mirrors the MMKV Cloud-AI settings into native SharedPreferences so the
+  // background call pipeline can run LLM extraction with the app dead.
+  setAiCredentials(key: string, model: string): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setAiCredentials(key, model) as Promise<void>;
+  },
+
+  // One-shot navigation route stashed by the native pipeline / notification
+  // taps. Returns the route and clears it, or null when there is none.
+  popPendingNavRoute(): Promise<string | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.popPendingNavRoute() as Promise<string | null>;
+  },
+
+  addCallRecordReadyListener(
+    listener: (data: { recordId: string; callerLabel: string; taskCount: number }) => void
+  ) {
+    if (!emitter) return { remove: () => undefined };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (emitter as any).addListener('onCallRecordReady', listener) as { remove: () => void };
+  },
+
   setCallTranscriptionEnabled(enabled: boolean): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.setCallTranscriptionEnabled(enabled) as Promise<void>;

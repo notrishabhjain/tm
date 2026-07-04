@@ -135,6 +135,31 @@ export const conversationMessages = sqliteTable(
   })
 );
 
+// One row per transcribed phone call — the app's call memory. Written natively
+// by CallRecordStore.kt (background pipeline) and read by CallRecordRepository.
+// DDL must stay identical to CallRecordStore.ensureCallRecordsTable.
+export const callRecords = sqliteTable(
+  'call_records',
+  {
+    id: text('id').primaryKey(),
+    callerLabel: text('caller_label').notNull(),
+    callerNumber: text('caller_number'),
+    callTime: integer('call_time').notNull(),
+    durationSec: integer('duration_sec'),
+    recordingPath: text('recording_path'),
+    transcript: text('transcript').notNull(),
+    summary: text('summary'),
+    topics: text('topics').notNull().default('[]'),
+    taskIds: text('task_ids').notNull().default('[]'),
+    status: text('status').notNull().default('TRANSCRIBED'), // TRANSCRIBED | EXTRACTED | REVIEWED
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => ({
+    createdAtIdx: index('idx_call_records_created_at').on(table.createdAt),
+    recordingIdx: uniqueIndex('idx_call_records_recording').on(table.recordingPath),
+  })
+);
+
 export const discardedLog = sqliteTable('discarded_log', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   notificationId: text('notification_id').notNull().default(''),

@@ -7,22 +7,12 @@ import { useTheme } from '@/ui/theme';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { TaskRepository } from '@/data/repositories/TaskRepository';
-import { SenderStatsRepository } from '@/data/repositories/SenderStatsRepository';
-import { DiscardedLogRepository } from '@/data/repositories/DiscardedLogRepository';
-import { LearnedKeywordRepository } from '@/data/repositories/LearnedKeywordRepository';
 import { db } from '@/data/db/client';
-import { extractNgrams, languageForText } from '@/services/ngram-extractor';
-import { buildSenderKey, buildAppKey } from '@/services/signal-scorer';
-import { createGoogleTask } from '@/services/google-tasks';
+import { confirmReviewTask, rejectReviewTask } from '@/services/review-actions';
 import { refreshWidget } from '@/services/task-actions';
-import { appDisplayName } from '@/services/app-name-map';
-import { getSetting } from '@/data/storage/settings';
 import type { Task } from '@/domain/types';
 
 const taskRepo = new TaskRepository(db);
-const senderStatsRepo = new SenderStatsRepository(db);
-const discardedRepo = new DiscardedLogRepository(db);
-const learnedKwRepo = new LearnedKeywordRepository(db);
 
 export default function ConfirmationsScreen(): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -34,37 +24,7 @@ export default function ConfirmationsScreen(): React.JSX.Element {
   });
 
   const confirmMutation = useMutation({
-    mutationFn: async (task: Task) => {
-      await taskRepo.confirmTask(task.id);
-      const senderKey = buildSenderKey(task.sourceApp, task.sender ?? '');
-      await senderStatsRepo.incrementConfirm(senderKey);
-      // App-level learning: confirms lower this app's future thresholds
-      await senderStatsRepo.incrementConfirm(buildAppKey(task.sourceApp));
-      const text = task.body ?? task.title;
-      const ngrams = extractNgrams(text, 'EN');
-      if (ngrams.length > 0) {
-        try {
-          await learnedKwRepo.recordNgrams(ngrams, languageForText('EN'));
-        } catch {
-          // Non-fatal
-        }
-      }
-      if (getSetting('google_tasks_enabled') && !task.googleTaskId) {
-        const notesLines: string[] = [`Source: ${appDisplayName(task.sourceApp)}`];
-        if (task.body) notesLines.push(`\nContext:\n${task.body.slice(0, 500)}`);
-        void createGoogleTask({
-          title: task.title,
-          notes: notesLines.join('\n'),
-          dueDate: task.dueDate,
-        })
-          .then((googleTaskId) => {
-            if (googleTaskId) void taskRepo.setGoogleTaskId(task.id, googleTaskId);
-          })
-          .catch(() => {
-            /* non-fatal */
-          });
-      }
-    },
+    mutationFn: (task: Task) => confirmReviewTask(task),
     onMutate: async (task: Task) => {
       await queryClient.cancelQueries({ queryKey: ['tasks', 'confirmation'] });
       const previous = queryClient.getQueryData<Task[]>(['tasks', 'confirmation']);
@@ -86,34 +46,7 @@ export default function ConfirmationsScreen(): React.JSX.Element {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: async (task: Task) => {
-      await discardedRepo.insert({
-        notificationId: task.id,
-        notificationKey: task.notificationKey,
-        sourceApp: task.sourceApp,
-        sender: task.sender ?? null,
-        bodyPreview: task.body ?? task.title,
-        reason: 'USER_REJECTED',
-        confidence: task.confidence,
-        createdAt: Date.now(),
-      });
-      const senderKey = buildSenderKey(task.sourceApp, task.sender ?? '');
-      await senderStatsRepo.incrementReject(senderKey);
-      // App-level learning: rejects raise this app's future thresholds
-      await senderStatsRepo.incrementReject(buildAppKey(task.sourceApp));
-      // Negative keyword learning: penalise the ngrams of the rejected message
-      // so similar messages score lower next time.
-      const rejectedText = task.body ?? task.title;
-      const rejectedNgrams = extractNgrams(rejectedText, 'EN');
-      if (rejectedNgrams.length > 0) {
-        try {
-          await learnedKwRepo.penalizeNgrams(rejectedNgrams, languageForText('EN'));
-        } catch {
-          // Non-fatal
-        }
-      }
-      await taskRepo.deleteTask(task.id);
-    },
+    mutationFn: (task: Task) => rejectReviewTask(task),
     onMutate: async (task: Task) => {
       await queryClient.cancelQueries({ queryKey: ['tasks', 'confirmation'] });
       const previous = queryClient.getQueryData<Task[]>(['tasks', 'confirmation']);

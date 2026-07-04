@@ -28,6 +28,7 @@ class NotificationListenerModule : Module() {
             "onNotification",
             "onQuickActionDoneTop",
             "onQuickActionOpen",
+            "onCallRecordReady",
             "onManualTrigger",
             "onCallTranscriptReady",
             "onCallTranscriptionTestLog"
@@ -274,6 +275,27 @@ class NotificationListenerModule : Module() {
                 .edit().putString("nvidia_api_key", key.trim()).apply()
         }
 
+        // Mirrors the MMKV Cloud-AI settings into SharedPreferences so the
+        // native call pipeline (CallTranscriptionService → NvidiaLlmClient)
+        // can run LLM extraction while the JS process is dead.
+        AsyncFunction("setAiCredentials") { key: String, model: String ->
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putString("ai_api_key", key.trim())
+                .putString("ai_model", model.trim())
+                .apply()
+        }
+
+        // One-shot navigation route written by the native pipeline (or
+        // MainActivity intent extras). JS peeks this on launch/foreground and
+        // routes to it — survives a cold start from a notification tap.
+        AsyncFunction("popPendingNavRoute") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            val route = prefs.getString("pending_nav_route", null)
+            if (route != null) prefs.edit().remove("pending_nav_route").apply()
+            route
+        }
+
         AsyncFunction("getNvidiaApiKey") {
             context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
                 .getString("nvidia_api_key", null).orEmpty()
@@ -303,7 +325,9 @@ class NotificationListenerModule : Module() {
                 appContext.permissions,
                 promise,
                 android.Manifest.permission.READ_PHONE_STATE,
-                android.Manifest.permission.READ_CALL_LOG
+                android.Manifest.permission.READ_CALL_LOG,
+                // Resolves caller numbers to contact names in CallerResolver
+                android.Manifest.permission.READ_CONTACTS
             )
         }
 
@@ -446,6 +470,24 @@ class NotificationListenerModule : Module() {
                     "extractedText" to extractedText,
                     "sender" to sender,
                     "screenshotPath" to (screenshotPath ?: ""),
+                )
+            )
+        }
+
+        /** Writes the one-shot nav route consumed by popPendingNavRoute. */
+        fun setPendingNavRoute(context: Context, route: String) {
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit().putString("pending_nav_route", route).apply()
+        }
+
+        /** Live-app path: native pipeline finished a call record. */
+        fun sendCallRecordReady(recordId: String, callerLabel: String, taskCount: Int) {
+            instance?.sendEvent(
+                "onCallRecordReady",
+                mapOf(
+                    "recordId" to recordId,
+                    "callerLabel" to callerLabel,
+                    "taskCount" to taskCount
                 )
             )
         }

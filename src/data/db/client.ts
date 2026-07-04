@@ -139,6 +139,24 @@ export function initializeDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_llm_metrics_created_at ON llm_metrics (created_at);
     CREATE INDEX IF NOT EXISTS idx_llm_metrics_model ON llm_metrics (model_id);
 
+    CREATE TABLE IF NOT EXISTS call_records (
+      id TEXT PRIMARY KEY NOT NULL,
+      caller_label TEXT NOT NULL,
+      caller_number TEXT,
+      call_time INTEGER NOT NULL,
+      duration_sec INTEGER,
+      recording_path TEXT,
+      transcript TEXT NOT NULL,
+      summary TEXT,
+      topics TEXT NOT NULL DEFAULT '[]',
+      task_ids TEXT NOT NULL DEFAULT '[]',
+      status TEXT NOT NULL DEFAULT 'TRANSCRIBED',
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_call_records_created_at ON call_records (created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_call_records_recording
+      ON call_records (recording_path) WHERE recording_path IS NOT NULL;
+
     CREATE TABLE IF NOT EXISTS conversation_messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
       conversation_key TEXT NOT NULL,

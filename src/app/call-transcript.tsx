@@ -162,6 +162,7 @@ export default function CallTranscriptScreen(): React.JSX.Element {
           title: t.title,
           body: taskBody,
           sourceApp: 'call.transcript',
+          sender: payloadRef.current?.callerLabel,
           priority: t.priority,
           confidence: 0.85,
           needsConfirmation: false,

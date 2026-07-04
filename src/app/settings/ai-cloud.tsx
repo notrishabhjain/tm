@@ -17,6 +17,14 @@ import { Button } from '@/ui/components/Button';
 import { getSetting, setSetting } from '@/data/storage/settings';
 import { testConnection } from '@/services/ai-classifier';
 import { runDailyDigestNow } from '@/services/ai-digest';
+import NotificationListener from '../../../modules/notification-listener/src';
+
+// Mirror the Cloud-AI credentials into native SharedPreferences so the
+// background call pipeline (CallTranscriptionService) can use them while the
+// JS process is dead.
+function mirrorAiCredentials(key: string, model: string): void {
+  void NotificationListener.setAiCredentials(key, model).catch(() => {});
+}
 
 const NVIDIA_MODELS = [
   { id: 'meta/llama-3.1-8b-instruct', label: 'Llama 3.1 8B (fast, default)' },
@@ -54,22 +62,28 @@ export default function AiCloudScreen(): React.JSX.Element {
       // can read it — don't require a separate "Save key" tap before toggling on.
       if (val && trimmedKey) {
         setSetting('ai_api_key', trimmedKey);
+        mirrorAiCredentials(trimmedKey, model);
       }
       setAiEnabled(val);
       setSetting('ai_enabled', val);
     },
-    [apiKey]
+    [apiKey, model]
   );
 
   const handleKeySave = useCallback(() => {
     setSetting('ai_api_key', apiKey.trim());
+    mirrorAiCredentials(apiKey.trim(), model);
     Alert.alert('Saved', 'API key saved.');
-  }, [apiKey]);
+  }, [apiKey, model]);
 
-  const handleModelSelect = useCallback((id: string) => {
-    setModel(id);
-    setSetting('ai_model', id);
-  }, []);
+  const handleModelSelect = useCallback(
+    (id: string) => {
+      setModel(id);
+      setSetting('ai_model', id);
+      mirrorAiCredentials(apiKey.trim(), id);
+    },
+    [apiKey]
+  );
 
   const handleDigestToggle = useCallback((val: boolean) => {
     setDigestEnabled(val);
@@ -103,6 +117,7 @@ export default function AiCloudScreen(): React.JSX.Element {
       return;
     }
     setSetting('ai_api_key', key); // persist so the notification handler can read it
+    mirrorAiCredentials(key, model);
     setTesting(true);
     setTestResult(null);
     const result = await testConnection(key, model);

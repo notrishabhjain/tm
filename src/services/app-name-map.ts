@@ -43,6 +43,9 @@ const APP_NAMES: Record<string, string> = {
   'com.netflix.mediaclient': 'Netflix',
   'com.spotify.music': 'Spotify',
   'com.android.chrome': 'Chrome',
+  'call.transcript': 'Phone call',
+  manual: 'Manual entry',
+  'manual.share': 'Shared text',
 };
 
 export function appDisplayName(packageName: string): string {

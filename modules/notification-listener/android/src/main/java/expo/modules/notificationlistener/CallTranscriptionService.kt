@@ -3,6 +3,7 @@ package expo.modules.notificationlistener
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -10,9 +11,16 @@ import android.os.IBinder
 import android.util.Log
 
 /**
- * Foreground service that runs the in-app call-transcription pipeline:
- * find the newest call recording, decode it to PCM, send to NVIDIA cloud ASR
- * (Whisper Large V3 over gRPC), and hand the transcript to the JS review screen.
+ * Foreground service that runs the FULL in-app call pipeline in the background:
+ * find the newest call recording, decode to PCM, transcribe via NVIDIA cloud
+ * ASR, resolve the caller (call log + contacts), run LLM analysis (summary +
+ * topics + tasks), write everything into the app DB as Review items, and post
+ * a tappable notification — all without the app being open.
+ *
+ * Fallback: if LLM analysis or the DB write fails, degrade to the legacy
+ * behavior (stash transcript in prefs; the JS screen extracts on app open).
+ * The success path never writes pending_transcript_*, which is what keeps the
+ * two paths from double-creating tasks.
  */
 class CallTranscriptionService : Service() {
 
@@ -20,6 +28,15 @@ class CallTranscriptionService : Service() {
         private const val TAG = "CallTranscriptionSvc"
         const val NOTIFICATION_ID = 1002
         const val CHANNEL_ID = "taskmind_call_transcription"
+        const val RESULT_CHANNEL_ID = "taskmind_call_results"
+
+        private const val SAMPLE_RATE = 16000
+        // Calls shorter than this skip LLM analysis entirely (user choice —
+        // token thrift). The record is still stored silently for call memory.
+        private const val MIN_ANALYSIS_DURATION_SEC = 60
+        private const val MIN_ANALYSIS_TRANSCRIPT_CHARS = 150
+        private const val MAX_TRANSCRIPT_CHARS = 8_000
+        private const val DEFAULT_MODEL = "meta/llama-3.1-8b-instruct"
     }
 
     private lateinit var notificationManager: NotificationManager
@@ -28,11 +45,11 @@ class CallTranscriptionService : Service() {
     override fun onCreate() {
         super.onCreate()
         notificationManager = getSystemService(NotificationManager::class.java)
-        createNotificationChannel()
+        createNotificationChannels()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startForeground(NOTIFICATION_ID, buildProgressNotification())
 
         if (worker?.isAlive == true) return START_NOT_STICKY
 
@@ -54,8 +71,8 @@ class CallTranscriptionService : Service() {
         val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("call_transcription_enabled", false)) return
 
-        val apiKey = prefs.getString("nvidia_api_key", null).orEmpty()
-        if (apiKey.isBlank()) {
+        val asrKey = prefs.getString("nvidia_api_key", null).orEmpty()
+        if (asrKey.isBlank()) {
             Log.w(TAG, "NVIDIA API key not set — skipping transcription")
             return
         }
@@ -84,8 +101,9 @@ class CallTranscriptionService : Service() {
             CallRecordingFinder.markProcessed(this, recording)
             return
         }
+        val durationSec = pcm.size / SAMPLE_RATE
 
-        val result = NvidiaAsrClient.transcribe(apiKey, pcm)
+        val result = NvidiaAsrClient.transcribe(asrKey, pcm)
         CallRecordingFinder.markProcessed(this, recording)
 
         val text = when (result) {
@@ -94,47 +112,139 @@ class CallTranscriptionService : Service() {
             NvidiaAsrClient.Result.NoApiKey  -> { Log.w(TAG, "NVIDIA API key missing"); return }
         }
 
-        val callInfo = CallLogHelper.lastCall(this)
-        val callerLabel = callInfo?.callerLabel
-            ?: recording.nameToCallerLabel()
-            ?: "Unknown"
-        val callTime = callInfo?.endedAt ?: recording.lastModified()
+        // Caller resolution with retry + contacts lookup (fixes "Unknown").
+        val caller = CallerResolver.resolve(this, recording)
+        val callTime = caller.endedAt
 
-        getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE).edit()
+        // ── Short call: store silently, no LLM, no notification ─────────────
+        if (durationSec < MIN_ANALYSIS_DURATION_SEC ||
+            text.trim().length < MIN_ANALYSIS_TRANSCRIPT_CHARS
+        ) {
+            Log.d(TAG, "Short call (${durationSec}s, ${text.length} chars) — stored without analysis")
+            CallRecordStore.insertCallRecordWithTasks(
+                this, caller, recording.absolutePath, text, extraction = null, callTimeMs = callTime
+            )
+            TaskWidgetProvider.triggerUpdate(this)
+            return
+        }
+
+        // ── LLM analysis ─────────────────────────────────────────────────────
+        // LLM key mirrored from MMKV by setAiCredentials; fall back to ASR key
+        // (same NVIDIA platform).
+        val llmKey = prefs.getString("ai_api_key", null).orEmpty().ifBlank { asrKey }
+        val model = prefs.getString("ai_model", null).orEmpty().ifBlank { DEFAULT_MODEL }
+        val capped = if (text.length > MAX_TRANSCRIPT_CHARS) {
+            text.take(MAX_TRANSCRIPT_CHARS) + "\n[transcript truncated]"
+        } else text
+
+        val llmResult = NvidiaLlmClient.extract(llmKey, model, capped, callTime, caller.label)
+
+        if (llmResult is NvidiaLlmClient.Result.Success) {
+            val inserted = CallRecordStore.insertCallRecordWithTasks(
+                this, caller, recording.absolutePath, text, llmResult.extraction, callTime
+            )
+            if (inserted != null) {
+                val route = "/call-review/${inserted.callRecordId}"
+                // Route survives a dead process; MainActivity also stashes the
+                // intent extra on warm starts (belt and suspenders).
+                NotificationListenerModule.setPendingNavRoute(this, route)
+                NotificationListenerModule.sendCallRecordReady(
+                    inserted.callRecordId, caller.label, inserted.taskIds.size
+                )
+                postResultNotification(
+                    recordId = inserted.callRecordId,
+                    title = "Call with ${caller.label}",
+                    text = when (inserted.taskIds.size) {
+                        0 -> "No action items — tap for summary"
+                        1 -> "1 task found — tap to review"
+                        else -> "${inserted.taskIds.size} tasks found — tap to review"
+                    },
+                    route = route
+                )
+                TaskWidgetProvider.triggerUpdate(this)
+                return
+            }
+            // DB write failed → fall through to legacy stash below.
+        }
+
+        // ── Fallback: legacy behavior (JS extracts on app open) ─────────────
+        Log.w(TAG, "Falling back to prefs stash (LLM or DB failure)")
+        prefs.edit()
             .putString("pending_transcript_text", text)
             .putLong("pending_transcript_time", callTime)
-            .putString("pending_transcript_caller", callerLabel)
+            .putString("pending_transcript_caller", caller.label)
             .apply()
-
-        NotificationListenerModule.sendCallTranscriptReady(text, callTime, callerLabel)
+        NotificationListenerModule.sendCallTranscriptReady(text, callTime, caller.label)
+        postResultNotification(
+            recordId = recording.absolutePath,
+            title = "Call with ${caller.label}",
+            text = "Transcript ready — tap to analyse",
+            route = null // resume-check navigation reads the prefs stash
+        )
         TaskWidgetProvider.triggerUpdate(this)
     }
 
-    private fun java.io.File.nameToCallerLabel(): String? {
-        val match = Regex("\\+?[0-9]{6,15}").find(this.nameWithoutExtension)
-        return match?.value
+    private fun postResultNotification(
+        recordId: String,
+        title: String,
+        text: String,
+        route: String?
+    ) {
+        try {
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            if (route != null) launchIntent.putExtra("taskmind_nav_route", route)
+            // Unique requestCode per call so successive notifications don't
+            // clobber each other's extras.
+            val pi = PendingIntent.getActivity(
+                this,
+                recordId.hashCode(),
+                launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val notification = Notification.Builder(this, RESULT_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .build()
+            notificationManager.notify(recordId.hashCode(), notification)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to post result notification: ${e.message}")
+        }
     }
 
-    private fun buildNotification(): Notification {
+    private fun buildProgressNotification(): Notification {
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
             .setContentTitle("TaskMind")
-            .setContentText("Transcribing your last call…")
+            .setContentText("Analysing your last call…")
             .setOngoing(true)
             .setShowWhen(false)
             .build()
     }
 
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Call Transcription",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Shown briefly while a call is being transcribed."
-            setShowBadge(false)
-        }
-        notificationManager.createNotificationChannel(channel)
+    private fun createNotificationChannels() {
+        notificationManager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ID,
+                "Call Transcription",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shown briefly while a call is being transcribed."
+                setShowBadge(false)
+            }
+        )
+        notificationManager.createNotificationChannel(
+            NotificationChannel(
+                RESULT_CHANNEL_ID,
+                "Call task review",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Tasks and summary extracted from your calls."
+            }
+        )
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

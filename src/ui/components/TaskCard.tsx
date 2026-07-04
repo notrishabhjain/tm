@@ -39,6 +39,9 @@ function getSourceLabel(sourceApp: string): string {
     'com.microsoft.teams': 'Teams',
     'org.telegram.messenger': 'Telegram',
     'com.android.mms': 'SMS',
+    'call.transcript': 'Call',
+    manual: 'Manual',
+    'manual.share': 'Shared',
   };
   return labels[sourceApp] ?? sourceApp.split('.').pop() ?? sourceApp;
 }
@@ -168,9 +171,16 @@ export function TaskCard({
               {task.title}
             </Text>
             <View style={styles.metaRow}>
+              {task.sourceApp === 'call.transcript' ? (
+                // Distinct call chip so call-derived tasks stand out at a glance
+                <Text style={[styles.callChip, { color: Colors.primary500 }]} numberOfLines={1}>
+                  📞 Call{task.sender ? ` · ${task.sender}` : ''}
+                </Text>
+              ) : null}
               <Text style={[styles.meta, { color: theme.onSurfaceVariant }]} numberOfLines={1}>
-                {task.sender ? `${task.sender} · ` : ''}
-                {getSourceLabel(task.sourceApp)} · {formatRelativeTime(task.createdAt)}
+                {task.sourceApp === 'call.transcript'
+                  ? formatRelativeTime(task.createdAt)
+                  : `${task.sender ? `${task.sender} · ` : ''}${getSourceLabel(task.sourceApp)} · ${formatRelativeTime(task.createdAt)}`}
               </Text>
               {task.needsConfirmation && (
                 <Text style={[styles.reviewTag, { color: Colors.primary500 }]}>Review</Text>
@@ -237,6 +247,7 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 8 },
   meta: { fontSize: 13, flex: 1, fontWeight: '400' },
   reviewTag: { fontSize: 12, fontWeight: '600' },
+  callChip: { fontSize: 12, fontWeight: '700', flexShrink: 1 },
   rightCol: { marginLeft: 12, alignItems: 'flex-end', gap: 6, alignSelf: 'center' },
   dueText: { fontSize: 12, fontWeight: '600' },
   checkBtn: {
