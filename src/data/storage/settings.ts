@@ -11,39 +11,16 @@ const _mem = new Map<string, boolean | number | string>();
 
 // Built-in NVIDIA Cloud-AI key (owner's personal key, included at their request
 // so a fresh install needs zero setup). Char-code encoded to satisfy repo
-// secret-scanning, same pattern as the Google OAuth credentials. Overridable
-// in Settings → Intelligence → Cloud AI.
+// secret-scanning, same pattern as the Google OAuth credentials.
 // prettier-ignore
 const DEFAULT_AI_API_KEY = String.fromCharCode(110,118,97,112,105,45,118,66,118,74,109,105,111,74,85,105,115,79,49,48,100,122,84,68,50,68,84,75,103,121,95,106,121,100,65,65,98,76,72,70,119,97,72,56,67,89,51,67,115,97,119,85,54,74,83,73,86,80,81,66,117,119,48,57,95,108,75,83,114,90);
 
+// v2 settings — only what the pipe needs.
 export interface AppSettings {
-  onboarding_complete: boolean;
-  db_seeded: boolean;
   theme: 'system' | 'light' | 'dark';
-  language: string;
-  nudge_freq_minutes: number;
-  quiet_hours_start: string;
-  quiet_hours_end: string;
-  urgent_override_quiet: boolean;
-  rule_weight: number;
-  model_weight: number;
-  model_weight_user_set: boolean;
-  model_downloaded: boolean;
-  model_version: string;
-  model_url: string;
-  email_enabled: boolean;
-  email_send_time: string;
-  auto_backup_enabled: boolean;
-  diag_notification_buffer: string;
-  diag_extraction_buffer: string;
-  // Cloud AI
-  ai_enabled: boolean;
   ai_api_key: string;
   ai_model: string;
-  ai_digest_enabled: boolean;
-  ai_digest_time: string;
-  ai_last_digest_date: string;
-  // Google Tasks integration
+  // Google Tasks OAuth + list cache
   google_tasks_enabled: boolean;
   google_tasks_client_id: string;
   google_tasks_client_secret: string;
@@ -58,31 +35,9 @@ export interface AppSettings {
 }
 
 const DEFAULTS: AppSettings = {
-  onboarding_complete: false,
-  db_seeded: false,
   theme: 'system',
-  language: 'en',
-  nudge_freq_minutes: 60,
-  quiet_hours_start: '22:00',
-  quiet_hours_end: '07:00',
-  urgent_override_quiet: true,
-  rule_weight: 1.0,
-  model_weight: 0.3,
-  model_weight_user_set: false,
-  model_downloaded: false,
-  model_version: '',
-  model_url: '',
-  email_enabled: false,
-  email_send_time: '21:00',
-  auto_backup_enabled: true,
-  diag_notification_buffer: '[]',
-  diag_extraction_buffer: '[]',
-  ai_enabled: true,
   ai_api_key: DEFAULT_AI_API_KEY,
-  ai_model: 'meta/llama-3.1-8b-instruct',
-  ai_digest_enabled: false,
-  ai_digest_time: '09:00',
-  ai_last_digest_date: '',
+  ai_model: 'meta/llama-3.3-70b-instruct',
   google_tasks_enabled: false,
   google_tasks_client_id: '',
   google_tasks_client_secret: '',
@@ -104,7 +59,10 @@ export function getSetting<K extends keyof AppSettings>(key: K): AppSettings[K] 
     } else if (typeof defaultVal === 'number') {
       return (_storage.getNumber(key) ?? defaultVal) as AppSettings[K];
     }
-    return (_storage.getString(key) ?? defaultVal) as AppSettings[K];
+    // Empty string = unset → fall back to the default (matters for the
+    // built-in API key when a user previously cleared the field).
+    const stored = _storage.getString(key);
+    return (stored != null && stored !== '' ? stored : defaultVal) as AppSettings[K];
   }
   return (_mem.get(key) ?? defaultVal) as AppSettings[K];
 }

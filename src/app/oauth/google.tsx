@@ -21,7 +21,7 @@ export default function GoogleOAuthCallback(): React.JSX.Element {
         'No authorization code received. Check that your Client ID is a Desktop app credential.'
       );
       setStatus('error');
-      redirectTimer = setTimeout(() => router.replace('/settings/google-tasks'), 3000);
+      redirectTimer = setTimeout(() => router.replace('/'), 3000);
       return () => {
         if (redirectTimer) clearTimeout(redirectTimer);
       };
@@ -36,7 +36,7 @@ export default function GoogleOAuthCallback(): React.JSX.Element {
       }
       redirectTimer = setTimeout(
         () => {
-          router.replace('/settings/google-tasks');
+          router.replace('/');
         },
         ok ? 1200 : 3000
       );

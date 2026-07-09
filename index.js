@@ -2,14 +2,18 @@ import { registerRootComponent } from 'expo';
 import { AppRegistry } from 'react-native';
 
 import App from './src/app/_layout';
-import { handleNotification } from './src/services/notification-handler';
+import { handleNotification, flushOutbox } from './src/services/pipeline';
 
-// Background notification processing. The native TaskMindNotificationListenerService
-// starts this Headless JS task (TaskMindHeadlessTaskService) whenever a notification
-// arrives while the app's JS context is dead (app swiped away / killed). It runs the
-// exact same pipeline as the in-app path so AI classification, task creation and the
-// persistent notification keep working without the user opening the app.
+// Background processing. The native side starts this Headless JS task whenever
+// work arrives while the app's JS context is dead:
+//  - notification captured  -> run the pipeline (LLM decision -> Google Tasks)
+//  - jobType "flush_outbox" -> push queued tasks (e.g. from a finished call
+//    analysis) to Google Tasks
 AppRegistry.registerHeadlessTask('TaskMindNotificationHandler', () => async (taskData) => {
+  if (taskData && taskData.jobType === 'flush_outbox') {
+    await flushOutbox();
+    return;
+  }
   let thread = [];
   try {
     thread = taskData && taskData.threadJson ? JSON.parse(taskData.threadJson) : [];

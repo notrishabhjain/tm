@@ -52,22 +52,34 @@ export function appDisplayName(packageName: string): string {
   return APP_NAMES[packageName] ?? packageName.split('.').pop() ?? packageName;
 }
 
+/**
+ * The v2 pipeline monitors exactly these apps — every messaging app where a
+ * human might assign the user a task. Pushed to the native notification filter
+ * on each boot.
+ */
+export const MESSAGING_APPS: string[] = [
+  'com.whatsapp',
+  'com.whatsapp.w4b',
+  'org.telegram.messenger',
+  'org.telegram.plus',
+  'org.thoughtcrime.securesms',
+  'com.facebook.orca',
+  'com.discord',
+  'com.skype.raider',
+  'com.viber.voip',
+  'com.snapchat.android',
+  'com.google.android.apps.messaging',
+  'com.samsung.android.messaging',
+  'com.android.mms',
+  'com.microsoft.teams',
+  'com.Slack',
+  'com.google.android.gm',
+  'com.microsoft.office.outlook',
+];
+
 /** True for apps that typically send personal/direct messages requiring replies. */
 export function isMessagingApp(packageName: string): boolean {
-  return [
-    'com.whatsapp',
-    'com.whatsapp.w4b',
-    'org.telegram.messenger',
-    'org.telegram.plus',
-    'com.facebook.orca',
-    'com.discord',
-    'com.skype.raider',
-    'com.viber.voip',
-    'com.snapchat.android',
-    'com.google.android.apps.messaging',
-    'com.samsung.android.messaging',
-    'com.android.mms',
-  ].includes(packageName);
+  return MESSAGING_APPS.includes(packageName);
 }
 
 /** True for apps that are almost always informational/promotional with no user action. */

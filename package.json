@@ -16,7 +16,6 @@
     "build:android:release": "eas build --platform android --profile production --local",
     "prebuild": "expo prebuild --platform android --clean",
     "db:generate": "drizzle-kit generate",
-    "db:seed": "tsx scripts/seed-db.ts",
     "android": "expo run:android",
     "ios": "expo run:ios"
   },

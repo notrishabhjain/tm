@@ -13,7 +13,6 @@ class BootReceiver : BroadcastReceiver() {
             context.startForegroundService(
                 Intent(context, TaskMindForegroundService::class.java)
             )
-            TaskWidgetProvider.triggerUpdate(context)
         }
     }
 }

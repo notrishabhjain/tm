@@ -81,46 +81,6 @@ function withNotificationListenerManifest(config) {
       });
     }
 
-    // QuickActionReceiver
-    const qaExists = application.receiver.some(
-      (r) => r.$?.['android:name'] === 'expo.modules.notificationlistener.QuickActionReceiver'
-    );
-    if (!qaExists) {
-      application.receiver.push({
-        $: {
-          'android:name': 'expo.modules.notificationlistener.QuickActionReceiver',
-          'android:exported': 'false',
-        },
-      });
-    }
-
-    // TaskWidgetProvider
-    const widgetExists = application.receiver.some(
-      (r) => r.$?.['android:name'] === 'expo.modules.notificationlistener.TaskWidgetProvider'
-    );
-    if (!widgetExists) {
-      application.receiver.push({
-        $: {
-          'android:name': 'expo.modules.notificationlistener.TaskWidgetProvider',
-          'android:exported': 'true',
-          'android:label': 'TaskMind Tasks',
-        },
-        'intent-filter': [
-          {
-            action: [{ $: { 'android:name': 'android.appwidget.action.APPWIDGET_UPDATE' } }],
-          },
-        ],
-        'meta-data': [
-          {
-            $: {
-              'android:name': 'android.appwidget.provider',
-              'android:resource': '@xml/task_widget_info',
-            },
-          },
-        ],
-      });
-    }
-
     // PhoneStateReceiver — static call-ended trigger for call transcription.
     // Must stay in sync with the hand-maintained android/ manifest.
     const phoneStateExists = application.receiver.some(
@@ -138,55 +98,6 @@ function withNotificationListenerManifest(config) {
           },
         ],
       });
-    }
-
-    // TaskMindAccessibilityService — focus-lock foreground-app detection.
-    const a11yExists = application.service.some(
-      (s) =>
-        s.$?.['android:name'] === 'expo.modules.notificationlistener.TaskMindAccessibilityService'
-    );
-    if (!a11yExists) {
-      application.service.push({
-        $: {
-          'android:name': 'expo.modules.notificationlistener.TaskMindAccessibilityService',
-          'android:exported': 'true',
-          'android:label': 'TaskMind Focus Service',
-          'android:permission': 'android.permission.BIND_ACCESSIBILITY_SERVICE',
-        },
-        'intent-filter': [
-          {
-            action: [
-              { $: { 'android:name': 'android.accessibilityservice.AccessibilityService' } },
-            ],
-          },
-        ],
-        'meta-data': [
-          {
-            $: {
-              'android:name': 'android.accessibilityservice',
-              'android:resource': '@xml/accessibility_service_config',
-            },
-          },
-        ],
-      });
-    }
-
-    // App shortcuts meta-data on MainActivity ("Voice task" long-press shortcut)
-    const activities = application.activity ?? [];
-    const mainActivity = activities.find((a) => a.$?.['android:name'] === '.MainActivity');
-    if (mainActivity) {
-      mainActivity['meta-data'] = mainActivity['meta-data'] ?? [];
-      const shortcutsExists = mainActivity['meta-data'].some(
-        (m) => m.$?.['android:name'] === 'android.app.shortcuts'
-      );
-      if (!shortcutsExists) {
-        mainActivity['meta-data'].push({
-          $: {
-            'android:name': 'android.app.shortcuts',
-            'android:resource': '@xml/shortcuts',
-          },
-        });
-      }
     }
 
     return modConfig;

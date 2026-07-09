@@ -1,4 +1,4 @@
-import type { Priority } from '@/domain/types';
+type Priority = 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
 
 export const Colors = {
   // Primary brand — electric violet ramp
