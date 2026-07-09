@@ -16,31 +16,13 @@ export interface NotificationData {
   isGroup: boolean;
   // MessagingStyle thread — last N messages from the conversation
   thread: ThreadMessage[];
-  // Android metadata for app-context scoring
-  category: string; // CATEGORY_MESSAGE, CATEGORY_EMAIL, etc.
+  // Android metadata
+  category: string;
   channelId: string;
-  importance: number; // 0-5 (IMPORTANCE_NONE to IMPORTANCE_HIGH)
-}
-
-export interface PersistentNotificationParams {
-  pendingCount: number;
-  urgentCount: number;
-  taskTexts: string[];
+  importance: number;
 }
 
 export type PermissionStatus = 'granted' | 'denied' | 'unknown';
-
-export interface FocusState {
-  enabled: boolean; // auto-lock on URGENT tasks
-  sessionEndsAt: number; // epoch ms of an active manual session (0 = none)
-  bypassesLeft: number; // timed bypasses remaining today
-  maxBypasses: number;
-  hasOverlayPermission: boolean; // SYSTEM_ALERT_WINDOW granted
-  accessibilityEnabled: boolean; // accessibility service enabled
-  lockActive: boolean; // lock currently in effect right now
-}
-
-export type NotificationEvent = 'onNotification' | 'onQuickActionDoneTop';
 
 export interface CallTranscriptionStatus {
   enabled: boolean;
@@ -48,15 +30,6 @@ export interface CallTranscriptionStatus {
   hasCallLogPermission: boolean;
   hasAllFilesAccess: boolean;
   apiKeySet: boolean;
-  autoOpenEnabled: boolean;
-  hasOverlayPermission: boolean;
-  hasMicPermission: boolean;
-}
-
-export interface CallTranscriptReadyEvent {
-  text: string;
-  callTime: number;
-  callerLabel: string;
 }
 
 export interface CallDirReport {

@@ -1,11 +1,8 @@
 import { requireNativeModule, EventEmitter } from 'expo-modules-core';
 import type {
   NotificationData,
-  PersistentNotificationParams,
   PermissionStatus,
-  FocusState,
   CallTranscriptionStatus,
-  CallTranscriptReadyEvent,
   CallDiagnostics,
   CallTranscriptionTestResult,
 } from './types';
@@ -25,6 +22,8 @@ try {
 }
 
 const NotificationListenerModule = {
+  // ── Notification listener ─────────────────────────────────────────────────
+
   getPermissionStatus(): Promise<PermissionStatus> {
     if (!NativeModule) return Promise.resolve('denied' as PermissionStatus);
     return NativeModule.getPermissionStatus() as Promise<PermissionStatus>;
@@ -55,91 +54,9 @@ const NotificationListenerModule = {
     return NativeModule.setMonitoredApps(packageNames) as Promise<void>;
   },
 
-  getMonitoredApps(): Promise<string[]> {
-    if (!NativeModule) return Promise.resolve([]);
-    return NativeModule.getMonitoredApps() as Promise<string[]>;
-  },
-
-  updatePersistentNotification(params: PersistentNotificationParams): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.updatePersistentNotification(params) as Promise<void>;
-  },
-
-  hidePersistentNotification(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.hidePersistentNotification() as Promise<void>;
-  },
-
-  updateWidget(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.updateWidget() as Promise<void>;
-  },
-
-  peekShareIntent(): Promise<{ text: string; subject: string | null } | null> {
-    if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.peekShareIntent() as Promise<{
-      text: string;
-      subject: string | null;
-    } | null>;
-  },
-
-  clearShareIntent(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.clearShareIntent() as Promise<void>;
-  },
-
   scanActiveNotifications(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.scanActiveNotifications() as Promise<void>;
-  },
-
-  focusGetState(): Promise<FocusState> {
-    if (!NativeModule)
-      return Promise.resolve({
-        enabled: false,
-        sessionEndsAt: 0,
-        bypassesLeft: 0,
-        maxBypasses: 3,
-        hasOverlayPermission: false,
-        accessibilityEnabled: false,
-        lockActive: false,
-      });
-    return NativeModule.focusGetState() as Promise<FocusState>;
-  },
-
-  focusSetEnabled(enabled: boolean): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.focusSetEnabled(enabled) as Promise<void>;
-  },
-
-  focusStartSession(minutes: number): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.focusStartSession(minutes) as Promise<void>;
-  },
-
-  focusEndSession(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.focusEndSession() as Promise<void>;
-  },
-
-  focusGetBlockApps(): Promise<string[]> {
-    if (!NativeModule) return Promise.resolve([]);
-    return NativeModule.focusGetBlockApps() as Promise<string[]>;
-  },
-
-  focusSetBlockApps(packages: string[]): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.focusSetBlockApps(packages) as Promise<void>;
-  },
-
-  requestOverlayPermission(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.requestOverlayPermission() as Promise<void>;
-  },
-
-  openAccessibilitySettings(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.openAccessibilitySettings() as Promise<void>;
   },
 
   addNotificationListener(listener: (data: NotificationData) => void) {
@@ -148,13 +65,14 @@ const NotificationListenerModule = {
     return (emitter as any).addListener('onNotification', listener) as { remove: () => void };
   },
 
-  addQuickActionDoneTopListener(listener: () => void) {
-    if (!emitter) return { remove: () => undefined };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (emitter as any).addListener('onQuickActionDoneTop', listener) as { remove: () => void };
+  // ── Confirmation notifications ────────────────────────────────────────────
+
+  postConfirmation(title: string, text: string): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.postConfirmation(title, text) as Promise<void>;
   },
 
-  // ── In-app call transcription (replaces Termux + MacroDroid) ─────────────
+  // ── Call transcription ────────────────────────────────────────────────────
 
   getCallTranscriptionStatus(): Promise<CallTranscriptionStatus> {
     if (!NativeModule) {
@@ -164,49 +82,9 @@ const NotificationListenerModule = {
         hasCallLogPermission: false,
         hasAllFilesAccess: false,
         apiKeySet: false,
-        autoOpenEnabled: true,
-        hasOverlayPermission: false,
-        hasMicPermission: false,
       });
     }
     return NativeModule.getCallTranscriptionStatus() as Promise<CallTranscriptionStatus>;
-  },
-
-  // Auto-open the app on the review screen when call analysis finishes.
-  setCallAutoOpen(enabled: boolean): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.setCallAutoOpen(enabled) as Promise<void>;
-  },
-
-  // ── Voice task capture (Whisper via the existing ASR pipeline) ───────────
-
-  requestMicPermission(): Promise<{ granted: boolean }> {
-    if (!NativeModule) return Promise.resolve({ granted: false });
-    return NativeModule.requestMicPermission() as Promise<{ granted: boolean }>;
-  },
-
-  startVoiceCapture(): Promise<boolean> {
-    if (!NativeModule) return Promise.resolve(false);
-    return NativeModule.startVoiceCapture() as Promise<boolean>;
-  },
-
-  stopVoiceCapture(): Promise<string | null> {
-    if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.stopVoiceCapture() as Promise<string | null>;
-  },
-
-  cancelVoiceCapture(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.cancelVoiceCapture() as Promise<void>;
-  },
-
-  transcribeFile(path: string): Promise<{ ok: boolean; text?: string; error?: string }> {
-    if (!NativeModule) return Promise.resolve({ ok: false, error: 'Native module unavailable' });
-    return NativeModule.transcribeFile(path) as Promise<{
-      ok: boolean;
-      text?: string;
-      error?: string;
-    }>;
   },
 
   setNvidiaApiKey(key: string): Promise<void> {
@@ -219,26 +97,9 @@ const NotificationListenerModule = {
     return NativeModule.getNvidiaApiKey() as Promise<string>;
   },
 
-  // Mirrors the MMKV Cloud-AI settings into native SharedPreferences so the
-  // background call pipeline can run LLM extraction with the app dead.
   setAiCredentials(key: string, model: string): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.setAiCredentials(key, model) as Promise<void>;
-  },
-
-  // One-shot navigation route stashed by the native pipeline / notification
-  // taps. Returns the route and clears it, or null when there is none.
-  popPendingNavRoute(): Promise<string | null> {
-    if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.popPendingNavRoute() as Promise<string | null>;
-  },
-
-  addCallRecordReadyListener(
-    listener: (data: { recordId: string; callerLabel: string; taskCount: number }) => void
-  ) {
-    if (!emitter) return { remove: () => undefined };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (emitter as any).addListener('onCallRecordReady', listener) as { remove: () => void };
   },
 
   setCallTranscriptionEnabled(enabled: boolean): Promise<void> {
@@ -266,24 +127,6 @@ const NotificationListenerModule = {
     return NativeModule.openAppSettings() as Promise<void>;
   },
 
-  peekPendingCallTranscript(): Promise<{
-    text: string;
-    callTime: number;
-    callerLabel: string;
-  } | null> {
-    if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.peekPendingCallTranscript() as Promise<{
-      text: string;
-      callTime: number;
-      callerLabel: string;
-    } | null>;
-  },
-
-  clearPendingCallTranscript(): Promise<void> {
-    if (!NativeModule) return Promise.resolve();
-    return NativeModule.clearPendingCallTranscript() as Promise<void>;
-  },
-
   getCallDiagnostics(): Promise<CallDiagnostics | null> {
     if (!NativeModule) return Promise.resolve(null);
     return NativeModule.getCallDiagnostics() as Promise<CallDiagnostics>;
@@ -302,14 +145,6 @@ const NotificationListenerModule = {
   simulateCallEnded(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.simulateCallEnded() as Promise<void>;
-  },
-
-  addCallTranscriptReadyListener(listener: (data: CallTranscriptReadyEvent) => void) {
-    if (!emitter) return { remove: () => undefined };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (emitter as any).addListener('onCallTranscriptReady', listener) as {
-      remove: () => void;
-    };
   },
 
   addCallTranscriptionTestLogListener(

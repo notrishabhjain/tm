@@ -1,7 +1,6 @@
 package com.taskmind.app
 import expo.modules.splashscreen.SplashScreenManager
 
-import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 
@@ -11,40 +10,11 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnable
 import com.facebook.react.defaults.DefaultReactActivityDelegate
 
 import expo.modules.ReactActivityDelegateWrapper
-import expo.modules.notificationlistener.NotificationListenerModule
 
 class MainActivity : ReactActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     SplashScreenManager.registerOnActivity(this)
     super.onCreate(null)
-    handleShareIntent(intent)
-    handleNavRouteExtra(intent)
-  }
-
-  override fun onNewIntent(intent: Intent?) {
-    super.onNewIntent(intent)
-    intent?.let {
-      handleShareIntent(it)
-      handleNavRouteExtra(it)
-    }
-  }
-
-  private fun handleShareIntent(intent: Intent) {
-    if (intent.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {
-      val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
-      val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
-      NotificationListenerModule.setShareIntent(text, subject)
-    }
-  }
-
-  // Notification taps and app shortcuts carry a target route as an extra.
-  // Stash it in prefs; JS peeks popPendingNavRoute on launch/foreground.
-  // (Covers the singleTask warm-start case where the cold-start pref written
-  // by CallTranscriptionService was already consumed.)
-  private fun handleNavRouteExtra(intent: Intent) {
-    intent.getStringExtra("taskmind_nav_route")?.let {
-      NotificationListenerModule.setPendingNavRoute(this, it)
-    }
   }
 
   /**

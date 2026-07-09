@@ -8,25 +8,20 @@ import org.json.JSONArray
 import java.io.File
 
 /**
- * Writes call records and their extracted tasks directly into the app's
- * expo-sqlite database from the native side, so the whole call→tasks pipeline
- * completes while the JS process is dead. Read patterns mirror
- * TaskWidgetProvider.readPendingTasks(); the DB is WAL so a second writer is
- * safe with a busy timeout.
- *
- * DDL here must stay identical to the call_records block in
- * src/data/db/client.ts.
+ * Native SQLite writer for the v2 pipeline. Writes:
+ *  - call_records  (call memory: transcript, summary, topics)
+ *  - outbox        (tasks waiting for Google Tasks creation — flushed by JS)
+ *  - activity_log  (the status screen's trail)
+ * DDL must stay identical to src/data/db/client.ts. The DB is WAL, so a second
+ * writer is safe with a busy timeout.
  */
 object CallRecordStore {
     private const val TAG = "CallRecordStore"
 
-    data class InsertResult(val callRecordId: String, val taskIds: List<String>)
-
-    /** Returns null when the DB doesn't exist yet (fresh install, app never ran). */
     private fun open(context: Context): SQLiteDatabase? {
         val dbFile = File(context.filesDir, "SQLite/taskmind.db")
         if (!dbFile.exists()) {
-            Log.w(TAG, "taskmind.db missing — app never launched; using fallback path")
+            Log.w(TAG, "taskmind.db missing — app never launched")
             return null
         }
         return try {
@@ -38,7 +33,7 @@ object CallRecordStore {
         }
     }
 
-    private fun ensureCallRecordsTable(db: SQLiteDatabase) {
+    private fun ensureTables(db: SQLiteDatabase) {
         db.execSQL(
             """
             CREATE TABLE IF NOT EXISTS call_records (
@@ -58,21 +53,41 @@ object CallRecordStore {
             """.trimIndent()
         )
         db.execSQL(
-            "CREATE INDEX IF NOT EXISTS idx_call_records_created_at ON call_records (created_at)"
-        )
-        db.execSQL(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_call_records_recording " +
                 "ON call_records (recording_path) WHERE recording_path IS NOT NULL"
         )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS outbox (
+              id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+              title TEXT NOT NULL,
+              notes TEXT,
+              due_date INTEGER,
+              created_at INTEGER NOT NULL,
+              attempts INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS activity_log (
+              id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+              source TEXT NOT NULL,
+              label TEXT NOT NULL,
+              outcome TEXT NOT NULL,
+              detail TEXT NOT NULL,
+              created_at INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
     }
 
-    // Matches TaskRepository.generateId() in src/data/repositories/TaskRepository.ts:
-    // "<epoch ms>-<7 base36 chars>". Keep the two generators in lockstep.
+    // Matches the JS id format "<epoch ms>-<7 base36 chars>".
     private var lastIdMs = 0L
     @Synchronized
     private fun generateId(): String {
         var ms = System.currentTimeMillis()
-        if (ms <= lastIdMs) ms = lastIdMs + 1 // uniqueness inside tight loops
+        if (ms <= lastIdMs) ms = lastIdMs + 1
         lastIdMs = ms
         val rand = (1..7)
             .map { "abcdefghijklmnopqrstuvwxyz0123456789".random() }
@@ -81,61 +96,26 @@ object CallRecordStore {
     }
 
     /**
-     * Inserts the call record and its tasks in one transaction.
-     * Returns null on any failure (caller falls back to the prefs-stash path).
-     * Tasks are created as Review items: needs_confirmation=1.
+     * Stores the call record and queues its tasks in the outbox, in one
+     * transaction. Returns the number of tasks queued, or -1 on failure
+     * (including "recording already processed" via the unique index).
      */
-    fun insertCallRecordWithTasks(
+    fun storeCallResult(
         context: Context,
         caller: CallerResolver.ResolvedCaller,
         recordingPath: String,
         transcript: String,
-        extraction: NvidiaLlmClient.CallExtraction?,   // null = TRANSCRIBED only (short call)
+        extraction: NvidiaLlmClient.CallExtraction?, // null = short call, stored silently
         callTimeMs: Long
-    ): InsertResult? {
-        val db = open(context) ?: return null
+    ): Int {
+        val db = open(context) ?: return -1
         return try {
             db.use { d ->
-                ensureCallRecordsTable(d)
+                ensureTables(d)
                 d.beginTransaction()
                 try {
-                    val recordId = generateId()
-                    val now = System.currentTimeMillis()
-                    val taskIds = mutableListOf<String>()
-
-                    if (extraction != null) {
-                        for (task in extraction.tasks) {
-                            val taskId = generateId()
-                            val body = buildString {
-                                if (!task.notes.isNullOrBlank()) {
-                                    append(task.notes).append("\n\n")
-                                }
-                                append("Call with ").append(caller.label)
-                                append("\n---\n")
-                                append(transcript.take(2000))
-                            }
-                            val cv = ContentValues().apply {
-                                put("id", taskId)
-                                put("title", task.title)
-                                put("body", body)
-                                put("source_app", "call.transcript")
-                                put("sender", caller.label)
-                                put("priority", task.priority)
-                                put("status", "PENDING")
-                                put("confidence", 0.85)
-                                put("rule_score", 0.0)
-                                put("language", "EN")
-                                put("matched_keywords", "[\"call_transcript\",\"ai_classifier\"]")
-                                put("needs_confirmation", 1)
-                                if (task.dueDateMs != null) put("due_date", task.dueDateMs)
-                                put("created_at", now)
-                            }
-                            if (d.insert("tasks", null, cv) != -1L) taskIds.add(taskId)
-                        }
-                    }
-
                     val recordCv = ContentValues().apply {
-                        put("id", recordId)
+                        put("id", generateId())
                         put("caller_label", caller.label)
                         if (caller.number != null) put("caller_number", caller.number)
                         put("call_time", callTimeMs)
@@ -149,28 +129,66 @@ object CallRecordStore {
                         } else {
                             put("status", "TRANSCRIBED")
                         }
-                        put("task_ids", JSONArray(taskIds).toString())
-                        put("created_at", now)
+                        put("created_at", System.currentTimeMillis())
                     }
-                    // CONFLICT_IGNORE: unique recording_path index is the
-                    // double-processing guard — a second run becomes a no-op.
                     val rowId = d.insertWithOnConflict(
                         "call_records", null, recordCv, SQLiteDatabase.CONFLICT_IGNORE
                     )
                     if (rowId == -1L) {
-                        Log.d(TAG, "Recording already has a call_record — skipping")
-                        return null
+                        Log.d(TAG, "Recording already processed — skipping")
+                        return -1
+                    }
+
+                    var queued = 0
+                    if (extraction != null) {
+                        for (task in extraction.tasks) {
+                            val notes = buildString {
+                                append("Priority: ").append(task.priority).append('\n')
+                                append("From: ").append(caller.label).append(" · Phone call\n")
+                                if (!task.notes.isNullOrBlank()) {
+                                    append("Notes: ").append(task.notes).append('\n')
+                                }
+                                append("---\n")
+                                append(extraction.summary.take(300))
+                            }
+                            val cv = ContentValues().apply {
+                                put("title", task.title)
+                                put("notes", notes)
+                                if (task.dueDateMs != null) put("due_date", task.dueDateMs)
+                                put("created_at", System.currentTimeMillis())
+                            }
+                            if (d.insert("outbox", null, cv) != -1L) queued++
+                        }
                     }
 
                     d.setTransactionSuccessful()
-                    InsertResult(recordId, taskIds)
+                    queued
                 } finally {
                     d.endTransaction()
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "insertCallRecordWithTasks failed: ${e.message}")
-            null
+            Log.w(TAG, "storeCallResult failed: ${e.message}")
+            -1
+        }
+    }
+
+    /** Appends a row to the activity log (best-effort). */
+    fun logActivity(context: Context, source: String, label: String, outcome: String, detail: String) {
+        val db = open(context) ?: return
+        try {
+            db.use { d ->
+                ensureTables(d)
+                d.insert("activity_log", null, ContentValues().apply {
+                    put("source", source)
+                    put("label", label.take(80))
+                    put("outcome", outcome)
+                    put("detail", detail.take(200))
+                    put("created_at", System.currentTimeMillis())
+                })
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "logActivity failed: ${e.message}")
         }
     }
 }
