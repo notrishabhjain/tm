@@ -88,11 +88,16 @@ export default function RootLayout(): React.JSX.Element {
     return () => sub.remove();
   }, []);
 
-  // On launch + every foreground: flush the outbox (offline retries, tasks
-  // queued by the native call pipeline) and re-analyse calls whose LLM pass
-  // failed in the background.
+  // On launch + every foreground, reconcile everything the background path may
+  // have missed (ColorOS & friends love blocking background service starts):
+  //  1. drain the native missed-notification queue into the pipeline
+  //  2. sweep the notification tray for anything still sitting there
+  //  3. flush the Google Tasks outbox
+  //  4. re-analyse calls whose LLM pass failed
   useEffect(() => {
     const sweep = (): void => {
+      void NotificationListener.drainPendingNotifications().catch(() => {});
+      void NotificationListener.scanActiveNotifications().catch(() => {});
       void flushOutbox().catch(() => {});
       void retryFailedCallAnalyses().catch(() => {});
     };

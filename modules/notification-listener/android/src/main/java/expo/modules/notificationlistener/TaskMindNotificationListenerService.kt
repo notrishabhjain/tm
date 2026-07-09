@@ -24,6 +24,16 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         fun triggerActiveScan() {
             serviceInstance?.scanActiveNotificationsInternal()
         }
+
+        /**
+         * Replays notifications queued while JS was unreachable (OEM blocked the
+         * headless start). Called when the JS context comes alive (module
+         * OnCreate) and from the app-open sweep — without this, queued items
+         * only drained when the NEXT notification arrived with the app open.
+         */
+        fun triggerDrain() {
+            serviceInstance?.drainPendingQueue()
+        }
         private const val DEDUP_WINDOW_MS = 60_000L
         private const val DEDUP_CACHE_MAX = 100
         private const val MAX_THREAD_MESSAGES = 10
@@ -268,7 +278,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         } catch (_: Exception) { }
     }
 
-    private fun drainPendingQueue() {
+    internal fun drainPendingQueue() {
         if (NotificationListenerModule.instance == null) return
         try {
             val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
