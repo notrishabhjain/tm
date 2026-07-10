@@ -4,7 +4,8 @@ import { initializeDatabase, db } from '@/data/db/client';
 import { ConversationRepository } from '@/data/repositories/ConversationRepository';
 import type { StoredMessage } from '@/data/repositories/ConversationRepository';
 import {
-  checkAndRecordFingerprint,
+  hasFingerprint,
+  recordFingerprint,
   logActivity,
   enqueueOutbox,
   getOutbox,
@@ -217,7 +218,7 @@ export async function handleNotification(taskData: {
   _inFlight.add(fingerprint);
 
   try {
-    if (await checkAndRecordFingerprint(fingerprint)) return; // already processed
+    if (await hasFingerprint(fingerprint)) return; // already fully processed
 
     const label = notification.title || appDisplayName(notification.packageName);
 
@@ -240,15 +241,18 @@ export async function handleNotification(taskData: {
     const decision = await decide(notification, history);
 
     if (decision === null) {
+      // Deliberately NOT recorded in the ledger: a re-delivery or the app-open
+      // tray sweep will retry this message once the network/AI recovers.
       await logActivity(
         notification.packageName,
         label,
         'ERROR',
-        'AI unreachable — message skipped'
+        'AI unreachable — will retry on next sweep'
       );
       return;
     }
     if (!decision.isTask || !decision.title) {
+      await recordFingerprint(fingerprint);
       await logActivity(
         notification.packageName,
         label,
@@ -271,6 +275,10 @@ export async function handleNotification(taskData: {
       notes,
       dueDate: decision.dueDate,
     });
+
+    // Decision is final — record it so re-deliveries can't double-create the
+    // task (a failed Google call is covered by the outbox, not a retry).
+    await recordFingerprint(fingerprint);
 
     if (googleTaskId) {
       await logActivity(notification.packageName, label, 'TASK_CREATED', decision.title);

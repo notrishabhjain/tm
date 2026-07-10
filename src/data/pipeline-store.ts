@@ -6,21 +6,34 @@ import { activityLog, outbox, processedLedger } from './db/schema';
 
 const LEDGER_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** True when this fingerprint was already fully processed. Read-only. */
+export async function hasFingerprint(fingerprint: string): Promise<boolean> {
+  try {
+    const rows = await db
+      .select({ id: processedLedger.id })
+      .from(processedLedger)
+      .where(eq(processedLedger.fingerprint, fingerprint))
+      .limit(1);
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Returns true when this fingerprint was seen before; records it otherwise.
- * Atomic via the unique index — safe against concurrent redeliveries.
+ * Records a fingerprint AFTER processing completed. Deliberately not written
+ * on AI/network failure so a re-delivery or tray sweep can retry the message.
+ * Unique index makes concurrent inserts safe.
  */
-export async function checkAndRecordFingerprint(fingerprint: string): Promise<boolean> {
+export async function recordFingerprint(fingerprint: string): Promise<void> {
   try {
     await db.insert(processedLedger).values({ fingerprint, createdAt: Date.now() });
     // Opportunistic prune of old entries
-    void db
+    await db
       .delete(processedLedger)
-      .where(lt(processedLedger.createdAt, Date.now() - LEDGER_RETENTION_MS))
-      .catch?.(() => {});
-    return false;
+      .where(lt(processedLedger.createdAt, Date.now() - LEDGER_RETENTION_MS));
   } catch {
-    return true; // unique violation = already processed
+    /* duplicate insert or prune failure — both fine */
   }
 }
 

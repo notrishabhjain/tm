@@ -59,6 +59,12 @@ const NotificationListenerModule = {
     return NativeModule.scanActiveNotifications() as Promise<void>;
   },
 
+  // Replays notifications queued while JS was dead (OEM blocked headless start).
+  drainPendingNotifications(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.drainPendingNotifications() as Promise<void>;
+  },
+
   addNotificationListener(listener: (data: NotificationData) => void) {
     if (!emitter) return { remove: () => undefined };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

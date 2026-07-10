@@ -33,6 +33,9 @@ class NotificationListenerModule : Module() {
 
         OnCreate {
             instance = this@NotificationListenerModule
+            // JS context just came alive — replay any notifications that were
+            // queued while it was dead (OEM blocked the headless start).
+            TaskMindNotificationListenerService.triggerDrain()
         }
 
         OnDestroy {
@@ -81,6 +84,11 @@ class NotificationListenerModule : Module() {
 
         AsyncFunction("scanActiveNotifications") {
             TaskMindNotificationListenerService.triggerActiveScan()
+        }
+
+        // Replays the missed-notification queue into JS (see triggerDrain).
+        AsyncFunction("drainPendingNotifications") {
+            TaskMindNotificationListenerService.triggerDrain()
         }
 
         // ── Confirmation notifications (the app's only user-facing output) ───
