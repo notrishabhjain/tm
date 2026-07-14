@@ -31,6 +31,14 @@ class CallTranscriptionService : Service() {
         private const val MIN_ANALYSIS_TRANSCRIPT_CHARS = 150
         private const val MAX_TRANSCRIPT_CHARS = 8_000
         private const val DEFAULT_CALL_MODEL = "meta/llama-3.3-70b-instruct"
+
+        // Recovery sweep: picks up recordings whose call-ended trigger was
+        // blocked (MIUI/HyperOS autostart off, background FGS restrictions).
+        const val EXTRA_MODE = "mode"
+        const val MODE_SWEEP = "sweep"
+        const val KEY_PENDING_CALL_SCAN = "pending_call_scan_at"
+        private const val SWEEP_WINDOW_MS = 24 * 60 * 60 * 1000L
+        private const val SWEEP_MAX_RECORDINGS = 6
     }
 
     private lateinit var notificationManager: NotificationManager
@@ -47,9 +55,10 @@ class CallTranscriptionService : Service() {
 
         if (worker?.isAlive == true) return START_NOT_STICKY
 
+        val sweep = intent?.getStringExtra(EXTRA_MODE) == MODE_SWEEP
         worker = Thread {
             try {
-                runPipeline()
+                if (sweep) runSweep() else runPipeline()
             } catch (e: Exception) {
                 Log.w(TAG, "Pipeline failed: ${e.message}")
             } finally {
@@ -65,9 +74,6 @@ class CallTranscriptionService : Service() {
         val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("call_transcription_enabled", false)) return
 
-        val asrKey = prefs.getString("nvidia_api_key", null).orEmpty()
-            .ifBlank { DefaultKeys.NVIDIA_ASR }
-
         // Recorders flush within seconds of hangup; retry covers slow OEMs.
         var recording = CallRecordingFinder.findLatestUnprocessed(this)
         if (recording == null) {
@@ -82,11 +88,60 @@ class CallTranscriptionService : Service() {
             Log.d(TAG, "No new call recording found after retries")
             return
         }
+        // A recovery sweep may already have stored it — don't spend an ASR call.
+        if (CallRecordStore.hasRecording(this, recording.absolutePath)) {
+            CallRecordingFinder.markProcessed(this, recording)
+            prefs.edit().remove(KEY_PENDING_CALL_SCAN).apply()
+            return
+        }
+
+        processRecording(prefs, recording)
+        prefs.edit().remove(KEY_PENDING_CALL_SCAN).apply()
+    }
+
+    /**
+     * Recovery sweep: process every recording from the last 24 h that has no
+     * call_records row. Catches calls whose end-of-call trigger was blocked
+     * (MIUI/HyperOS autostart off, broadcast not delivered, FGS start denied)
+     * and transient ASR failures. Started from the app-open sweep, the
+     * notification listener, or the Troubleshoot button — all contexts where
+     * a foreground-service start is permitted.
+     */
+    private fun runSweep() {
+        val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("call_transcription_enabled", false)) return
+
+        val candidates = CallRecordingFinder
+            .findRecentRecordings(this, SWEEP_WINDOW_MS, SWEEP_MAX_RECORDINGS)
+            .filter { !CallRecordStore.hasRecording(this, it.absolutePath) }
+
+        if (candidates.isEmpty()) {
+            prefs.edit().remove(KEY_PENDING_CALL_SCAN).apply()
+            return
+        }
+
+        Log.d(TAG, "Recovery sweep: ${candidates.size} unprocessed recording(s)")
+        // Oldest first so tasks and activity entries appear in natural order.
+        for (file in candidates.sortedBy { it.lastModified() }) {
+            try {
+                processRecording(prefs, file)
+            } catch (e: Exception) {
+                Log.w(TAG, "Sweep failed on ${file.name}: ${e.message}")
+            }
+        }
+        prefs.edit().remove(KEY_PENDING_CALL_SCAN).apply()
+    }
+
+    private fun processRecording(prefs: android.content.SharedPreferences, recording: java.io.File) {
+        val asrKey = prefs.getString("nvidia_api_key", null).orEmpty()
+            .ifBlank { DefaultKeys.NVIDIA_ASR }
 
         val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
         if (pcm == null || pcm.isEmpty()) {
             Log.w(TAG, "Failed to decode ${recording.absolutePath}")
             CallRecordingFinder.markProcessed(this, recording)
+            // Deterministic failure — store a stub so sweeps stop retrying it.
+            CallRecordStore.storeFailedRecording(this, recording.absolutePath, "Could not decode recording")
             CallRecordStore.logActivity(this, "call", "Call", "ERROR", "Could not decode recording")
             return
         }
@@ -98,8 +153,13 @@ class CallTranscriptionService : Service() {
         val text = when (result) {
             is NvidiaAsrClient.Result.Success -> result.text
             is NvidiaAsrClient.Result.Error -> {
+                // Transient (network/service) — deliberately NOT stored, so the
+                // next recovery sweep retries it until the 24 h window expires.
                 Log.w(TAG, "NVIDIA ASR failed: ${result.message}")
-                CallRecordStore.logActivity(this, "call", "Call", "ERROR", "Transcription failed: ${result.message}")
+                CallRecordStore.logActivity(
+                    this, "call", "Call", "ERROR",
+                    "Transcription failed — will retry: ${result.message}"
+                )
                 return
             }
             NvidiaAsrClient.Result.NoApiKey -> return

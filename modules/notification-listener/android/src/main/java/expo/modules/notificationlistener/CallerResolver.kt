@@ -84,7 +84,9 @@ object CallerResolver {
                 ),
                 null,
                 null,
-                "${CallLog.Calls.DATE} DESC LIMIT 3"
+                // Deep enough that recovery sweeps can attribute recordings from
+                // hours ago; the end-time window still prevents mis-attribution.
+                "${CallLog.Calls.DATE} DESC LIMIT 50"
             )?.use { cursor ->
                 while (cursor.moveToNext()) {
                     val date = cursor.getLong(cursor.getColumnIndexOrThrow(CallLog.Calls.DATE))

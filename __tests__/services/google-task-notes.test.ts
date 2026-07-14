@@ -37,4 +37,29 @@ describe('buildGoogleTaskNotes', () => {
   it('returns empty string for empty input', () => {
     expect(buildGoogleTaskNotes({})).toBe('');
   });
+
+  it('builds a From line from the source app alone', () => {
+    const notes = buildGoogleTaskNotes({ sourceApp: 'com.whatsapp' });
+    expect(notes).toBe('From: WhatsApp');
+  });
+
+  it('only inserts the --- separator when metadata precedes the body', () => {
+    expect(buildGoogleTaskNotes({ body: 'just a body' })).toBe('just a body');
+    const withMeta = buildGoogleTaskNotes({ priority: 'LOW', body: 'the body' });
+    expect(withMeta).toBe('Priority: LOW\n---\nthe body');
+  });
+
+  it('keeps the time-of-day for call tasks (Google Tasks drops it from due)', () => {
+    const due = new Date();
+    due.setHours(9, 15, 0, 0);
+    const notes = buildGoogleTaskNotes({
+      priority: 'HIGH',
+      sender: 'Sharma Ji',
+      sourceApp: 'call.transcript',
+      dueDate: due.getTime(),
+    });
+    expect(notes).toContain('From: Sharma Ji · Phone call');
+    expect(notes).toContain('Due:');
+    expect(notes).toMatch(/9:15/);
+  });
 });

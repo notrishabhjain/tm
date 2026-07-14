@@ -57,6 +57,14 @@ class PhoneStateReceiver : BroadcastReceiver() {
                     return
                 }
 
+                // Flag the pending call FIRST: if the service start below is
+                // blocked (MIUI/HyperOS autostart off, background restrictions),
+                // the recovery sweep — triggered from the notification listener
+                // or the next app open — picks this recording up.
+                prefs.edit()
+                    .putLong(CallTranscriptionService.KEY_PENDING_CALL_SCAN, System.currentTimeMillis())
+                    .apply()
+
                 try {
                     // Start immediately — the service's retry loop (3 + 6 + 10 + 20 s)
                     // handles the recording file not yet being flushed to disk.

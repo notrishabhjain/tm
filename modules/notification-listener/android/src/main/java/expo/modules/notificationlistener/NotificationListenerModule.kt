@@ -213,6 +213,104 @@ class NotificationListenerModule : Module() {
                 context.startForegroundService(Intent(context, CallTranscriptionService::class.java))
             } catch (_: Exception) { }
         }
+
+        // Recovery sweep: processes every recent recording that has no
+        // call_records row yet. Safe to call any time — dedups via the DB.
+        AsyncFunction("scanForMissedCalls") {
+            try {
+                context.startForegroundService(
+                    Intent(context, CallTranscriptionService::class.java)
+                        .putExtra(CallTranscriptionService.EXTRA_MODE, CallTranscriptionService.MODE_SWEEP)
+                )
+            } catch (_: Exception) { }
+        }
+
+        AsyncFunction("getOemInfo") {
+            val mfr = Build.MANUFACTURER.lowercase()
+            val brand = Build.BRAND.lowercase()
+            val oem = when {
+                mfr.contains("xiaomi") || brand.contains("xiaomi") ||
+                    brand.contains("redmi") || brand.contains("poco") -> "xiaomi"
+                mfr.contains("oppo") || mfr.contains("realme") || mfr.contains("oneplus") -> "oppo"
+                mfr.contains("vivo") || mfr.contains("iqoo") -> "vivo"
+                mfr.contains("huawei") || mfr.contains("honor") -> "huawei"
+                mfr.contains("samsung") -> "samsung"
+                else -> "other"
+            }
+            mapOf(
+                "manufacturer" to Build.MANUFACTURER,
+                "brand" to Build.BRAND,
+                "oem" to oem,
+                // OEMs whose battery managers kill receivers/services unless the
+                // app is granted "Autostart" — a switch separate from the
+                // battery-unrestricted setting.
+                "needsAutostart" to (oem == "xiaomi" || oem == "oppo" || oem == "vivo" || oem == "huawei")
+            )
+        }
+
+        // Opens the OEM's autostart/background-launch management screen.
+        // Returns true when an OEM-specific screen opened, false when it fell
+        // back to the generic app-details settings page.
+        AsyncFunction("openAutostartSettings") {
+            openAutostartSettingsInternal()
+        }
+    }
+
+    private fun openAutostartSettingsInternal(): Boolean {
+        val candidates = listOf(
+            // Xiaomi / Redmi / POCO (MIUI & HyperOS)
+            ComponentName(
+                "com.miui.securitycenter",
+                "com.miui.permcenter.autostart.AutoStartManagementActivity"
+            ),
+            // Oppo / Realme / OnePlus (ColorOS)
+            ComponentName(
+                "com.coloros.safecenter",
+                "com.coloros.safecenter.permission.startup.StartupAppListActivity"
+            ),
+            ComponentName(
+                "com.coloros.safecenter",
+                "com.coloros.safecenter.startupapp.StartupAppListActivity"
+            ),
+            // Vivo / iQOO
+            ComponentName(
+                "com.vivo.permissionmanager",
+                "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"
+            ),
+            ComponentName(
+                "com.iqoo.secure",
+                "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"
+            ),
+            // Huawei / Honor
+            ComponentName(
+                "com.huawei.systemmanager",
+                "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
+            )
+        )
+        for (component in candidates) {
+            try {
+                val intent = Intent().apply {
+                    setComponent(component)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                if (context.packageManager.resolveActivity(intent, 0) != null) {
+                    context.startActivity(intent)
+                    return true
+                }
+            } catch (_: Exception) { }
+        }
+        // Fallback: generic app details (user navigates to autostart manually).
+        return try {
+            context.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+            )
+            false
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun hasPermission(permission: String): Boolean {

@@ -60,4 +60,91 @@ describe('parseDecision', () => {
     });
     expect(parseDecision(raw)!.priority).toBe('MEDIUM');
   });
+
+  it('parses JSON wrapped in markdown code fences', () => {
+    const raw =
+      '```json\n{"reasoning":"boss asks for report","isTask":true,"title":"Send report to boss","priority":"URGENT","dueDate":null,"notes":null}\n```';
+    const d = parseDecision(raw);
+    expect(d).not.toBeNull();
+    expect(d!.isTask).toBe(true);
+    expect(d!.title).toBe('Send report to boss');
+    expect(d!.priority).toBe('URGENT');
+  });
+
+  it('treats whitespace-only or literal "null" titles as missing', () => {
+    for (const title of ['   ', 'null']) {
+      const d = parseDecision(
+        JSON.stringify({ reasoning: 'x', isTask: true, title, priority: 'HIGH' })
+      );
+      expect(d!.title).toBeNull();
+      expect(d!.isTask).toBe(false);
+    }
+  });
+
+  it('keeps isTask=false even when the model included a title', () => {
+    const d = parseDecision(
+      JSON.stringify({ reasoning: 'group chatter', isTask: false, title: 'Book tickets' })
+    );
+    expect(d!.isTask).toBe(false);
+  });
+
+  it('truncates absurdly long titles to 120 chars', () => {
+    const d = parseDecision(
+      JSON.stringify({ reasoning: 'x', isTask: true, title: 'a'.repeat(300), priority: 'LOW' })
+    );
+    expect(d!.title).toHaveLength(120);
+  });
+
+  it('treats "null" strings and unparseable strings as no due date', () => {
+    for (const dueDate of ['null', 'someday soon', '']) {
+      const d = parseDecision(
+        JSON.stringify({ reasoning: 'x', isTask: true, title: 'T', priority: 'LOW', dueDate })
+      );
+      expect(d!.dueDate).toBeNull();
+    }
+  });
+
+  it('leaves a due date from yesterday alone (recent past ≠ hallucinated year)', () => {
+    const yesterday = new Date(Date.now() - 86_400_000);
+    const d = parseDecision(
+      JSON.stringify({
+        reasoning: 'x',
+        isTask: true,
+        title: 'T',
+        priority: 'LOW',
+        dueDate: yesterday.toISOString(),
+      })
+    );
+    expect(d!.dueDate).toBeLessThan(Date.now());
+    expect(d!.dueDate).toBeGreaterThan(Date.now() - 2 * 86_400_000);
+  });
+
+  it('leaves a far-future due date alone', () => {
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    const d = parseDecision(
+      JSON.stringify({
+        reasoning: 'x',
+        isTask: true,
+        title: 'T',
+        priority: 'LOW',
+        dueDate: nextYear.toISOString(),
+      })
+    );
+    expect(Math.abs(d!.dueDate! - nextYear.getTime())).toBeLessThan(1000);
+  });
+
+  it('normalises "null" notes and non-string reasoning', () => {
+    const d = parseDecision(
+      JSON.stringify({ reasoning: 42, isTask: true, title: 'T', priority: 'LOW', notes: 'null' })
+    );
+    expect(d!.notes).toBeNull();
+    expect(d!.reasoning).toBe('');
+  });
+
+  it('returns null for empty input and bare arrays', () => {
+    expect(parseDecision('')).toBeNull();
+    expect(parseDecision('[]')).toBeNull();
+    expect(parseDecision('{broken')).toBeNull();
+  });
 });
