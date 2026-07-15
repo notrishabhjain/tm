@@ -89,9 +89,16 @@ const NotificationListenerModule = {
         hasCallLogPermission: false,
         hasAllFilesAccess: false,
         apiKeySet: false,
+        sarvamKeySet: false,
       });
     }
     return NativeModule.getCallTranscriptionStatus() as Promise<CallTranscriptionStatus>;
+  },
+
+  /** Sarvam AI key for Hindi/Hinglish transcription; blank clears it. */
+  setSarvamApiKey(key: string): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setSarvamApiKey(key) as Promise<void>;
   },
 
   setNvidiaApiKey(key: string): Promise<void> {

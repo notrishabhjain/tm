@@ -9,6 +9,7 @@ import {
   Alert,
   Linking,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -35,6 +36,7 @@ interface PipelineStatus {
   phonePerms: boolean;
   filesAccess: boolean;
   googleConnected: boolean;
+  sarvamKeySet: boolean;
 }
 
 const DEFAULT_STATUS: PipelineStatus = {
@@ -44,6 +46,7 @@ const DEFAULT_STATUS: PipelineStatus = {
   phonePerms: false,
   filesAccess: false,
   googleConnected: false,
+  sarvamKeySet: false,
 };
 
 export default function StatusScreen(): React.JSX.Element {
@@ -52,6 +55,8 @@ export default function StatusScreen(): React.JSX.Element {
   const [oem, setOem] = useState<OemInfo | null>(null);
   const [testing, setTesting] = useState(false);
   const [testLogs, setTestLogs] = useState<string[]>([]);
+  const [editingSarvamKey, setEditingSarvamKey] = useState(false);
+  const [sarvamKeyDraft, setSarvamKeyDraft] = useState('');
 
   useEffect(() => {
     void NotificationListener.getOemInfo()
@@ -78,6 +83,7 @@ export default function StatusScreen(): React.JSX.Element {
           phonePerms: call.hasPhoneStatePermission && call.hasCallLogPermission,
           filesAccess: call.hasAllFilesAccess,
           googleConnected: getSetting('google_tasks_enabled'),
+          sarvamKeySet: call.sarvamKeySet,
         });
         if (perm === 'granted' && !running) {
           void NotificationListener.startService().catch(() => {});
@@ -93,6 +99,13 @@ export default function StatusScreen(): React.JSX.Element {
       refresh();
     }, [refresh])
   );
+
+  const saveSarvamKey = async (): Promise<void> => {
+    await NotificationListener.setSarvamApiKey(sarvamKeyDraft.trim()).catch(() => {});
+    setEditingSarvamKey(false);
+    setSarvamKeyDraft('');
+    refresh();
+  };
 
   // OAuth callback listener — Google redirects back into the app.
   useEffect(() => {
@@ -240,6 +253,55 @@ export default function StatusScreen(): React.JSX.Element {
                 onValueChange={(v) => void toggleCalls(v)}
                 trackColor={{ true: Colors.primary500, false: theme.outline }}
               />
+            </View>
+            <View style={styles.sarvamBlock}>
+              <SetupRow
+                ok={status.sarvamKeySet}
+                label="Hindi transcription (Sarvam AI)"
+                detail={
+                  status.sarvamKeySet
+                    ? 'Active — calls are transcribed by the Hindi/Hinglish specialist engine'
+                    : 'Add a free Sarvam AI key for far more accurate Hindi call transcription (dashboard.sarvam.ai)'
+                }
+                actionLabel={
+                  editingSarvamKey ? undefined : status.sarvamKeySet ? 'Change' : 'Add key'
+                }
+                onAction={() => setEditingSarvamKey(true)}
+              />
+              {editingSarvamKey && (
+                <View
+                  style={[
+                    styles.row,
+                    { backgroundColor: theme.surface, borderColor: theme.outline },
+                  ]}
+                >
+                  <TextInput
+                    value={sarvamKeyDraft}
+                    onChangeText={setSarvamKeyDraft}
+                    placeholder="Paste Sarvam API key (blank = use Whisper)"
+                    placeholderTextColor={theme.onSurfaceVariant}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={[styles.keyInput, { color: theme.onSurface }]}
+                  />
+                  <Pressable
+                    onPress={() => void saveSarvamKey()}
+                    style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.actionText}>Save</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setEditingSarvamKey(false);
+                      setSarvamKeyDraft('');
+                    }}
+                  >
+                    <Text style={[styles.logDismissText, { color: theme.onSurfaceVariant }]}>
+                      Cancel
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
             <SetupRow
               ok={status.googleConnected}
@@ -435,6 +497,8 @@ const styles = StyleSheet.create({
   },
   actionText: { color: Colors.white, fontSize: 13, fontWeight: '600' },
   activityTitle: { fontSize: 12, fontWeight: '700', marginTop: 18, marginBottom: 4 },
+  sarvamBlock: { gap: 10 },
+  keyInput: { flex: 1, fontSize: 13, padding: 0 },
   troubleshootRow: { flexDirection: 'row', gap: 10 },
   troubleshootBtn: {
     flex: 1,

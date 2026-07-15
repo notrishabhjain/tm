@@ -30,6 +30,8 @@ export interface CallTranscriptionStatus {
   hasCallLogPermission: boolean;
   hasAllFilesAccess: boolean;
   apiKeySet: boolean;
+  /** True when the Sarvam (Hindi-specialist) transcription key is configured. */
+  sarvamKeySet: boolean;
 }
 
 export interface CallDirReport {

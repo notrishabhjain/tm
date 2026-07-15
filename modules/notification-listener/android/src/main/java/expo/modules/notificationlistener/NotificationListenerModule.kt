@@ -107,7 +107,15 @@ class NotificationListenerModule : Module() {
                 "hasCallLogPermission" to hasPermission(android.Manifest.permission.READ_CALL_LOG),
                 "hasAllFilesAccess" to hasAllFilesAccess(),
                 "apiKeySet" to true, // built-in default key always available
+                "sarvamKeySet" to AsrEngine.sarvamKey(context).isNotBlank(),
             )
+        }
+
+        // Sarvam AI key — enables the Hindi/Hinglish-specialist transcription
+        // engine. Empty/blank clears it (pipeline falls back to Whisper).
+        AsyncFunction("setSarvamApiKey") { key: String ->
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit().putString("sarvam_api_key", key.trim()).apply()
         }
 
         AsyncFunction("setNvidiaApiKey") { key: String ->

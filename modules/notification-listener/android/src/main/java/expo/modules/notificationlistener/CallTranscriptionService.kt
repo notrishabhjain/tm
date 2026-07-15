@@ -133,9 +133,6 @@ class CallTranscriptionService : Service() {
     }
 
     private fun processRecording(prefs: android.content.SharedPreferences, recording: java.io.File) {
-        val asrKey = prefs.getString("nvidia_api_key", null).orEmpty()
-            .ifBlank { DefaultKeys.NVIDIA_ASR }
-
         val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
         if (pcm == null || pcm.isEmpty()) {
             Log.w(TAG, "Failed to decode ${recording.absolutePath}")
@@ -147,22 +144,22 @@ class CallTranscriptionService : Service() {
         }
         val durationSec = pcm.size / SAMPLE_RATE
 
-        val result = NvidiaAsrClient.transcribe(asrKey, pcm)
+        val result = AsrEngine.transcribe(this, pcm)
         CallRecordingFinder.markProcessed(this, recording)
 
         val text = when (result) {
-            is NvidiaAsrClient.Result.Success -> result.text
-            is NvidiaAsrClient.Result.Error -> {
+            is AsrEngine.Result.Success -> result.text
+            is AsrEngine.Result.Error -> {
                 // Transient (network/service) — deliberately NOT stored, so the
                 // next recovery sweep retries it until the 24 h window expires.
-                Log.w(TAG, "NVIDIA ASR failed: ${result.message}")
+                Log.w(TAG, "ASR failed: ${result.message}")
                 CallRecordStore.logActivity(
                     this, "call", "Call", "ERROR",
                     "Transcription failed — will retry: ${result.message}"
                 )
                 return
             }
-            NvidiaAsrClient.Result.NoApiKey -> return
+            AsrEngine.Result.NoApiKey -> return
         }
 
         val caller = CallerResolver.resolve(this, recording)

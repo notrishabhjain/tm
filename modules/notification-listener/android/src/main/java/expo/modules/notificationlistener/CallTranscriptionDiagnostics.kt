@@ -137,19 +137,24 @@ object CallTranscriptionDiagnostics {
         val sizeKb = recording.length() / 1024
         onLog?.invoke("find", "Found: ${recording.name} ($sizeKb KB, ${ageSec}s old)")
 
-        // Check API key
+        // Check API keys — Sarvam preferred when configured, Whisper otherwise.
         val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+        val sarvamKey = AsrEngine.sarvamKey(context)
         val apiKey = prefs.getString("nvidia_api_key", null).orEmpty().ifBlank { DefaultKeys.NVIDIA_ASR }
-        if (apiKey.isBlank()) {
-            onLog?.invoke("apikey", "FAILED — NVIDIA API key not set")
+        if (apiKey.isBlank() && sarvamKey.isBlank()) {
+            onLog?.invoke("apikey", "FAILED — no transcription API key set")
             return mapOf(
                 "ok" to false,
                 "stage" to "apikey",
                 "recordingPath" to recording.absolutePath,
-                "error" to "NVIDIA API key is not set. Enter it in the Call Transcription settings."
+                "error" to "No transcription API key is set."
             )
         }
-        onLog?.invoke("apikey", "API key present (${apiKey.take(8)}…)")
+        onLog?.invoke(
+            "apikey",
+            if (sarvamKey.isNotBlank()) "Sarvam key present (${sarvamKey.take(6)}…) — Hindi specialist engine active"
+            else "Whisper key present (${apiKey.take(8)}…) — add a Sarvam key for better Hindi"
+        )
 
         // Check network reachability to NVIDIA gRPC endpoint
         onLog?.invoke("network", "Checking connectivity to ${NvidiaAsrClient.HOST}:${NvidiaAsrClient.PORT}…")
@@ -189,18 +194,22 @@ object CallTranscriptionDiagnostics {
         val durationSec = pcm.size / 16000.0
         onLog?.invoke("decode", "Decoded %.1fs of audio in %dms".format(durationSec, decodeMs))
 
-        onLog?.invoke("transcribe", "Sending %.1fs of audio to NVIDIA cloud ASR…".format(durationSec))
+        onLog?.invoke("transcribe", "Sending %.1fs of audio to cloud ASR…".format(durationSec))
 
         val transcribeStart = System.currentTimeMillis()
-        val result = NvidiaAsrClient.transcribe(apiKey, pcm)
+        // Same routing as the live pipeline: Sarvam when configured, Whisper fallback.
+        val result = AsrEngine.transcribe(context, pcm) { message ->
+            onLog?.invoke("transcribe", message)
+        }
         val transcribeMs = System.currentTimeMillis() - transcribeStart
 
         return when (result) {
-            is NvidiaAsrClient.Result.Success -> {
+            is AsrEngine.Result.Success -> {
                 onLog?.invoke(
                     "transcribe",
-                    "Done in %.1fs. Preview: %s".format(
+                    "Done in %.1fs via %s. Preview: %s".format(
                         transcribeMs / 1000.0,
+                        result.engine,
                         result.text.take(100).replace('\n', ' ')
                     )
                 )
@@ -212,10 +221,11 @@ object CallTranscriptionDiagnostics {
                     "decodedSamples" to pcm.size.toDouble(),
                     "decodeMs" to decodeMs.toDouble(),
                     "transcribeMs" to transcribeMs.toDouble(),
+                    "engine" to result.engine,
                     "transcript" to result.text
                 )
             }
-            is NvidiaAsrClient.Result.Error -> {
+            is AsrEngine.Result.Error -> {
                 onLog?.invoke("transcribe", "FAILED — ${result.message}")
                 mapOf(
                     "ok" to false,
@@ -227,7 +237,7 @@ object CallTranscriptionDiagnostics {
                     "error" to result.message
                 )
             }
-            NvidiaAsrClient.Result.NoApiKey -> {
+            AsrEngine.Result.NoApiKey -> {
                 onLog?.invoke("apikey", "FAILED — API key disappeared during test")
                 mapOf("ok" to false, "stage" to "apikey", "error" to "API key not set.")
             }
