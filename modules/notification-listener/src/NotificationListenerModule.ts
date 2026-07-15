@@ -5,6 +5,7 @@ import type {
   CallTranscriptionStatus,
   CallDiagnostics,
   CallTranscriptionTestResult,
+  OemInfo,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -151,6 +152,31 @@ const NotificationListenerModule = {
   simulateCallEnded(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.simulateCallEnded() as Promise<void>;
+  },
+
+  // Recovery sweep: processes recent recordings missed by the call-ended
+  // trigger (MIUI/HyperOS autostart restrictions). Dedups via the DB.
+  scanForMissedCalls(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.scanForMissedCalls() as Promise<void>;
+  },
+
+  getOemInfo(): Promise<OemInfo> {
+    if (!NativeModule) {
+      return Promise.resolve({
+        manufacturer: '',
+        brand: '',
+        oem: 'other',
+        needsAutostart: false,
+      } as OemInfo);
+    }
+    return NativeModule.getOemInfo() as Promise<OemInfo>;
+  },
+
+  /** Opens the OEM autostart screen; false = fell back to app details. */
+  openAutostartSettings(): Promise<boolean> {
+    if (!NativeModule) return Promise.resolve(false);
+    return NativeModule.openAutostartSettings() as Promise<boolean>;
   },
 
   addCallTranscriptionTestLogListener(

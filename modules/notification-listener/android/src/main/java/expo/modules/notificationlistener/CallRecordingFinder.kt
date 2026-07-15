@@ -115,4 +115,31 @@ object CallRecordingFinder {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_LAST_PROCESSED, file.absolutePath).apply()
     }
+
+    /**
+     * Recovery-sweep finder: returns ALL audio recordings (each candidate dir
+     * plus one subdirectory level) newer than [maxAgeMs], newest first, capped
+     * at [limit]. Unlike [findLatestUnprocessed] this ignores the last-processed
+     * marker and the 30-minute freshness window — deduplication against
+     * already-processed recordings is the caller's job (CallRecordStore).
+     */
+    fun findRecentRecordings(context: Context, maxAgeMs: Long, limit: Int): List<File> {
+        val cutoff = System.currentTimeMillis() - maxAgeMs
+        val found = mutableListOf<File>()
+        for (dirPath in candidateDirs(context)) {
+            val dir = File(dirPath)
+            val entries = dir.listFiles() ?: continue
+            for (entry in entries) {
+                if (entry.isFile && AUDIO_EXTENSIONS.contains(entry.extension.lowercase())) {
+                    if (entry.lastModified() >= cutoff) found.add(entry)
+                } else if (entry.isDirectory) {
+                    val nested = entry.listFiles { f ->
+                        f.isFile && AUDIO_EXTENSIONS.contains(f.extension.lowercase())
+                    } ?: continue
+                    for (f in nested) if (f.lastModified() >= cutoff) found.add(f)
+                }
+            }
+        }
+        return found.sortedByDescending { it.lastModified() }.take(limit)
+    }
 }

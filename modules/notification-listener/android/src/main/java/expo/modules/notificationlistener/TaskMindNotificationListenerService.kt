@@ -36,6 +36,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         }
         private const val DEDUP_WINDOW_MS = 60_000L
         private const val DEDUP_CACHE_MAX = 100
+        private const val CALL_SWEEP_THROTTLE_MS = 3 * 60_000L
         private const val MAX_THREAD_MESSAGES = 10
         private const val KEY_PENDING_QUEUE = "pending_notification_queue"
         private const val MAX_PENDING_QUEUE = 50
@@ -129,8 +130,42 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         }
     }
 
+    @Volatile
+    private var lastCallSweepAt = 0L
+
+    // MIUI/HyperOS frequently blocks the PHONE_STATE receiver and background
+    // service starts, so a finished call may never reach CallTranscriptionService.
+    // The notification-listener binding survives those restrictions (system-bound
+    // process is allowed to start foreground services) — so piggyback on
+    // notification traffic to launch a recovery sweep for unprocessed
+    // recordings. Throttled; the service dedups against the DB, so a spurious
+    // start is a cheap no-op.
+    private fun maybeTriggerCallRecoverySweep() {
+        val now = System.currentTimeMillis()
+        if (now - lastCallSweepAt < CALL_SWEEP_THROTTLE_MS) return
+        lastCallSweepAt = now
+        Thread {
+            try {
+                val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                if (!prefs.getBoolean("call_transcription_enabled", false)) return@Thread
+                val pendingCall =
+                    prefs.getLong(CallTranscriptionService.KEY_PENDING_CALL_SCAN, 0L) != 0L
+                val freshRecording =
+                    pendingCall || CallRecordingFinder.findLatestUnprocessed(this) != null
+                if (!freshRecording) return@Thread
+                startForegroundService(
+                    Intent(this, CallTranscriptionService::class.java)
+                        .putExtra(CallTranscriptionService.EXTRA_MODE, CallTranscriptionService.MODE_SWEEP)
+                )
+            } catch (_: Exception) { }
+        }.start()
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName ?: return
+
+        // Any notification traffic doubles as a heartbeat for missed calls.
+        maybeTriggerCallRecoverySweep()
 
         // Skip our own notifications
         if (packageName == applicationContext.packageName) return
@@ -369,8 +404,12 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         // Zero content
         if (text.isBlank() && bigText.isBlank()) return true
 
-        // System/sync packages
-        if (SYSTEM_PACKAGE_PREFIXES.any { packageName.startsWith(it) }) return true
+        // System/sync packages — but NEVER discard an explicitly monitored app:
+        // com.android.mms is MIUI/stock Android's SMS app and would otherwise
+        // be swallowed by the "com.android." prefix.
+        if (!monitoredApps.contains(packageName) &&
+            SYSTEM_PACKAGE_PREFIXES.any { packageName.startsWith(it) }
+        ) return true
 
         // Call notifications (Android category or text pattern)
         if (category == Notification.CATEGORY_CALL) return true

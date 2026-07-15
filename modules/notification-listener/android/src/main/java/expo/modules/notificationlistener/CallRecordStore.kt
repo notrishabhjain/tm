@@ -173,6 +173,53 @@ object CallRecordStore {
         }
     }
 
+    /** True when this recording path was already stored (i.e. fully processed). */
+    fun hasRecording(context: Context, path: String): Boolean {
+        val db = open(context) ?: return false
+        return try {
+            db.use { d ->
+                ensureTables(d)
+                d.rawQuery(
+                    "SELECT 1 FROM call_records WHERE recording_path = ? LIMIT 1",
+                    arrayOf(path)
+                ).use { it.moveToFirst() }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "hasRecording failed: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Stores a stub record for a recording that failed deterministically
+     * (e.g. an undecodable file) so recovery sweeps stop retrying it. Uses the
+     * same unique recording_path index as real records for dedup.
+     */
+    fun storeFailedRecording(context: Context, path: String, reason: String) {
+        val db = open(context) ?: return
+        try {
+            db.use { d ->
+                ensureTables(d)
+                d.insertWithOnConflict(
+                    "call_records", null,
+                    ContentValues().apply {
+                        put("id", generateId())
+                        put("caller_label", "Unknown")
+                        put("call_time", System.currentTimeMillis())
+                        put("recording_path", path)
+                        put("transcript", "")
+                        put("summary", reason.take(200))
+                        put("status", "ERROR")
+                        put("created_at", System.currentTimeMillis())
+                    },
+                    SQLiteDatabase.CONFLICT_IGNORE
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "storeFailedRecording failed: ${e.message}")
+        }
+    }
+
     /** Appends a row to the activity log (best-effort). */
     fun logActivity(context: Context, source: String, label: String, outcome: String, detail: String) {
         val db = open(context) ?: return

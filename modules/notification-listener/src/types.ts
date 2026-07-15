@@ -62,6 +62,14 @@ export interface CallDiagnostics {
   recentRecordings: CallRecordingReport[];
 }
 
+export interface OemInfo {
+  manufacturer: string;
+  brand: string;
+  oem: 'xiaomi' | 'oppo' | 'vivo' | 'huawei' | 'samsung' | 'other';
+  /** OEM battery manager kills background triggers unless Autostart is granted. */
+  needsAutostart: boolean;
+}
+
 export interface CallTranscriptionTestResult {
   ok: boolean;
   stage: 'find' | 'apikey' | 'network' | 'decode' | 'transcribe';

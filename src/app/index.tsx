@@ -26,6 +26,7 @@ import {
 } from '@/services/google-tasks';
 import { appDisplayName } from '@/services/app-name-map';
 import NotificationListener from '../../modules/notification-listener/src';
+import type { OemInfo } from '../../modules/notification-listener/src/types';
 
 interface PipelineStatus {
   notifAccess: boolean;
@@ -48,6 +49,19 @@ const DEFAULT_STATUS: PipelineStatus = {
 export default function StatusScreen(): React.JSX.Element {
   const theme = useTheme();
   const [status, setStatus] = useState<PipelineStatus>(DEFAULT_STATUS);
+  const [oem, setOem] = useState<OemInfo | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testLogs, setTestLogs] = useState<string[]>([]);
+
+  useEffect(() => {
+    void NotificationListener.getOemInfo()
+      .then(setOem)
+      .catch(() => {});
+    const sub = NotificationListener.addCallTranscriptionTestLogListener((e) => {
+      setTestLogs((prev) => [...prev, `[${e.stage}] ${e.message}`].slice(-40));
+    });
+    return () => sub.remove();
+  }, []);
 
   const refresh = useCallback(() => {
     void (async () => {
@@ -154,6 +168,35 @@ export default function StatusScreen(): React.JSX.Element {
     }
   };
 
+  const runPipelineTest = async (): Promise<void> => {
+    if (testing) return;
+    setTesting(true);
+    setTestLogs(['Running full call-pipeline test (find → decode → cloud transcription)…']);
+    try {
+      const res = await NotificationListener.runCallTranscriptionTest();
+      setTestLogs((prev) => [
+        ...prev,
+        res.ok
+          ? '✓ PASS — the call pipeline works end-to-end on this device'
+          : `✗ FAIL at "${res.stage}": ${res.error ?? 'unknown error'}`,
+      ]);
+    } catch (e) {
+      setTestLogs((prev) => [...prev, `✗ FAIL: ${e instanceof Error ? e.message : String(e)}`]);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const checkNow = (): void => {
+    setTestLogs([
+      'Checking now — scanning recordings from the last 24h, the notification tray, and the sync queue. Results appear in Recent Activity below.',
+    ]);
+    void NotificationListener.scanForMissedCalls().catch(() => {});
+    void NotificationListener.drainPendingNotifications().catch(() => {});
+    void NotificationListener.scanActiveNotifications().catch(() => {});
+    setTimeout(() => void refetch(), 5000);
+  };
+
   const allGood =
     status.notifAccess && status.callEnabled && status.phonePerms && status.googleConnected;
 
@@ -209,6 +252,75 @@ export default function StatusScreen(): React.JSX.Element {
               actionLabel={status.googleConnected ? 'Disconnect' : 'Connect'}
               onAction={handleGoogle}
             />
+
+            {oem?.needsAutostart && (
+              <View
+                style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.outline }]}
+              >
+                <Ionicons name="flash-outline" size={18} color={Colors.primary500} />
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowLabel, { color: theme.onSurface }]}>
+                    Autostart ({oem.manufacturer})
+                  </Text>
+                  <Text style={[styles.rowDetail, { color: theme.onSurfaceVariant }]}>
+                    {oem.oem === 'xiaomi'
+                      ? 'On Xiaomi/Redmi, enable Autostart for TaskMind — without it, HyperOS blocks call detection in the background even with battery unrestricted.'
+                      : 'Enable Autostart for TaskMind so background call detection is not killed by the battery manager.'}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => void NotificationListener.openAutostartSettings()}
+                  style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.actionText}>Open</Text>
+                </Pressable>
+              </View>
+            )}
+
+            <Text style={[styles.activityTitle, { color: theme.onSurfaceVariant }]}>
+              TROUBLESHOOT
+            </Text>
+            <View style={styles.troubleshootRow}>
+              <Pressable
+                onPress={() => void runPipelineTest()}
+                disabled={testing}
+                style={({ pressed }) => [
+                  styles.troubleshootBtn,
+                  { borderColor: theme.outline, backgroundColor: theme.surface },
+                  (pressed || testing) && { opacity: 0.6 },
+                ]}
+              >
+                <Ionicons name="pulse-outline" size={16} color={Colors.primary500} />
+                <Text style={[styles.troubleshootText, { color: theme.onSurface }]}>
+                  {testing ? 'Testing…' : 'Test call pipeline'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={checkNow}
+                style={({ pressed }) => [
+                  styles.troubleshootBtn,
+                  { borderColor: theme.outline, backgroundColor: theme.surface },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Ionicons name="refresh-outline" size={16} color={Colors.primary500} />
+                <Text style={[styles.troubleshootText, { color: theme.onSurface }]}>Check now</Text>
+              </Pressable>
+            </View>
+            {testLogs.length > 0 && (
+              <View style={[styles.logBox, { borderColor: theme.outline }]}>
+                {testLogs.map((line, i) => (
+                  <Text key={i} style={styles.logLine}>
+                    {line}
+                  </Text>
+                ))}
+                <Pressable onPress={() => setTestLogs([])} style={styles.logDismiss}>
+                  <Text style={[styles.logDismissText, { color: theme.onSurfaceVariant }]}>
+                    Dismiss
+                  </Text>
+                </Pressable>
+              </View>
+            )}
 
             <Text style={[styles.activityTitle, { color: theme.onSurfaceVariant }]}>
               RECENT ACTIVITY
@@ -323,6 +435,28 @@ const styles = StyleSheet.create({
   },
   actionText: { color: Colors.white, fontSize: 13, fontWeight: '600' },
   activityTitle: { fontSize: 12, fontWeight: '700', marginTop: 18, marginBottom: 4 },
+  troubleshootRow: { flexDirection: 'row', gap: 10 },
+  troubleshootBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 0.5,
+    borderRadius: 12,
+    paddingVertical: 11,
+  },
+  troubleshootText: { fontSize: 13, fontWeight: '600' },
+  logBox: {
+    borderWidth: 0.5,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
+    backgroundColor: 'rgba(127,127,127,0.08)',
+  },
+  logLine: { fontSize: 11, fontFamily: 'monospace', lineHeight: 16, color: '#7A9E7E' },
+  logDismiss: { alignSelf: 'flex-end', paddingTop: 6 },
+  logDismissText: { fontSize: 12, fontWeight: '600' },
   empty: { fontSize: 13, paddingVertical: 12 },
   activityRow: {
     flexDirection: 'row',

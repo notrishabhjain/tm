@@ -89,15 +89,17 @@ export default function RootLayout(): React.JSX.Element {
   }, []);
 
   // On launch + every foreground, reconcile everything the background path may
-  // have missed (ColorOS & friends love blocking background service starts):
+  // have missed (ColorOS/MIUI love blocking background service starts):
   //  1. drain the native missed-notification queue into the pipeline
   //  2. sweep the notification tray for anything still sitting there
-  //  3. flush the Google Tasks outbox
-  //  4. re-analyse calls whose LLM pass failed
+  //  3. process call recordings whose end-of-call trigger never fired
+  //  4. flush the Google Tasks outbox
+  //  5. re-analyse calls whose LLM pass failed
   useEffect(() => {
     const sweep = (): void => {
       void NotificationListener.drainPendingNotifications().catch(() => {});
       void NotificationListener.scanActiveNotifications().catch(() => {});
+      void NotificationListener.scanForMissedCalls().catch(() => {});
       void flushOutbox().catch(() => {});
       void retryFailedCallAnalyses().catch(() => {});
     };
