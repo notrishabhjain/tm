@@ -16,6 +16,14 @@ object DefaultKeys {
         121, 118, 45, 110, 67, 119
     ).map { it.toChar() }.joinToString("")
 
+    // Gemini 2.5 Flash (single-call audio → tasks; Vertex AI express key)
+    val GEMINI: String = intArrayOf(
+        65, 81, 46, 65, 98, 56, 82, 78, 54, 76, 75, 52, 122, 104, 72, 107,
+        108, 121, 104, 122, 88, 111, 113, 97, 110, 75, 100, 85, 84, 102, 77, 54,
+        113, 65, 52, 82, 80, 117, 53, 98, 75, 116, 77, 50, 121, 53, 99, 114,
+        85, 75, 102, 98, 65
+    ).map { it.toChar() }.joinToString("")
+
     // Cloud AI (LLM via integrate.api.nvidia.com)
     val NVIDIA_LLM: String = intArrayOf(
         110, 118, 97, 112, 105, 45, 118, 66, 118, 74, 109, 105, 111, 74, 85, 105,

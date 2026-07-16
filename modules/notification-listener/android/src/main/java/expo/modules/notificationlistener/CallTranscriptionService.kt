@@ -59,8 +59,10 @@ class CallTranscriptionService : Service() {
         worker = Thread {
             try {
                 if (sweep) runSweep() else runPipeline()
-            } catch (e: Exception) {
-                Log.w(TAG, "Pipeline failed: ${e.message}")
+            } catch (t: Throwable) {
+                // Throwable, not Exception: an OOM here must not kill the app
+                // process — that takes the notification listener down with it.
+                Log.w(TAG, "Pipeline failed: ${t.javaClass.simpleName}: ${t.message}")
             } finally {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
@@ -125,17 +127,38 @@ class CallTranscriptionService : Service() {
         for (file in candidates.sortedBy { it.lastModified() }) {
             try {
                 processRecording(prefs, file)
-            } catch (e: Exception) {
-                Log.w(TAG, "Sweep failed on ${file.name}: ${e.message}")
+            } catch (t: Throwable) {
+                Log.w(TAG, "Sweep failed on ${file.name}: ${t.javaClass.simpleName}: ${t.message}")
             }
         }
         prefs.edit().remove(KEY_PENDING_CALL_SCAN).apply()
     }
 
     private fun processRecording(prefs: android.content.SharedPreferences, recording: java.io.File) {
-        val asrKey = prefs.getString("nvidia_api_key", null).orEmpty()
-            .ifBlank { DefaultKeys.NVIDIA_ASR }
+        val caller = CallerResolver.resolve(this, recording)
+        val callTime = caller.endedAt
 
+        // Primary engine: ONE Gemini call — audio in, transcript + tasks out.
+        // Container metadata gives the duration without decoding.
+        val metaDurationSec = AudioDecoder.durationSeconds(recording.absolutePath) ?: -1
+        if (metaDurationSec >= MIN_ANALYSIS_DURATION_SEC) {
+            when (val g = GeminiCallAnalyzer.analyze(this, recording, callTime, caller.label)) {
+                is GeminiCallAnalyzer.Result.Success -> {
+                    CallRecordingFinder.markProcessed(this, recording)
+                    storeAndFinish(
+                        caller, recording.absolutePath,
+                        g.transcript.ifBlank { "[transcript unavailable]" },
+                        g.extraction, callTime
+                    )
+                    return
+                }
+                is GeminiCallAnalyzer.Result.Error ->
+                    Log.w(TAG, "Gemini failed (${g.message}) — falling back to Whisper + 70B")
+                GeminiCallAnalyzer.Result.NoApiKey -> { /* legacy path below */ }
+            }
+        }
+
+        // Legacy/fallback path: decode → cloud ASR → 70B extraction + verify.
         val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
         if (pcm == null || pcm.isEmpty()) {
             Log.w(TAG, "Failed to decode ${recording.absolutePath}")
@@ -147,26 +170,23 @@ class CallTranscriptionService : Service() {
         }
         val durationSec = pcm.size / SAMPLE_RATE
 
-        val result = NvidiaAsrClient.transcribe(asrKey, pcm)
+        val result = AsrEngine.transcribe(this, pcm)
         CallRecordingFinder.markProcessed(this, recording)
 
         val text = when (result) {
-            is NvidiaAsrClient.Result.Success -> result.text
-            is NvidiaAsrClient.Result.Error -> {
+            is AsrEngine.Result.Success -> result.text
+            is AsrEngine.Result.Error -> {
                 // Transient (network/service) — deliberately NOT stored, so the
                 // next recovery sweep retries it until the 24 h window expires.
-                Log.w(TAG, "NVIDIA ASR failed: ${result.message}")
+                Log.w(TAG, "ASR failed: ${result.message}")
                 CallRecordStore.logActivity(
                     this, "call", "Call", "ERROR",
                     "Transcription failed — will retry: ${result.message}"
                 )
                 return
             }
-            NvidiaAsrClient.Result.NoApiKey -> return
+            AsrEngine.Result.NoApiKey -> return
         }
-
-        val caller = CallerResolver.resolve(this, recording)
-        val callTime = caller.endedAt
 
         // Short call → store silently for call memory, no LLM, no notification.
         if (durationSec < MIN_ANALYSIS_DURATION_SEC ||
@@ -205,10 +225,22 @@ class CallTranscriptionService : Service() {
             NvidiaLlmClient.verify(llmKey, model, capped, llmResult.extraction, callTime)
         } else llmResult.extraction
 
+        storeAndFinish(caller, recording.absolutePath, text, verified, callTime)
+    }
+
+    /** Stores the call + queues its tasks, logs the outcome, syncs, confirms. */
+    private fun storeAndFinish(
+        caller: CallerResolver.ResolvedCaller,
+        recordingPath: String,
+        transcript: String,
+        extraction: NvidiaLlmClient.CallExtraction?,
+        callTimeMs: Long
+    ) {
         val queued = CallRecordStore.storeCallResult(
-            this, caller, recording.absolutePath, text, verified, callTime
+            this, caller, recordingPath, transcript, extraction, callTimeMs
         )
         if (queued < 0) return // duplicate or DB unavailable
+        if (extraction == null) return // short call — stored silently as call memory
 
         CallRecordStore.logActivity(
             this, "call", caller.label,

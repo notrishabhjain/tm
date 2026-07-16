@@ -7,15 +7,57 @@ import android.util.Log
 import java.nio.ByteOrder
 
 /**
- * Decodes a call-recording file (m4a/aac, amr, 3gp, ...) to mono 16 kHz
- * float32 PCM in -1..1, the format whisper.cpp expects. Uses MediaExtractor
- * + MediaCodec only — no ffmpeg dependency.
+ * Decodes a call-recording file (m4a/aac, amr, mp3, 3gp, ...) to mono 16 kHz
+ * float32 PCM in -1..1. Uses MediaExtractor + MediaCodec only — no ffmpeg.
+ *
+ * Decoding is STREAMING with a hard output cap: each codec output buffer is
+ * downmixed and resampled immediately into a pre-allocated 15-minute buffer,
+ * so peak memory stays ~60 MB regardless of recording length. The previous
+ * implementation buffered the entire file (a 1-hour stereo recording needed
+ * ~600 MB) and died with an uncatchable-by-`Exception` OutOfMemoryError —
+ * taking the whole app process, including the notification listener, with it.
  */
 object AudioDecoder {
     private const val TAG = "AudioDecoder"
     private const val TARGET_SAMPLE_RATE = 16000
 
+    /** Hard cap on decoded output — matches the ASR/LLM 15-minute analysis cap. */
+    private const val MAX_OUTPUT_SECONDS = 15 * 60
+
+    /** Audio duration in seconds from container metadata — no decode. */
+    fun durationSeconds(path: String): Int? {
+        val extractor = MediaExtractor()
+        return try {
+            extractor.setDataSource(path)
+            var durationUs = -1L
+            for (i in 0 until extractor.trackCount) {
+                val f = extractor.getTrackFormat(i)
+                if (f.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true &&
+                    f.containsKey(MediaFormat.KEY_DURATION)
+                ) {
+                    durationUs = f.getLong(MediaFormat.KEY_DURATION)
+                    break
+                }
+            }
+            if (durationUs > 0) (durationUs / 1_000_000L).toInt() else null
+        } catch (t: Throwable) {
+            null
+        } finally {
+            extractor.release()
+        }
+    }
+
     fun decodeToWhisperPcm(path: String): FloatArray? {
+        return try {
+            decodeInternal(path)
+        } catch (t: Throwable) {
+            // Includes OutOfMemoryError — a bad/huge file must never crash the app.
+            Log.w(TAG, "Decode failed hard for $path: ${t.javaClass.simpleName}: ${t.message}")
+            null
+        }
+    }
+
+    private fun decodeInternal(path: String): FloatArray? {
         val extractor = MediaExtractor()
         try {
             extractor.setDataSource(path)
@@ -58,13 +100,13 @@ object AudioDecoder {
         codec.configure(format, null, null, 0)
         codec.start()
 
-        val pcmChunks = mutableListOf<ShortArray>()
+        val sink = ResamplingMonoSink(sourceChannels, sourceSampleRate, MAX_OUTPUT_SECONDS)
         val bufferInfo = MediaCodec.BufferInfo()
         var sawInputEOS = false
         var sawOutputEOS = false
 
         try {
-            while (!sawOutputEOS) {
+            while (!sawOutputEOS && !sink.isFull) {
                 if (!sawInputEOS) {
                     val inIndex = codec.dequeueInputBuffer(10_000)
                     if (inIndex >= 0) {
@@ -94,7 +136,7 @@ object AudioDecoder {
                             outBuffer.limit(bufferInfo.offset + bufferInfo.size)
                             val shorts = ShortArray(bufferInfo.size / 2)
                             outBuffer.asShortBuffer().get(shorts)
-                            pcmChunks.add(shorts)
+                            sink.write(shorts)
                         }
                     }
                     codec.releaseOutputBuffer(outIndex, false)
@@ -103,62 +145,86 @@ object AudioDecoder {
                     }
                 } else if (outIndex == MediaCodec.INFO_TRY_AGAIN_LATER && sawInputEOS) {
                     // Give the decoder a few more spins to flush before bailing.
-                    if (pcmChunks.isEmpty()) sawOutputEOS = true
+                    if (sink.isEmpty) sawOutputEOS = true
                 }
             }
         } catch (e: Exception) {
             Log.w(TAG, "Decode error for $path: ${e.message}")
             return null
         } finally {
-            codec.stop()
-            codec.release()
+            try { codec.stop() } catch (_: Exception) {}
+            try { codec.release() } catch (_: Exception) {}
             extractor.release()
         }
 
-        if (pcmChunks.isEmpty()) return null
-
-        val totalSamples = pcmChunks.sumOf { it.size }
-        val interleaved = ShortArray(totalSamples)
-        var offset = 0
-        for (chunk in pcmChunks) {
-            System.arraycopy(chunk, 0, interleaved, offset, chunk.size)
-            offset += chunk.size
+        if (sink.isFull) {
+            Log.i(TAG, "Recording longer than ${MAX_OUTPUT_SECONDS / 60} min — analysing the first ${MAX_OUTPUT_SECONDS / 60} min")
         }
-
-        val mono = downmixToMono(interleaved, sourceChannels)
-        return resampleTo16k(mono, sourceSampleRate)
+        return sink.result()
     }
 
-    private fun downmixToMono(interleaved: ShortArray, channels: Int): FloatArray {
-        if (channels <= 1) {
-            return FloatArray(interleaved.size) { interleaved[it] / 32768.0f }
-        }
-        val frames = interleaved.size / channels
-        val mono = FloatArray(frames)
-        for (i in 0 until frames) {
-            var sum = 0
-            for (c in 0 until channels) {
-                sum += interleaved[i * channels + c]
+    /**
+     * Consumes interleaved 16-bit PCM chunks, downmixes to mono, and linearly
+     * resamples to 16 kHz into a single pre-allocated output buffer. Carries
+     * partial frames and the resampler position across chunk boundaries so the
+     * output is identical to whole-file processing.
+     */
+    private class ResamplingMonoSink(
+        private val channels: Int,
+        sourceRate: Int,
+        maxSeconds: Int
+    ) {
+        private val step = sourceRate.toDouble() / TARGET_SAMPLE_RATE
+        private val out = FloatArray(maxSeconds * TARGET_SAMPLE_RATE)
+        private var outCount = 0
+
+        // Absolute mono-sample index of the first sample in the current chunk.
+        private var absBase = 0L
+        // Absolute source position (fractional) of the next output sample.
+        private var pos = 0.0
+        // Last mono sample of the previous chunk, for interpolation across chunks.
+        private var carrySample = 0f
+        // Leftover interleaved shorts that didn't complete a frame.
+        private var frameRemainder = ShortArray(0)
+
+        val isFull: Boolean get() = outCount >= out.size
+        val isEmpty: Boolean get() = outCount == 0 && absBase == 0L
+
+        fun write(shorts: ShortArray) {
+            if (isFull) return
+            val data = if (frameRemainder.isEmpty()) shorts else frameRemainder + shorts
+            val frames = data.size / channels
+            if (frames == 0) { frameRemainder = data; return }
+            frameRemainder = data.copyOfRange(frames * channels, data.size)
+
+            val mono = FloatArray(frames)
+            if (channels == 1) {
+                for (i in 0 until frames) mono[i] = data[i] / 32768.0f
+            } else {
+                for (i in 0 until frames) {
+                    var sum = 0
+                    for (c in 0 until channels) sum += data[i * channels + c]
+                    mono[i] = (sum / channels) / 32768.0f
+                }
             }
-            mono[i] = (sum / channels) / 32768.0f
-        }
-        return mono
-    }
 
-    private fun resampleTo16k(samples: FloatArray, sourceRate: Int): FloatArray {
-        if (sourceRate == TARGET_SAMPLE_RATE || samples.isEmpty()) return samples
-
-        val ratio = TARGET_SAMPLE_RATE.toDouble() / sourceRate.toDouble()
-        val outLength = (samples.size * ratio).toInt()
-        val out = FloatArray(outLength)
-        for (i in 0 until outLength) {
-            val srcPos = i / ratio
-            val srcIndex = srcPos.toInt()
-            val frac = (srcPos - srcIndex).toFloat()
-            val a = samples[srcIndex.coerceIn(0, samples.size - 1)]
-            val b = samples[(srcIndex + 1).coerceIn(0, samples.size - 1)]
-            out[i] = a + (b - a) * frac
+            val absEnd = absBase + frames
+            // Emit every output sample whose interpolation window [i, i+1] is available.
+            while (outCount < out.size && pos + 1 < absEnd) {
+                val i = pos.toLong()
+                val frac = (pos - i).toFloat()
+                val a = if (i < absBase) carrySample else mono[(i - absBase).toInt()]
+                val b = mono[(i + 1 - absBase).toInt()]
+                out[outCount++] = a + (b - a) * frac
+                pos += step
+            }
+            carrySample = mono[frames - 1]
+            absBase = absEnd
         }
-        return out
+
+        fun result(): FloatArray? {
+            if (outCount == 0) return null
+            return if (outCount == out.size) out else out.copyOf(outCount)
+        }
     }
 }

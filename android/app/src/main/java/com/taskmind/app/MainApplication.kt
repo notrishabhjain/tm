@@ -42,6 +42,7 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    installCrashLogger()
     SoLoader.init(this, OpenSourceMergedSoMapping)
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
@@ -53,5 +54,28 @@ class MainApplication : Application(), ReactApplication {
   override fun onConfigurationChanged(newConfig: Configuration) {
     super.onConfigurationChanged(newConfig)
     ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
+  }
+
+  // Records every fatal crash (including background ones the user never sees)
+  // into SharedPreferences so the status screen can show "App crashed last
+  // time: …" — turning "the app died randomly" into an actionable stack trace.
+  private fun installCrashLogger() {
+    val previous = Thread.getDefaultUncaughtExceptionHandler()
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+      try {
+        val stack = android.util.Log.getStackTraceString(throwable)
+        getSharedPreferences("taskmind_prefs", MODE_PRIVATE)
+          .edit()
+          .putString(
+            "last_crash",
+            "${System.currentTimeMillis()}|${throwable.javaClass.simpleName}: " +
+              "${throwable.message}\n${stack.take(1500)}"
+          )
+          .commit() // synchronous — the process is about to die
+      } catch (_: Throwable) {
+        // Never interfere with crash handling itself.
+      }
+      previous?.uncaughtException(thread, throwable)
+    }
   }
 }

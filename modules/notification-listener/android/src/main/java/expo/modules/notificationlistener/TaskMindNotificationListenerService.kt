@@ -34,6 +34,13 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         fun triggerDrain() {
             serviceInstance?.drainPendingQueue()
         }
+
+        /**
+         * True only while the system actually has the listener bound. The
+         * Settings permission string can say "granted" while the binding is
+         * dead (e.g. after a process crash) — this is the ground truth.
+         */
+        fun isConnected(): Boolean = serviceInstance != null
         private const val DEDUP_WINDOW_MS = 60_000L
         private const val DEDUP_CACHE_MAX = 100
         private const val CALL_SWEEP_THROTTLE_MS = 3 * 60_000L
@@ -157,7 +164,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
                     Intent(this, CallTranscriptionService::class.java)
                         .putExtra(CallTranscriptionService.EXTRA_MODE, CallTranscriptionService.MODE_SWEEP)
                 )
-            } catch (_: Exception) { }
+            } catch (_: Throwable) { }
         }.start()
     }
 
