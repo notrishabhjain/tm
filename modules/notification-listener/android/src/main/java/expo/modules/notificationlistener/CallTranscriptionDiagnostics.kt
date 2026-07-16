@@ -194,6 +194,41 @@ object CallTranscriptionDiagnostics {
         val durationSec = pcm.size / 16000.0
         onLog?.invoke("decode", "Decoded %.1fs of audio in %dms".format(durationSec, decodeMs))
 
+        // Primary engine first — same order as the live pipeline.
+        if (GeminiCallAnalyzer.apiKey(context).isNotBlank()) {
+            onLog?.invoke("gemini", "Analysing with Gemini 2.5 Flash (audio → transcript + tasks, one call)…")
+            val gStart = System.currentTimeMillis()
+            when (val g = GeminiCallAnalyzer.analyze(
+                context, recording, recording.lastModified(), "Pipeline test"
+            )) {
+                is GeminiCallAnalyzer.Result.Success -> {
+                    val gMs = System.currentTimeMillis() - gStart
+                    onLog?.invoke(
+                        "gemini",
+                        "Done in %.1fs — %d task(s) found. Transcript: %s".format(
+                            gMs / 1000.0,
+                            g.extraction.tasks.size,
+                            g.transcript.take(100).replace('\n', ' ')
+                        )
+                    )
+                    return mapOf(
+                        "ok" to true,
+                        "stage" to "transcribe",
+                        "recordingPath" to recording.absolutePath,
+                        "recordingAgeMs" to (now - recording.lastModified()).toDouble(),
+                        "decodedSamples" to pcm.size.toDouble(),
+                        "decodeMs" to decodeMs.toDouble(),
+                        "transcribeMs" to gMs.toDouble(),
+                        "engine" to "Gemini 2.5 Flash",
+                        "transcript" to g.transcript
+                    )
+                }
+                is GeminiCallAnalyzer.Result.Error ->
+                    onLog?.invoke("gemini", "Gemini failed (${g.message}) — testing fallback engines")
+                GeminiCallAnalyzer.Result.NoApiKey -> { /* fall through */ }
+            }
+        }
+
         onLog?.invoke("transcribe", "Sending %.1fs of audio to cloud ASR…".format(durationSec))
 
         val transcribeStart = System.currentTimeMillis()

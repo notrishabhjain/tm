@@ -32,6 +32,15 @@ export interface CallTranscriptionStatus {
   apiKeySet: boolean;
   /** True when the Sarvam (Hindi-specialist) transcription key is configured. */
   sarvamKeySet: boolean;
+  /** True when the Gemini (one-call audio→tasks) engine is available. */
+  geminiKeySet: boolean;
+}
+
+export interface ListenerHealth {
+  /** Notification access is granted in system settings. */
+  granted: boolean;
+  /** The system actually has the listener bound right now (ground truth). */
+  connected: boolean;
 }
 
 export interface CallDirReport {

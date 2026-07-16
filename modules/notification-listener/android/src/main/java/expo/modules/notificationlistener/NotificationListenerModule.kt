@@ -55,6 +55,38 @@ class NotificationListenerModule : Module() {
             if (enabled.contains(cn.flattenToString())) "granted" else "denied"
         }
 
+        // Permission string vs. actual binding — they diverge after a crash.
+        AsyncFunction("getListenerHealth") {
+            val cn = ComponentName(context, TaskMindNotificationListenerService::class.java)
+            val enabled = Settings.Secure.getString(
+                context.contentResolver,
+                "enabled_notification_listeners"
+            ) ?: ""
+            mapOf(
+                "granted" to enabled.contains(cn.flattenToString()),
+                "connected" to TaskMindNotificationListenerService.isConnected()
+            )
+        }
+
+        // Asks the system to re-bind a granted-but-dead listener (post-crash).
+        AsyncFunction("rebindListener") {
+            try {
+                android.service.notification.NotificationListenerService.requestRebind(
+                    ComponentName(context, TaskMindNotificationListenerService::class.java)
+                )
+            } catch (_: Exception) { }
+        }
+
+        AsyncFunction("getLastCrash") {
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .getString("last_crash", null)
+        }
+
+        AsyncFunction("clearLastCrash") {
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit().remove("last_crash").apply()
+        }
+
         AsyncFunction("openPermissionSettings") {
             val intent = Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -108,7 +140,15 @@ class NotificationListenerModule : Module() {
                 "hasAllFilesAccess" to hasAllFilesAccess(),
                 "apiKeySet" to true, // built-in default key always available
                 "sarvamKeySet" to AsrEngine.sarvamKey(context).isNotBlank(),
+                "geminiKeySet" to GeminiCallAnalyzer.apiKey(context).isNotBlank(),
             )
+        }
+
+        // Gemini key for the one-call audio→tasks engine. Blank restores the
+        // built-in default; the legacy NVIDIA chain remains the fallback.
+        AsyncFunction("setGeminiApiKey") { key: String ->
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit().putString("gemini_api_key", key.trim()).apply()
         }
 
         // Sarvam AI key — enables the Hindi/Hinglish-specialist transcription

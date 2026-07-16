@@ -31,22 +31,24 @@ import type { OemInfo } from '../../modules/notification-listener/src/types';
 
 interface PipelineStatus {
   notifAccess: boolean;
+  listenerConnected: boolean;
   serviceRunning: boolean;
   callEnabled: boolean;
   phonePerms: boolean;
   filesAccess: boolean;
   googleConnected: boolean;
-  sarvamKeySet: boolean;
+  geminiKeySet: boolean;
 }
 
 const DEFAULT_STATUS: PipelineStatus = {
   notifAccess: false,
+  listenerConnected: false,
   serviceRunning: false,
   callEnabled: false,
   phonePerms: false,
   filesAccess: false,
   googleConnected: false,
-  sarvamKeySet: false,
+  geminiKeySet: false,
 };
 
 export default function StatusScreen(): React.JSX.Element {
@@ -55,12 +57,16 @@ export default function StatusScreen(): React.JSX.Element {
   const [oem, setOem] = useState<OemInfo | null>(null);
   const [testing, setTesting] = useState(false);
   const [testLogs, setTestLogs] = useState<string[]>([]);
-  const [editingSarvamKey, setEditingSarvamKey] = useState(false);
-  const [sarvamKeyDraft, setSarvamKeyDraft] = useState('');
+  const [editingGeminiKey, setEditingGeminiKey] = useState(false);
+  const [geminiKeyDraft, setGeminiKeyDraft] = useState('');
+  const [lastCrash, setLastCrash] = useState<string | null>(null);
 
   useEffect(() => {
     void NotificationListener.getOemInfo()
       .then(setOem)
+      .catch(() => {});
+    void NotificationListener.getLastCrash()
+      .then(setLastCrash)
       .catch(() => {});
     const sub = NotificationListener.addCallTranscriptionTestLogListener((e) => {
       setTestLogs((prev) => [...prev, `[${e.stage}] ${e.message}`].slice(-40));
@@ -71,22 +77,27 @@ export default function StatusScreen(): React.JSX.Element {
   const refresh = useCallback(() => {
     void (async () => {
       try {
-        const [perm, running, call] = await Promise.all([
-          NotificationListener.getPermissionStatus(),
+        const [health, running, call] = await Promise.all([
+          NotificationListener.getListenerHealth(),
           NotificationListener.isServiceRunning(),
           NotificationListener.getCallTranscriptionStatus(),
         ]);
         setStatus({
-          notifAccess: perm === 'granted',
+          notifAccess: health.granted,
+          listenerConnected: health.connected,
           serviceRunning: running,
           callEnabled: call.enabled,
           phonePerms: call.hasPhoneStatePermission && call.hasCallLogPermission,
           filesAccess: call.hasAllFilesAccess,
           googleConnected: getSetting('google_tasks_enabled'),
-          sarvamKeySet: call.sarvamKeySet,
+          geminiKeySet: call.geminiKeySet,
         });
-        if (perm === 'granted' && !running) {
+        if (health.granted && !running) {
           void NotificationListener.startService().catch(() => {});
+        }
+        // Granted but not bound (e.g. after a crash) — ask the system to rebind.
+        if (health.granted && !health.connected) {
+          void NotificationListener.rebindListener().catch(() => {});
         }
       } catch {
         /* native unavailable (dev) */
@@ -100,11 +111,16 @@ export default function StatusScreen(): React.JSX.Element {
     }, [refresh])
   );
 
-  const saveSarvamKey = async (): Promise<void> => {
-    await NotificationListener.setSarvamApiKey(sarvamKeyDraft.trim()).catch(() => {});
-    setEditingSarvamKey(false);
-    setSarvamKeyDraft('');
+  const saveGeminiKey = async (): Promise<void> => {
+    await NotificationListener.setGeminiApiKey(geminiKeyDraft.trim()).catch(() => {});
+    setEditingGeminiKey(false);
+    setGeminiKeyDraft('');
     refresh();
+  };
+
+  const dismissCrash = (): void => {
+    setLastCrash(null);
+    void NotificationListener.clearLastCrash().catch(() => {});
   };
 
   // OAuth callback listener — Google redirects back into the app.
@@ -229,12 +245,52 @@ export default function StatusScreen(): React.JSX.Element {
         }
         ListHeaderComponent={
           <View style={styles.setup}>
+            {lastCrash !== null && (
+              <View style={[styles.row, styles.crashRow]}>
+                <Ionicons name="warning-outline" size={18} color={Colors.urgentFg} />
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowLabel, { color: Colors.urgentFg }]}>
+                    App crashed last time
+                  </Text>
+                  <Text style={[styles.crashDetail, { color: theme.onSurfaceVariant }]}>
+                    {formatCrash(lastCrash)}
+                  </Text>
+                </View>
+                <Pressable onPress={dismissCrash}>
+                  <Text style={[styles.logDismissText, { color: theme.onSurfaceVariant }]}>
+                    Dismiss
+                  </Text>
+                </Pressable>
+              </View>
+            )}
             <SetupRow
-              ok={status.notifAccess}
+              ok={status.notifAccess && status.listenerConnected}
               label="Notification access"
-              detail="Reads messages from your messaging apps"
-              actionLabel={status.notifAccess ? undefined : 'Grant'}
-              onAction={() => void NotificationListener.openPermissionSettings()}
+              detail={
+                status.notifAccess && !status.listenerConnected
+                  ? 'Granted but NOT connected — tap Fix; if still red, toggle TaskMind off & on in the settings that open'
+                  : 'Reads messages from your messaging apps'
+              }
+              actionLabel={
+                !status.notifAccess ? 'Grant' : !status.listenerConnected ? 'Fix' : undefined
+              }
+              onAction={() => {
+                if (status.notifAccess && !status.listenerConnected) {
+                  void NotificationListener.rebindListener().catch(() => {});
+                  setTimeout(() => {
+                    refresh();
+                    void NotificationListener.getListenerHealth()
+                      .then((h) => {
+                        if (h.granted && !h.connected) {
+                          void NotificationListener.openPermissionSettings();
+                        }
+                      })
+                      .catch(() => {});
+                  }, 2000);
+                } else {
+                  void NotificationListener.openPermissionSettings();
+                }
+              }}
             />
             <View
               style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.outline }]}
@@ -256,19 +312,17 @@ export default function StatusScreen(): React.JSX.Element {
             </View>
             <View style={styles.sarvamBlock}>
               <SetupRow
-                ok={status.sarvamKeySet}
-                label="Hindi transcription (Sarvam AI)"
+                ok={status.geminiKeySet}
+                label="Call AI — Gemini 2.5 Flash"
                 detail={
-                  status.sarvamKeySet
-                    ? 'Active — calls are transcribed by the Hindi/Hinglish specialist engine'
-                    : 'Add a free Sarvam AI key for far more accurate Hindi call transcription (dashboard.sarvam.ai)'
+                  status.geminiKeySet
+                    ? 'One call does it all: audio → Hindi/English transcript → tasks. NVIDIA is the automatic fallback.'
+                    : 'Add a Gemini API key (aistudio.google.com) — calls fall back to Whisper until then'
                 }
-                actionLabel={
-                  editingSarvamKey ? undefined : status.sarvamKeySet ? 'Change' : 'Add key'
-                }
-                onAction={() => setEditingSarvamKey(true)}
+                actionLabel={editingGeminiKey ? undefined : 'Change key'}
+                onAction={() => setEditingGeminiKey(true)}
               />
-              {editingSarvamKey && (
+              {editingGeminiKey && (
                 <View
                   style={[
                     styles.row,
@@ -276,24 +330,24 @@ export default function StatusScreen(): React.JSX.Element {
                   ]}
                 >
                   <TextInput
-                    value={sarvamKeyDraft}
-                    onChangeText={setSarvamKeyDraft}
-                    placeholder="Paste Sarvam API key (blank = use Whisper)"
+                    value={geminiKeyDraft}
+                    onChangeText={setGeminiKeyDraft}
+                    placeholder="Paste Gemini key (blank = built-in key)"
                     placeholderTextColor={theme.onSurfaceVariant}
                     autoCapitalize="none"
                     autoCorrect={false}
                     style={[styles.keyInput, { color: theme.onSurface }]}
                   />
                   <Pressable
-                    onPress={() => void saveSarvamKey()}
+                    onPress={() => void saveGeminiKey()}
                     style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
                   >
                     <Text style={styles.actionText}>Save</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => {
-                      setEditingSarvamKey(false);
-                      setSarvamKeyDraft('');
+                      setEditingGeminiKey(false);
+                      setGeminiKeyDraft('');
                     }}
                   >
                     <Text style={[styles.logDismissText, { color: theme.onSurfaceVariant }]}>
@@ -400,6 +454,18 @@ export default function StatusScreen(): React.JSX.Element {
   );
 }
 
+/** "<epoch ms>|<type>: <message>\n<stack>" → "12 Jul, 3:41 pm — OutOfMemoryError: …" */
+function formatCrash(raw: string): string {
+  const sep = raw.indexOf('|');
+  if (sep === -1) return raw.split('\n')[0] ?? raw;
+  const when = new Date(Number(raw.slice(0, sep)));
+  const firstLine = raw.slice(sep + 1).split('\n')[0] ?? '';
+  const time = isNaN(when.getTime())
+    ? ''
+    : `${when.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })} — `;
+  return `${time}${firstLine}`.slice(0, 160);
+}
+
 function StatusDot({ ok }: { ok: boolean }): React.JSX.Element {
   return <View style={[styles.dot, { backgroundColor: ok ? Colors.success : Colors.urgentFg }]} />;
 }
@@ -499,6 +565,8 @@ const styles = StyleSheet.create({
   activityTitle: { fontSize: 12, fontWeight: '700', marginTop: 18, marginBottom: 4 },
   sarvamBlock: { gap: 10 },
   keyInput: { flex: 1, fontSize: 13, padding: 0 },
+  crashRow: { backgroundColor: 'rgba(220,60,60,0.10)', borderColor: 'rgba(220,60,60,0.4)' },
+  crashDetail: { fontSize: 11, fontFamily: 'monospace', marginTop: 2, lineHeight: 15 },
   troubleshootRow: { flexDirection: 'row', gap: 10 },
   troubleshootBtn: {
     flex: 1,

@@ -6,6 +6,7 @@ import type {
   CallDiagnostics,
   CallTranscriptionTestResult,
   OemInfo,
+  ListenerHealth,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,6 +91,7 @@ const NotificationListenerModule = {
         hasAllFilesAccess: false,
         apiKeySet: false,
         sarvamKeySet: false,
+        geminiKeySet: false,
       });
     }
     return NativeModule.getCallTranscriptionStatus() as Promise<CallTranscriptionStatus>;
@@ -99,6 +101,35 @@ const NotificationListenerModule = {
   setSarvamApiKey(key: string): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.setSarvamApiKey(key) as Promise<void>;
+  },
+
+  /** Gemini key for the one-call audio→tasks engine; blank restores the default. */
+  setGeminiApiKey(key: string): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setGeminiApiKey(key) as Promise<void>;
+  },
+
+  /** Permission string vs. actual binding — they diverge after a crash. */
+  getListenerHealth(): Promise<ListenerHealth> {
+    if (!NativeModule) return Promise.resolve({ granted: false, connected: false });
+    return NativeModule.getListenerHealth() as Promise<ListenerHealth>;
+  },
+
+  /** Asks the system to re-bind a granted-but-dead listener. */
+  rebindListener(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.rebindListener() as Promise<void>;
+  },
+
+  /** "<epoch ms>|<type>: <message>\n<stack>" of the last fatal crash, or null. */
+  getLastCrash(): Promise<string | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.getLastCrash() as Promise<string | null>;
+  },
+
+  clearLastCrash(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.clearLastCrash() as Promise<void>;
   },
 
   setNvidiaApiKey(key: string): Promise<void> {
