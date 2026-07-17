@@ -217,17 +217,40 @@ export default function StatusScreen(): React.JSX.Element {
   };
 
   const checkNow = (): void => {
-    setTestLogs([
-      'Checking now — scanning recordings from the last 24h, the notification tray, and the sync queue. Results appear in Recent Activity below.',
-    ]);
-    void NotificationListener.scanForMissedCalls().catch(() => {});
-    void NotificationListener.drainPendingNotifications().catch(() => {});
-    void NotificationListener.scanActiveNotifications().catch(() => {});
-    setTimeout(() => void refetch(), 5000);
+    void (async () => {
+      // The tray scan silently does nothing when the listener binding is dead,
+      // so report its true state first — this is the #1 cause of "no tasks".
+      const health = await NotificationListener.getListenerHealth().catch(() => null);
+      const listenerLine = !health
+        ? '? Listener status unavailable'
+        : health.connected
+          ? '✓ Notification listener is CONNECTED'
+          : health.granted
+            ? '✗ Listener granted but NOT CONNECTED — tap Fix on the Notification access row, then toggle TaskMind off & on in the settings it opens'
+            : '✗ Notification access NOT granted — tap Grant above';
+      setTestLogs([
+        listenerLine,
+        'Scanning recordings (last 24h), the notification tray, and the sync queue — results appear in Recent Activity below.',
+      ]);
+      if (health?.granted && !health.connected) {
+        void NotificationListener.rebindListener().catch(() => {});
+      }
+      void NotificationListener.scanForMissedCalls().catch(() => {});
+      void NotificationListener.drainPendingNotifications().catch(() => {});
+      void NotificationListener.scanActiveNotifications().catch(() => {});
+      setTimeout(() => {
+        void refetch();
+        refresh();
+      }, 5000);
+    })();
   };
 
   const allGood =
-    status.notifAccess && status.callEnabled && status.phonePerms && status.googleConnected;
+    status.notifAccess &&
+    status.listenerConnected &&
+    status.callEnabled &&
+    status.phonePerms &&
+    status.googleConnected;
 
   return (
     <Screen>
