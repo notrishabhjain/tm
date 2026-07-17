@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
   <uses-permission android:name="android.permission.READ_CALL_LOG"/>
@@ -28,7 +29,12 @@
         <action android:name="android.service.notification.NotificationListenerService"/>
       </intent-filter>
     </service>
-    <service android:name="expo.modules.notificationlistener.TaskMindForegroundService" android:foregroundServiceType="dataSync" android:exported="false"/>
+    <!-- specialUse, NOT dataSync: this watcher runs all day, and Android 15
+         caps dataSync at ~6h/day — after which every restart crashed the app
+         (ForegroundServiceStartNotAllowedException) and killed the listener. -->
+    <service android:name="expo.modules.notificationlistener.TaskMindForegroundService" android:foregroundServiceType="specialUse" android:exported="false">
+      <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Continuous monitoring of user-approved notifications and finished calls to create tasks"/>
+    </service>
     <service android:name="expo.modules.notificationlistener.CallTranscriptionService" android:foregroundServiceType="dataSync" android:exported="false"/>
     <service android:name="expo.modules.notificationlistener.TaskMindHeadlessTaskService" android:exported="false"/>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">

@@ -59,6 +59,7 @@ object GeminiCallAnalyzer {
     fun apiKey(context: Context): String =
         context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
             .getString("gemini_api_key", null).orEmpty().trim()
+            .takeUnless { it == DefaultKeys.GEMINI_DEAD_LEGACY }.orEmpty()
             .ifBlank { DefaultKeys.GEMINI }
 
     /** Blocks (network + possible decode) — call off the main thread. */

@@ -51,25 +51,67 @@ class CallTranscriptionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildProgressNotification())
-
-        if (worker?.isAlive == true) return START_NOT_STICKY
-
         val sweep = intent?.getStringExtra(EXTRA_MODE) == MODE_SWEEP
-        worker = Thread {
-            try {
-                if (sweep) runSweep() else runPipeline()
-            } catch (t: Throwable) {
-                // Throwable, not Exception: an OOM here must not kill the app
-                // process — that takes the notification listener down with it.
-                Log.w(TAG, "Pipeline failed: ${t.javaClass.simpleName}: ${t.message}")
-            } finally {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+
+        val foregrounded = try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFICATION_ID, buildProgressNotification(),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildProgressNotification())
             }
-        }.also { it.start() }
+            true
+        } catch (t: Throwable) {
+            // dataSync budget exhausted or background start denied — degrade,
+            // never crash (a crash kills the notification listener too).
+            Log.w(TAG, "startForeground denied: ${t.message} — running detached")
+            false
+        }
+
+        if (worker?.isAlive == true) {
+            if (!foregrounded) stopSelf()
+            return START_NOT_STICKY
+        }
+
+        if (foregrounded) {
+            worker = Thread {
+                try {
+                    if (sweep) runSweep() else runPipeline()
+                } catch (t: Throwable) {
+                    // Throwable, not Exception: an OOM here must not kill the app
+                    // process — that takes the notification listener down with it.
+                    Log.w(TAG, "Pipeline failed: ${t.javaClass.simpleName}: ${t.message}")
+                } finally {
+                    try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (_: Throwable) {}
+                    stopSelf()
+                }
+            }.also { it.start() }
+        } else {
+            // The service must stop immediately (unfulfilled startForeground
+            // contract triggers an ANR otherwise) — run the work detached; the
+            // process stays alive via the listener binding.
+            Thread {
+                try {
+                    if (sweep) runSweep() else runPipeline()
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Detached pipeline failed: ${t.javaClass.simpleName}: ${t.message}")
+                }
+            }.start()
+            stopSelf()
+        }
 
         return START_NOT_STICKY
+    }
+
+    // Android 15 calls this when the dataSync time budget runs out mid-run; the
+    // service must stop promptly or the system kills the app. The worker thread
+    // survives the service stop and finishes its current recording.
+    override fun onTimeout(startId: Int) {
+        Log.w(TAG, "dataSync time budget exhausted — stopping service")
+        try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (_: Throwable) {}
+        stopSelf()
     }
 
     private fun runPipeline() {

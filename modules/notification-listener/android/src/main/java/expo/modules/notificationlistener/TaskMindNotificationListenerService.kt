@@ -116,8 +116,9 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        val serviceIntent = Intent(this, TaskMindForegroundService::class.java)
-        startForegroundService(serviceIntent)
+        try {
+            startForegroundService(Intent(this, TaskMindForegroundService::class.java))
+        } catch (_: Throwable) { }
         // If any notifications were queued while the binding was down, replay them.
         drainPendingQueue()
     }

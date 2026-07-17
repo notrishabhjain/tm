@@ -95,8 +95,9 @@ class NotificationListenerModule : Module() {
         }
 
         AsyncFunction("startService") {
-            val intent = Intent(context, TaskMindForegroundService::class.java)
-            context.startForegroundService(intent)
+            try {
+                context.startForegroundService(Intent(context, TaskMindForegroundService::class.java))
+            } catch (_: Throwable) { }
         }
 
         AsyncFunction("stopService") {
