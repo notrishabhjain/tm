@@ -23,11 +23,9 @@ import { getSetting } from '@/data/storage/settings';
 // reasoning-first output, worked examples covering both languages and both
 // verdicts, and explicit tests a message must pass to count as a task.
 
-const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1';
-// Accuracy is the product. Calls + notifications both use the strongest
-// free-tier model; notification volume after native hard filters is low
-// enough that latency/rate limits are a non-issue.
-const MODEL = 'meta/llama-3.3-70b-instruct';
+// Three independent LLM engines, all free-tier, all using Llama 3.3 70B.
+// Notification volume after native hard-filters is low enough that none of
+// them will hit rate limits under normal personal use.
 const TIMEOUT_MS = 25_000;
 
 const NOTIFICATION_PROMPT = `You are the sole gatekeeper of a busy Indian professional's to-do list. You read one incoming message (with its conversation history when available) and decide: does this message give the USER a concrete task? Your verdict is final — a "yes" goes straight onto their Google Tasks list with no human review. A false task wastes their attention; a missed task means a dropped commitment to a real person.
@@ -155,32 +153,46 @@ function buildUserContent(notification: NotificationData, history: StoredMessage
   return parts.join('\n');
 }
 
-// Two independent judges, same prompt, same output contract: NVIDIA Llama 70B
-// first, Gemini 2.5 Flash when NVIDIA fails (dead key, quota, network). Either
-// one keeps tasks flowing.
+// Three independent judges, same prompt, same output contract.
+// Order: Groq (Llama 3.3 70B, 14 400 req/day free) → OpenRouter (Llama 3.3 70B
+// free tier, multiple backend providers) → Gemini 2.5 Flash (last resort).
+// Error classification: 401/403 = bad key → skip immediately; 429 = rate
+// limit → skip (next engine may not be); 5xx = transient → one retry.
 async function decide(
   notification: NotificationData,
   history: StoredMessage[]
 ): Promise<PipelineDecision | null> {
   const userContent = buildUserContent(notification, history);
-  return (await decideWithNvidia(userContent)) ?? (await decideWithGemini(userContent));
+  return (
+    (await decideWithGroq(userContent)) ??
+    (await decideWithOpenRouter(userContent)) ??
+    (await decideWithGemini(userContent))
+  );
 }
 
-async function decideWithNvidia(userContent: string): Promise<PipelineDecision | null> {
-  const key = getSetting('ai_api_key');
-  if (!key) return null;
-
+// Shared OpenAI-compatible caller used by Groq and OpenRouter.
+async function callOpenAiCompat(
+  url: string,
+  model: string,
+  key: string,
+  userContent: string,
+  extraHeaders: Record<string, string> = {}
+): Promise<PipelineDecision | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const resp = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+        const resp = await fetch(url, {
           method: 'POST',
           signal: controller.signal,
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${key}`,
+            ...extraHeaders,
+          },
           body: JSON.stringify({
-            model: MODEL,
+            model,
             temperature: 0.05,
             max_tokens: 500,
             messages: [
@@ -196,11 +208,14 @@ async function decideWithNvidia(userContent: string): Promise<PipelineDecision |
           const content: string = data?.choices?.[0]?.message?.content ?? '';
           return parseDecision(content);
         }
-        if (resp.status !== 429 && resp.status < 500) return null;
+        // Bad key or rate-limited: skip this engine, try the next one.
+        if (resp.status === 401 || resp.status === 403 || resp.status === 429) return null;
+        if (resp.status < 500) return null; // other 4xx — not retryable
+        // 5xx: retry once after a short pause.
       } catch (e) {
         if ((e as Error).name === 'AbortError') return null;
       }
-      if (attempt === 1) await new Promise((r) => setTimeout(r, 3000));
+      if (attempt === 1) await new Promise<void>((r) => setTimeout(r, 3000));
     }
     return null;
   } finally {
@@ -208,13 +223,39 @@ async function decideWithNvidia(userContent: string): Promise<PipelineDecision |
   }
 }
 
+async function decideWithGroq(userContent: string): Promise<PipelineDecision | null> {
+  const key = getSetting('groq_api_key');
+  if (!key) return null;
+  return callOpenAiCompat(
+    'https://api.groq.com/openai/v1/chat/completions',
+    'llama-3.3-70b-versatile',
+    key,
+    userContent
+  );
+}
+
+async function decideWithOpenRouter(userContent: string): Promise<PipelineDecision | null> {
+  const key = getSetting('openrouter_api_key');
+  if (!key) return null;
+  return callOpenAiCompat(
+    'https://openrouter.ai/api/v1/chat/completions',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    key,
+    userContent,
+    { 'HTTP-Referer': 'https://taskmind.app', 'X-Title': 'TaskMind' }
+  );
+}
+
 async function decideWithGemini(userContent: string): Promise<PipelineDecision | null> {
   try {
-    const key = ((await NotificationListener.getGeminiApiKey().catch(() => '')) || '').trim();
+    const key = getSetting('gemini_api_key').trim();
     if (!key) return null;
+    // AIzaSy keys → AI Studio endpoint (query-param auth)
+    // AQ. keys → Vertex Express endpoint (query-param auth, different project)
+    const encodedKey = encodeURIComponent(key);
     const url = key.startsWith('AIza')
-      ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`
-      : `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`;
+      ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodedKey}`
+      : `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=${encodedKey}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
@@ -442,7 +483,7 @@ export async function runNotificationPipelineTest(log: (line: string) => void): 
   );
   if (decision === null) {
     log(
-      '✗ AI DECISION FAILED — BOTH engines failed (NVIDIA key dead/unreachable AND the Gemini fallback). Every real message hits this same wall.'
+      '✗ AI DECISION FAILED — all three engines failed (Groq, OpenRouter, and Gemini all unreachable or rejected the key). Every real message hits this same wall.'
     );
     return;
   }
