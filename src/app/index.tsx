@@ -18,6 +18,7 @@ import { useTheme } from '@/ui/theme';
 import { Colors } from '@/ui/theme/colors';
 import { Screen, LargeHeader } from '@/ui/components/Screen';
 import { getSetting } from '@/data/storage/settings';
+import { initializeDatabase } from '@/data/db/client';
 import { getRecentActivity } from '@/data/pipeline-store';
 import type { ActivityEntry } from '@/data/pipeline-store';
 import {
@@ -61,6 +62,18 @@ export default function StatusScreen(): React.JSX.Element {
   const [editingGeminiKey, setEditingGeminiKey] = useState(false);
   const [geminiKeyDraft, setGeminiKeyDraft] = useState('');
   const [lastCrash, setLastCrash] = useState<string | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  // Storage is the one component whose failure silently blanks everything —
+  // surface it loudly and re-check on every focus (the open now self-heals).
+  const checkStorage = useCallback(() => {
+    try {
+      initializeDatabase();
+      setDbError(null);
+    } catch (e) {
+      setDbError(e instanceof Error ? `${e.name}: ${e.message}`.slice(0, 200) : String(e));
+    }
+  }, []);
 
   useEffect(() => {
     void NotificationListener.getOemInfo()
@@ -109,7 +122,8 @@ export default function StatusScreen(): React.JSX.Element {
   useFocusEffect(
     useCallback(() => {
       refresh();
-    }, [refresh])
+      checkStorage();
+    }, [refresh, checkStorage])
   );
 
   const saveGeminiKey = async (): Promise<void> => {
@@ -297,6 +311,19 @@ export default function StatusScreen(): React.JSX.Element {
         }
         ListHeaderComponent={
           <View style={styles.setup}>
+            {dbError !== null && (
+              <View style={[styles.row, styles.crashRow]}>
+                <Ionicons name="server-outline" size={18} color={Colors.urgentFg} />
+                <View style={styles.rowText}>
+                  <Text style={[styles.rowLabel, { color: Colors.urgentFg }]}>
+                    Storage error — pipeline blocked
+                  </Text>
+                  <Text style={[styles.crashDetail, { color: theme.onSurfaceVariant }]}>
+                    {dbError}
+                  </Text>
+                </View>
+              </View>
+            )}
             {lastCrash !== null && (
               <View style={[styles.row, styles.crashRow]}>
                 <Ionicons name="warning-outline" size={18} color={Colors.urgentFg} />
