@@ -205,7 +205,14 @@ export async function handleNotification(taskData: {
   notification: NotificationData;
 }): Promise<void> {
   const { notification } = taskData;
-  initializeDatabase();
+  // A broken local DB must NOT abort the pipeline: dedup/history/logging
+  // degrade gracefully (their helpers already swallow failures), but the
+  // AI decision and Google Tasks creation still work — tasks keep flowing.
+  try {
+    initializeDatabase();
+  } catch (e) {
+    console.error('DB init failed — continuing without local storage:', e);
+  }
 
   const text = notification.bigText || notification.text || '';
   if (!text.trim()) return;

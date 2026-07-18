@@ -2,26 +2,43 @@ import { drizzle } from 'drizzle-orm/expo-sqlite';
 import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 import * as schema from './schema';
 
+// Lazy, RETRYING open. The previous version opened at module load and treated
+// a single failure as permanent for the process lifetime — one bad moment at
+// startup silently killed every pipeline stage AND blanked the activity list,
+// with no error surfaced anywhere. Now every db access retries the open, and
+// initializeDatabase() throws the real error so the UI can display it.
 let _sqlite: SQLiteDatabase | null = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _db: any = null;
-let _openError: unknown = null;
-
-try {
-  _sqlite = openDatabaseSync('taskmind.db');
-  _db = drizzle(_sqlite, { schema });
-} catch (e) {
-  _openError = e;
-}
+let _real: any = null;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const db = _db as any;
+function ensureOpen(): any {
+  if (_real) return _real;
+  _sqlite = openDatabaseSync('taskmind.db');
+  _real = drizzle(_sqlite, { schema });
+  return _real;
+}
+
+// All existing call sites do `db.select()...` etc. — the proxy defers the
+// open to first use and keeps retrying after earlier failures.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const db: any = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const real = ensureOpen();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const value = real[prop];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      return typeof value === 'function' ? value.bind(real) : value;
+    },
+  }
+);
 export type Database = ReturnType<typeof drizzle<typeof schema>>;
 
 export function initializeDatabase(): void {
-  if (_openError !== null) {
-    throw _openError instanceof Error ? _openError : new Error(String(_openError));
-  }
+  ensureOpen(); // throws the real underlying error when SQLite cannot open
   if (!_sqlite) {
     throw new Error('SQLite failed to open');
   }
