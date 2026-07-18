@@ -70,8 +70,18 @@ const NotificationListenerModule = {
 
   addNotificationListener(listener: (data: NotificationData) => void) {
     if (!emitter) return { remove: () => undefined };
+    // Signal native: a live JS listener is now registered. Native dispatch uses
+    // this to distinguish "process alive via FGS but no listener" (swipe) from
+    // "process alive AND JS is handling events" (app open).
+    void NativeModule?.setNotificationListenerActive(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (emitter as any).addListener('onNotification', listener) as { remove: () => void };
+    const sub = (emitter as any).addListener('onNotification', listener) as { remove: () => void };
+    return {
+      remove: () => {
+        void NativeModule?.setNotificationListenerActive(false);
+        sub.remove();
+      },
+    };
   },
 
   // ── Confirmation notifications ────────────────────────────────────────────
