@@ -110,6 +110,12 @@ const NotificationListenerModule = {
     return NativeModule.setGeminiApiKey(key) as Promise<void>;
   },
 
+  /** Effective Gemini key (user override or built-in default). */
+  getGeminiApiKey(): Promise<string> {
+    if (!NativeModule) return Promise.resolve('');
+    return NativeModule.getGeminiApiKey() as Promise<string>;
+  },
+
   /** Permission string vs. actual binding — they diverge after a crash. */
   getListenerHealth(): Promise<ListenerHealth> {
     if (!NativeModule) return Promise.resolve({ granted: false, connected: false });

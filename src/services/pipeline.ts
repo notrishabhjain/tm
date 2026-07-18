@@ -138,13 +138,7 @@ export function parseDecision(raw: string): PipelineDecision | null {
   }
 }
 
-async function decide(
-  notification: NotificationData,
-  history: StoredMessage[]
-): Promise<PipelineDecision | null> {
-  const key = getSetting('ai_api_key');
-  if (!key) return null;
-
+function buildUserContent(notification: NotificationData, history: StoredMessage[]): string {
   const parts: string[] = [
     `Today: ${formatNow()} — resolve every relative date/time against this moment.`,
     `App: ${appDisplayName(notification.packageName)}`,
@@ -158,6 +152,23 @@ async function decide(
       .join('\n');
     parts.push(`Conversation history (oldest first):\n${lines}`);
   }
+  return parts.join('\n');
+}
+
+// Two independent judges, same prompt, same output contract: NVIDIA Llama 70B
+// first, Gemini 2.5 Flash when NVIDIA fails (dead key, quota, network). Either
+// one keeps tasks flowing.
+async function decide(
+  notification: NotificationData,
+  history: StoredMessage[]
+): Promise<PipelineDecision | null> {
+  const userContent = buildUserContent(notification, history);
+  return (await decideWithNvidia(userContent)) ?? (await decideWithGemini(userContent));
+}
+
+async function decideWithNvidia(userContent: string): Promise<PipelineDecision | null> {
+  const key = getSetting('ai_api_key');
+  if (!key) return null;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -174,7 +185,7 @@ async function decide(
             max_tokens: 500,
             messages: [
               { role: 'system', content: NOTIFICATION_PROMPT },
-              { role: 'user', content: parts.join('\n') },
+              { role: 'user', content: userContent },
             ],
           }),
         });
@@ -194,6 +205,48 @@ async function decide(
     return null;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function decideWithGemini(userContent: string): Promise<PipelineDecision | null> {
+  try {
+    const key = ((await NotificationListener.getGeminiApiKey().catch(() => '')) || '').trim();
+    if (!key) return null;
+    const url = key.startsWith('AIza')
+      ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`
+      : `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: NOTIFICATION_PROMPT }] },
+          contents: [{ role: 'user', parts: [{ text: userContent }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 600,
+            responseMimeType: 'application/json',
+          },
+        }),
+      });
+      if (!resp.ok) return null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = (await resp.json()) as any;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+      const candidateParts = data?.candidates?.[0]?.content?.parts;
+      const text = Array.isArray(candidateParts)
+        ? // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+          candidateParts.map((p: { text?: string }) => p?.text ?? '').join('')
+        : '';
+      return parseDecision(text);
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
   }
 }
 
@@ -389,7 +442,7 @@ export async function runNotificationPipelineTest(log: (line: string) => void): 
   );
   if (decision === null) {
     log(
-      '✗ AI DECISION FAILED — NVIDIA API unreachable or key rejected. Every real message hits this same wall.'
+      '✗ AI DECISION FAILED — BOTH engines failed (NVIDIA key dead/unreachable AND the Gemini fallback). Every real message hits this same wall.'
     );
     return;
   }

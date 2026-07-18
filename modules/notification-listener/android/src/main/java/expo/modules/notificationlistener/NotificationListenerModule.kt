@@ -161,6 +161,11 @@ class NotificationListenerModule : Module() {
                 .edit().putString("gemini_api_key", key.trim()).apply()
         }
 
+        // The JS notification pipeline uses this for its Gemini fallback.
+        AsyncFunction("getGeminiApiKey") {
+            GeminiCallAnalyzer.apiKey(context)
+        }
+
         // Sarvam AI key — enables the Hindi/Hinglish-specialist transcription
         // engine. Empty/blank clears it (pipeline falls back to Whisper).
         AsyncFunction("setSarvamApiKey") { key: String ->
