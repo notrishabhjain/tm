@@ -46,10 +46,20 @@ object AsrEngine {
         val whisperKey = prefs.getString("nvidia_api_key", null).orEmpty()
             .ifBlank { DefaultKeys.NVIDIA_ASR }
         onLog?.invoke("Transcribing with NVIDIA Whisper Large V3…")
-        return when (val r = NvidiaAsrClient.transcribe(whisperKey, pcm)) {
-            is NvidiaAsrClient.Result.Success -> Result.Success(r.text, "Whisper Large V3")
-            is NvidiaAsrClient.Result.Error -> Result.Error(r.message)
-            NvidiaAsrClient.Result.NoApiKey -> Result.NoApiKey
+        when (val r = NvidiaAsrClient.transcribe(whisperKey, pcm)) {
+            is NvidiaAsrClient.Result.Success -> return Result.Success(r.text, "Whisper Large V3")
+            is NvidiaAsrClient.Result.Error ->
+                onLog?.invoke("NVIDIA Whisper failed (${r.message}) — falling back to Groq Whisper")
+            NvidiaAsrClient.Result.NoApiKey ->
+                onLog?.invoke("NVIDIA Whisper key missing — falling back to Groq Whisper")
+        }
+
+        val groqKey = prefs.getString("groq_api_key", null).orEmpty().ifBlank { DefaultKeys.GROQ }
+        onLog?.invoke("Transcribing with Groq Whisper Large V3…")
+        return when (val r = GroqAsrClient.transcribe(groqKey, pcm)) {
+            is GroqAsrClient.Result.Success -> Result.Success(r.text, "Groq Whisper Large V3")
+            is GroqAsrClient.Result.Error -> Result.Error(r.message)
+            GroqAsrClient.Result.NoApiKey -> Result.Error("No ASR key available")
         }
     }
 }

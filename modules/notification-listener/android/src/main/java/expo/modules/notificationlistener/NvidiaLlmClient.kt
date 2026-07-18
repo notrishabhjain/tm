@@ -24,6 +24,7 @@ import java.util.Locale
 object NvidiaLlmClient {
     private const val TAG = "NvidiaLlmClient"
     private const val ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions"
+    internal const val GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
     private const val CONNECT_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 45_000
     private const val MAX_ATTEMPTS = 2
@@ -109,13 +110,30 @@ Be strict: when in doubt, drop. Return ONLY valid JSON, no markdown:
   ]
 }"""
 
+    /** Convenience: extract via Groq Llama 3.3 70B. */
+    fun extractWithGroq(
+        groqKey: String,
+        transcript: String,
+        callTimeMs: Long,
+        callerLabel: String
+    ): Result = extract(groqKey, "llama-3.3-70b-versatile", transcript, callTimeMs, callerLabel, GROQ_ENDPOINT)
+
+    /** Convenience: verify pass via Groq Llama 3.3 70B. */
+    fun verifyWithGroq(
+        groqKey: String,
+        transcript: String,
+        extraction: CallExtraction,
+        callTimeMs: Long
+    ): CallExtraction = verify(groqKey, "llama-3.3-70b-versatile", transcript, extraction, callTimeMs, GROQ_ENDPOINT)
+
     /** Blocking — must be called off the main thread. */
     fun extract(
         apiKey: String,
         model: String,
         transcript: String,
         callTimeMs: Long,
-        callerLabel: String
+        callerLabel: String,
+        endpoint: String = ENDPOINT
     ): Result {
         if (apiKey.isBlank()) return Result.NoApiKey
 
@@ -128,7 +146,7 @@ Be strict: when in doubt, drop. Return ONLY valid JSON, no markdown:
             append("Call transcript:\n\n").append(transcript)
         }
 
-        return when (val content = chatCompletion(apiKey, model, SYSTEM_PROMPT, userMessage)) {
+        return when (val content = chatCompletion(apiKey, model, SYSTEM_PROMPT, userMessage, endpoint)) {
             is ChatResult.Content -> {
                 val parsed = parseExtraction(content.text, callTimeMs)
                     ?: return Result.Error("Unparseable LLM response")
@@ -149,7 +167,8 @@ Be strict: when in doubt, drop. Return ONLY valid JSON, no markdown:
         model: String,
         transcript: String,
         extraction: CallExtraction,
-        callTimeMs: Long
+        callTimeMs: Long,
+        endpoint: String = ENDPOINT
     ): CallExtraction {
         if (extraction.tasks.isEmpty()) return extraction
         return try {
@@ -166,7 +185,7 @@ Be strict: when in doubt, drop. Return ONLY valid JSON, no markdown:
                 }
             }
             val userMessage = "Transcript:\n\n$transcript\n\nCandidate tasks:\n$candidates"
-            val content = chatCompletion(apiKey, model, VERIFY_PROMPT, userMessage)
+            val content = chatCompletion(apiKey, model, VERIFY_PROMPT, userMessage, endpoint)
             if (content !is ChatResult.Content) return extraction
 
             val start = content.text.indexOf('{')
@@ -213,7 +232,8 @@ Be strict: when in doubt, drop. Return ONLY valid JSON, no markdown:
         apiKey: String,
         model: String,
         systemPrompt: String,
-        userMessage: String
+        userMessage: String,
+        endpoint: String = ENDPOINT
     ): ChatResult {
         val body = JSONObject().apply {
             put("model", model)
@@ -228,7 +248,7 @@ Be strict: when in doubt, drop. Return ONLY valid JSON, no markdown:
         var lastError = "unknown"
         for (attempt in 1..MAX_ATTEMPTS) {
             try {
-                val (status, response) = post(apiKey, body)
+                val (status, response) = post(apiKey, body, endpoint)
                 if (status in 200..299) {
                     val content = JSONObject(response)
                         .optJSONArray("choices")?.optJSONObject(0)
@@ -250,8 +270,8 @@ Be strict: when in doubt, drop. Return ONLY valid JSON, no markdown:
         return ChatResult.Failure(lastError)
     }
 
-    private fun post(apiKey: String, body: String): Pair<Int, String> {
-        val conn = URL(ENDPOINT).openConnection() as HttpURLConnection
+    private fun post(apiKey: String, body: String, endpoint: String = ENDPOINT): Pair<Int, String> {
+        val conn = URL(endpoint).openConnection() as HttpURLConnection
         return try {
             conn.requestMethod = "POST"
             conn.connectTimeout = CONNECT_TIMEOUT_MS

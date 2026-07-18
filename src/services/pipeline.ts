@@ -35,11 +35,11 @@ Messages are in Hindi, English, or Hinglish (Hindi in Latin script). Read them a
 THE THREE TESTS — all must pass for isTask=true:
 1. A specific person is asking or expecting THE USER to do something, OR the user has committed to do something. (Automated senders, systems, and broadcasts never assign tasks.)
 2. The action is concrete: it has a verb and an object — something the user could tick off as done. ("Send the invoice" ✓, "we should catch up sometime" ✗)
-3. The message is directed at the user personally — not group chatter between other people, not a broadcast, not an FYI they merely need to know.
+3. The message could reasonably require the user to act. IMPORTANT for group chats: when the request is ambiguous about who should do it, DEFAULT TO CREATING THE TASK and put "Group chat — verify if this is meant for you" in notes. Only return isTask=false when the request explicitly names a specific other person (not the user) as the doer.
 
 A meeting/appointment the user is expected to attend passes all three tests ("attend" is the action).
 
-NEVER a task, regardless of wording: OTPs and verification codes, payment/bank confirmations, delivery status, promotions and offers, news, social-media activity, app/system alerts, group messages where someone ELSE is asked to do something.
+NEVER a task, regardless of wording: OTPs and verification codes, payment/bank confirmations, delivery status, promotions and offers, news, social-media activity, app/system alerts.
 
 You will be given today's date and time. Resolve all relative expressions — "kal", "parso", "aaj shaam", "tomorrow", "by Friday", "5 baje" — against it. "kal" with a deadline meaning = tomorrow. If no time is stated for a date, use 18:00.
 
@@ -63,8 +63,11 @@ WORKED EXAMPLES
 [Today: Monday 7 July, 2:00 PM] WhatsApp, from "Boss": "Client call got moved — can you share the revised deck before 11 tomorrow?"
 {"reasoning":"The boss personally asks the user to share the revised deck before 11 AM tomorrow. Concrete deliverable with a deadline. All tests pass.","isTask":true,"title":"Share revised client deck with Boss","priority":"HIGH","dueDate":"<tomorrow>T11:00:00","notes":"Client call was rescheduled"}
 
+[Today: Monday 7 July, 2:00 PM] WhatsApp group "Project Team", from "Rishabh Jain": "guys please send me the Q2 report before the client meeting tomorrow morning"
+{"reasoning":"Rishabh asks the group for a report — doesn't name anyone specific. As a group member the user may be the expected sender. Test 3: ambiguous group request, so create task with context.","isTask":true,"title":"Send Q2 report to Rishabh Jain (needed before tomorrow's client meeting)","priority":"HIGH","dueDate":"<tomorrow>T09:00:00","notes":"Group chat — verify if you're the right person to send this report"}
+
 [Today: Monday 7 July, 2:00 PM] WhatsApp group "College Friends", from "Amit": "bhai Rohit tu hi book kar le tickets, tera card pe offer hai"
-{"reasoning":"Amit is asking ROHIT to book tickets, not the user. Test 3 fails — the request targets someone else in the group.","isTask":false,"title":null,"priority":"LOW","dueDate":null,"notes":null}
+{"reasoning":"Amit explicitly names ROHIT as the one to book tickets — not the user. Test 3 fails: request is clearly directed at a specific other person by name.","isTask":false,"title":null,"priority":"LOW","dueDate":null,"notes":null}
 
 [Today: Monday 7 July, 2:00 PM] SMS, from "HDFCBK": "Rs.4,500 debited from a/c XX1234 for UPI txn. Avl bal: Rs.52,310"
 {"reasoning":"Automated bank debit confirmation — no person, no request, purely informational. Test 1 fails.","isTask":false,"title":null,"priority":"LOW","dueDate":null,"notes":null}
