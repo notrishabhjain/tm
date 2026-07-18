@@ -35,12 +35,25 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
             serviceInstance?.drainPendingQueue()
         }
 
+        // Set by onListenerConnected/Disconnected — the service object can
+        // outlive the actual system binding, so instance-null checks lie.
+        @Volatile
+        private var listenerBound = false
+
         /**
          * True only while the system actually has the listener bound. The
          * Settings permission string can say "granted" while the binding is
          * dead (e.g. after a process crash) — this is the ground truth.
          */
-        fun isConnected(): Boolean = serviceInstance != null
+        fun isConnected(): Boolean = serviceInstance != null && listenerBound
+
+        // Stage counters (prefs-backed, survive restarts) so Check Now can
+        // show exactly where notifications go: seen → monitored → passed
+        // filters → delivered. The gap between stages IS the diagnosis.
+        val STAT_KEYS = listOf(
+            "stat_seen", "stat_summary", "stat_unmonitored", "stat_discarded",
+            "stat_dedup", "stat_live", "stat_headless", "stat_queued"
+        )
         private const val DEDUP_WINDOW_MS = 60_000L
         private const val DEDUP_CACHE_MAX = 100
         private const val CALL_SWEEP_THROTTLE_MS = 3 * 60_000L
@@ -114,8 +127,16 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         } catch (_: Exception) { }
     }
 
+    private fun bump(key: String) {
+        try {
+            val p = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            p.edit().putLong(key, p.getLong(key, 0L) + 1L).apply()
+        } catch (_: Throwable) { }
+    }
+
     override fun onListenerConnected() {
         super.onListenerConnected()
+        listenerBound = true
         try {
             startForegroundService(Intent(this, TaskMindForegroundService::class.java))
         } catch (_: Throwable) { }
@@ -129,6 +150,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
     // cause of "app suddenly stopped capturing notifications".
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        listenerBound = false
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             try {
                 requestRebind(
@@ -177,22 +199,36 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
 
         // Skip our own notifications
         if (packageName == applicationContext.packageName) return
+        bump("stat_seen")
 
         // Group-summary notifications (FLAG_GROUP_SUMMARY) are meta-notifications that
         // aggregate child notifications already dispatched individually — skip them.
-        if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+            bump("stat_summary")
+            return
+        }
 
         // Filter by monitored apps (empty set = monitor all)
-        if (monitoredApps.isNotEmpty() && !monitoredApps.contains(packageName)) return
+        if (monitoredApps.isNotEmpty() && !monitoredApps.contains(packageName)) {
+            bump("stat_unmonitored")
+            return
+        }
 
         val extras: Bundle = sbn.notification.extras
-        val title = extras.getCharSequence("android.title")?.toString() ?: return
+        val title = extras.getCharSequence("android.title")?.toString()
+        if (title == null) {
+            bump("stat_discarded")
+            return
+        }
         val text = extras.getCharSequence("android.text")?.toString() ?: ""
         val bigText = extras.getCharSequence("android.bigText")?.toString() ?: text
         val category = sbn.notification.category ?: ""
 
         // Hard discard filter (applied before deduplication)
-        if (shouldDiscard(packageName, title, text, bigText, category)) return
+        if (shouldDiscard(packageName, title, text, bigText, category)) {
+            bump("stat_discarded")
+            return
+        }
 
         // Deduplication: same notification key + same content within 60 seconds.
         // Using content-aware key so distinct messages on the same conversation thread
@@ -202,7 +238,10 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         val contentHash = (bigText.ifBlank { text }).hashCode()
         val dedupKey = "$notificationKey|$contentHash"
         val lastSeen = dedupCache[dedupKey]
-        if (lastSeen != null && (now - lastSeen) < DEDUP_WINDOW_MS) return
+        if (lastSeen != null && (now - lastSeen) < DEDUP_WINDOW_MS) {
+            bump("stat_dedup")
+            return
+        }
         dedupCache[dedupKey] = now
 
         val appName = try {
@@ -254,10 +293,17 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
     private fun dispatchNotificationData(data: Map<String, Any>) {
         if (NotificationListenerModule.instance != null) {
             // JS is alive — first flush anything that was queued while it was dead,
-            // then deliver the current notification.
-            drainPendingQueue()
-            NotificationListenerModule.sendNotificationEvent(data)
-            return
+            // then deliver the current notification. Guarded: a conversion or
+            // emitter failure must fall through to the headless path, not
+            // silently swallow the notification (or crash the listener).
+            try {
+                drainPendingQueue()
+                NotificationListenerModule.sendNotificationEvent(data)
+                bump("stat_live")
+                return
+            } catch (t: Throwable) {
+                android.util.Log.w("TaskMindListener", "Live dispatch failed: ${t.message}")
+            }
         }
         try {
             val bundle = android.os.Bundle().apply {
@@ -279,11 +325,13 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
             intent.putExtras(bundle)
             startService(intent)
             HeadlessJsTaskService.acquireWakeLockNow(this)
-        } catch (_: Exception) {
+            bump("stat_headless")
+        } catch (_: Throwable) {
             // Background-start restrictions or context unavailable. Previously this
             // dropped the notification silently; now it's persisted to a durable
             // queue and replayed the next time the JS context is available.
             enqueuePending(data)
+            bump("stat_queued")
         }
     }
 
