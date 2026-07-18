@@ -56,11 +56,14 @@ object GeminiCallAnalyzer {
         object NoApiKey : Result()
     }
 
-    fun apiKey(context: Context): String =
-        context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+    fun apiKey(context: Context): String {
+        val stored = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
             .getString("gemini_api_key", null).orEmpty().trim()
             .takeUnless { it == DefaultKeys.GEMINI_DEAD_LEGACY }.orEmpty()
-            .ifBlank { DefaultKeys.GEMINI }
+        if (stored.isNotBlank()) return stored
+        // DefaultKeys.GEMINI = AI Studio key (AIzaSy…); V2 = Vertex Express fallback.
+        return DefaultKeys.GEMINI.ifBlank { DefaultKeys.GEMINI_V2 }
+    }
 
     /** Blocks (network + possible decode) — call off the main thread. */
     fun analyze(
