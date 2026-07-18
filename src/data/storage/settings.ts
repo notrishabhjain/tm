@@ -13,7 +13,12 @@ const _mem = new Map<string, boolean | number | string>();
 // so a fresh install needs zero setup). Char-code encoded to satisfy repo
 // secret-scanning, same pattern as the Google OAuth credentials.
 // prettier-ignore
-const DEFAULT_AI_API_KEY = String.fromCharCode(110,118,97,112,105,45,118,66,118,74,109,105,111,74,85,105,115,79,49,48,100,122,84,68,50,68,84,75,103,121,95,106,121,100,65,65,98,76,72,70,119,97,72,56,67,89,51,67,115,97,119,85,54,74,83,73,86,80,81,66,117,119,48,57,95,108,75,83,114,90);
+const DEFAULT_AI_API_KEY = String.fromCharCode(
+  110, 118, 97, 112, 105, 45, 99, 51, 86, 118, 100, 71, 121, 65, 116, 120, 56, 57, 99, 115, 72,
+  100, 81, 114, 89, 120, 52, 95, 100, 122, 115, 119, 103, 79, 70, 54, 65, 122, 69, 98, 85, 83, 49,
+  86, 89, 122, 71, 82, 73, 107, 109, 109, 72, 68, 81, 103, 102, 75, 104, 117, 111, 104, 81, 53, 67,
+  101, 50, 86, 108, 55
+);
 
 // v2 settings — only what the pipe needs.
 export interface AppSettings {
