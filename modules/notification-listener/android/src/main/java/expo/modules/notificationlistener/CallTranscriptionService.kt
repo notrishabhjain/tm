@@ -249,10 +249,19 @@ class CallTranscriptionService : Service() {
             text.take(MAX_TRANSCRIPT_CHARS) + "\n[transcript truncated]"
         } else text
 
-        val llmResult = NvidiaLlmClient.extract(llmKey, model, capped, callTime, caller.label)
+        val groqKey = prefs.getString("groq_api_key", null).orEmpty().ifBlank { DefaultKeys.GROQ }
+
+        // Try NVIDIA LLM first, then Groq as fallback.
+        var usedGroq = false
+        var llmResult = NvidiaLlmClient.extract(llmKey, model, capped, callTime, caller.label)
+        if (llmResult !is NvidiaLlmClient.Result.Success) {
+            Log.w(TAG, "NVIDIA LLM failed — falling back to Groq LLM")
+            llmResult = NvidiaLlmClient.extractWithGroq(groqKey, capped, callTime, caller.label)
+            usedGroq = true
+        }
 
         if (llmResult !is NvidiaLlmClient.Result.Success) {
-            // Store transcript for a JS-side retry when the app next opens.
+            // Both LLM engines failed — store transcript for JS-side retry on next app open.
             CallRecordStore.storeCallResult(
                 this, caller, recording.absolutePath, text, extraction = null, callTimeMs = callTime
             )
@@ -263,8 +272,13 @@ class CallTranscriptionService : Service() {
             return
         }
 
+        // Verify pass uses the same engine that succeeded at extraction.
         val verified = if (llmResult.extraction.tasks.isNotEmpty()) {
-            NvidiaLlmClient.verify(llmKey, model, capped, llmResult.extraction, callTime)
+            if (usedGroq) {
+                NvidiaLlmClient.verifyWithGroq(groqKey, capped, llmResult.extraction, callTime)
+            } else {
+                NvidiaLlmClient.verify(llmKey, model, capped, llmResult.extraction, callTime)
+            }
         } else llmResult.extraction
 
         storeAndFinish(caller, recording.absolutePath, text, verified, callTime)
