@@ -144,7 +144,7 @@ function buildUserContent(notification: NotificationData, history: StoredMessage
     `Today: ${formatNow()} — resolve every relative date/time against this moment.`,
     `App: ${appDisplayName(notification.packageName)}`,
     `From: ${notification.title || 'Unknown'}${notification.isGroup ? ' (group chat)' : ''}`,
-    `Message: ${notification.bigText || notification.text}`,
+    `Message: ${notification.text || notification.bigText}`,
   ];
   if (history.length > 1) {
     const lines = history
@@ -311,7 +311,12 @@ export async function handleNotification(taskData: {
     console.error('DB init failed — continuing without local storage:', e);
   }
 
-  const text = notification.bigText || notification.text || '';
+  // Use notification.text (single latest message) for both fingerprinting and
+  // LLM content. bigText accumulates ALL unread messages in a conversation —
+  // using it creates a new fingerprint each time Android bundles a second
+  // unread message, turning a normal notification update into a duplicate task.
+  // Fall back to bigText only when text is blank (some apps omit it).
+  const text = notification.text || notification.bigText || '';
   if (!text.trim()) return;
 
   // Identity = conversation key + content hash: re-deliveries of the same
