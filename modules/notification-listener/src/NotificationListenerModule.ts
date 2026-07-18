@@ -7,6 +7,7 @@ import type {
   CallTranscriptionTestResult,
   OemInfo,
   ListenerHealth,
+  ListenerStats,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,6 +114,23 @@ const NotificationListenerModule = {
   getListenerHealth(): Promise<ListenerHealth> {
     if (!NativeModule) return Promise.resolve({ granted: false, connected: false });
     return NativeModule.getListenerHealth() as Promise<ListenerHealth>;
+  },
+
+  /** Stage counters since install; gaps between stages locate lost notifications. */
+  getListenerStats(): Promise<ListenerStats> {
+    if (!NativeModule) {
+      return Promise.resolve({
+        stat_seen: 0,
+        stat_summary: 0,
+        stat_unmonitored: 0,
+        stat_discarded: 0,
+        stat_dedup: 0,
+        stat_live: 0,
+        stat_headless: 0,
+        stat_queued: 0,
+      });
+    }
+    return NativeModule.getListenerStats() as Promise<ListenerStats>;
   },
 
   /** Asks the system to re-bind a granted-but-dead listener. */

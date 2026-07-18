@@ -43,6 +43,18 @@ export interface ListenerHealth {
   connected: boolean;
 }
 
+/** Stage counters since install — the gap between stages locates lost notifications. */
+export interface ListenerStats {
+  stat_seen: number;
+  stat_summary: number;
+  stat_unmonitored: number;
+  stat_discarded: number;
+  stat_dedup: number;
+  stat_live: number;
+  stat_headless: number;
+  stat_queued: number;
+}
+
 export interface CallDirReport {
   path: string;
   exists: boolean;

@@ -342,6 +342,79 @@ export async function flushOutbox(): Promise<number> {
   return flushed;
 }
 
+// ── End-to-end self-test for the notification pipeline ───────────────────────
+// Runs the REAL stages (local DB → AI decision → Google Tasks create) on a
+// synthetic WhatsApp-style message and reports every outcome verbatim via
+// [log] — deliberately NOT through the activity log, so a broken database
+// cannot hide its own failure.
+
+export async function runNotificationPipelineTest(log: (line: string) => void): Promise<void> {
+  // Stage 1 — local database (a failure here silently kills the whole
+  // pipeline AND blanks the activity list, looking like "nothing happens").
+  try {
+    initializeDatabase();
+    await logActivity('test', 'Pipeline test', 'SKIPPED', 'Notification pipeline self-test ran');
+    log('✓ Local database OK — this entry itself should appear in Recent Activity below');
+  } catch (e) {
+    log(`✗ LOCAL DATABASE FAILED — this is why nothing ever appears: ${String(e).slice(0, 150)}`);
+    return;
+  }
+
+  // Stage 2 — AI decision on a message that is unambiguously a task.
+  log('Asking the AI to judge a test message ("send the quarterly report by tomorrow 5pm")…');
+  const decision = await decide(
+    {
+      packageName: 'com.whatsapp',
+      appName: 'WhatsApp',
+      title: 'Pipeline Test',
+      text: 'Please send me the quarterly report by tomorrow 5pm',
+      bigText: '',
+      subText: '',
+      postTime: Date.now(),
+      notificationKey: `pipeline-test-${Date.now()}`,
+      isGroup: false,
+      thread: [],
+      category: 'msg',
+      channelId: '',
+      importance: 4,
+    },
+    []
+  );
+  if (decision === null) {
+    log(
+      '✗ AI DECISION FAILED — NVIDIA API unreachable or key rejected. Every real message hits this same wall.'
+    );
+    return;
+  }
+  log(
+    `✓ AI decision: ${decision.isTask ? `TASK — "${decision.title ?? ''}"` : 'not a task'} · ${decision.reasoning.slice(0, 100)}`
+  );
+
+  // Stage 3 — Google Tasks (real create, visible in the TaskMind list).
+  if (!getSetting('google_tasks_enabled')) {
+    log('✗ Google Tasks is not connected — tasks would queue forever. Tap Connect above.');
+    return;
+  }
+  log('Creating a real test task in Google Tasks…');
+  const googleTaskId = await createGoogleTask({
+    title: '✅ TaskMind pipeline test — you can delete me',
+    notes: 'Created by the "Test notifications" button to prove the Google Tasks stage works.',
+    dueDate: null,
+  });
+  if (!googleTaskId) {
+    log(
+      '✗ GOOGLE TASKS CREATE FAILED — sign-in token likely expired. Disconnect and reconnect Google above.'
+    );
+    return;
+  }
+  log(
+    '✓ Test task created — open Google Tasks, switch to the "TaskMind" list, and it will be there.'
+  );
+  log(
+    'ALL STAGES PASS — if real messages still create nothing, the loss is in native capture/delivery (see the Check Now counters).'
+  );
+}
+
 function simpleHash(s: string): string {
   let h = 0;
   for (let i = 0; i < s.length; i++) {

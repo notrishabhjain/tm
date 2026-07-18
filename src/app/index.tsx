@@ -26,6 +26,7 @@ import {
   disconnectGoogleTasks,
 } from '@/services/google-tasks';
 import { appDisplayName } from '@/services/app-name-map';
+import { runNotificationPipelineTest } from '@/services/pipeline';
 import NotificationListener from '../../modules/notification-listener/src';
 import type { OemInfo } from '../../modules/notification-listener/src/types';
 
@@ -216,11 +217,31 @@ export default function StatusScreen(): React.JSX.Element {
     }
   };
 
+  const testNotifications = async (): Promise<void> => {
+    if (testing) return;
+    setTesting(true);
+    setTestLogs(['Testing the notification pipeline end-to-end (database → AI → Google Tasks)…']);
+    try {
+      await runNotificationPipelineTest((line) =>
+        setTestLogs((prev) => [...prev, line].slice(-40))
+      );
+    } catch (e) {
+      setTestLogs((prev) => [
+        ...prev,
+        `✗ Test crashed: ${e instanceof Error ? e.message : String(e)}`,
+      ]);
+    } finally {
+      setTesting(false);
+      void refetch();
+    }
+  };
+
   const checkNow = (): void => {
     void (async () => {
       // The tray scan silently does nothing when the listener binding is dead,
       // so report its true state first — this is the #1 cause of "no tasks".
       const health = await NotificationListener.getListenerHealth().catch(() => null);
+      const stats = await NotificationListener.getListenerStats().catch(() => null);
       const listenerLine = !health
         ? '? Listener status unavailable'
         : health.connected
@@ -228,8 +249,16 @@ export default function StatusScreen(): React.JSX.Element {
           : health.granted
             ? '✗ Listener granted but NOT CONNECTED — tap Fix on the Notification access row, then toggle TaskMind off & on in the settings it opens'
             : '✗ Notification access NOT granted — tap Grant above';
+      const statsLine = stats
+        ? `Since install: ${stats.stat_seen} notifications seen → ` +
+          `${stats.stat_seen - stats.stat_summary - stats.stat_unmonitored} from monitored apps → ` +
+          `${stats.stat_live + stats.stat_headless + stats.stat_queued} delivered ` +
+          `(${stats.stat_live} live, ${stats.stat_headless} background, ${stats.stat_queued} queued) · ` +
+          `filtered: ${stats.stat_discarded} noise, ${stats.stat_dedup} duplicates`
+        : 'Stage counters unavailable';
       setTestLogs([
         listenerLine,
+        statsLine,
         'Scanning recordings (last 24h), the notification tray, and the sync queue — results appear in Recent Activity below.',
       ]);
       if (health?.granted && !health.connected) {
@@ -444,6 +473,22 @@ export default function StatusScreen(): React.JSX.Element {
               >
                 <Ionicons name="refresh-outline" size={16} color={Colors.primary500} />
                 <Text style={[styles.troubleshootText, { color: theme.onSurface }]}>Check now</Text>
+              </Pressable>
+            </View>
+            <View style={styles.troubleshootRow}>
+              <Pressable
+                onPress={() => void testNotifications()}
+                disabled={testing}
+                style={({ pressed }) => [
+                  styles.troubleshootBtn,
+                  { borderColor: theme.outline, backgroundColor: theme.surface },
+                  (pressed || testing) && { opacity: 0.6 },
+                ]}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={16} color={Colors.primary500} />
+                <Text style={[styles.troubleshootText, { color: theme.onSurface }]}>
+                  {testing ? 'Testing…' : 'Test notifications (DB → AI → Google)'}
+                </Text>
               </Pressable>
             </View>
             {testLogs.length > 0 && (

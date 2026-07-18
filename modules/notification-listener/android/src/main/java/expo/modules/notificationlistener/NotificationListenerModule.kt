@@ -68,6 +68,15 @@ class NotificationListenerModule : Module() {
             )
         }
 
+        // Stage counters since install — the gap between stages says exactly
+        // where notifications are being lost.
+        AsyncFunction("getListenerStats") {
+            val p = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            TaskMindNotificationListenerService.STAT_KEYS.associateWith {
+                p.getLong(it, 0L).toDouble()
+            }
+        }
+
         // Asks the system to re-bind a granted-but-dead listener (post-crash).
         AsyncFunction("rebindListener") {
             try {
