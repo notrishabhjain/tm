@@ -5,11 +5,10 @@ import android.content.Context
 /**
  * Picks the transcription engine for call audio.
  *
- * Sarvam (Indian-language/Hinglish specialist) is used whenever a Sarvam API
- * key is configured; NVIDIA Whisper Large V3 is the fallback — both when no
- * Sarvam key is set and when Sarvam fails mid-call. The diagnostics test and
- * the live pipeline share this routing so the test always exercises exactly
- * what production runs.
+ * Priority order:
+ *   1. Sarvam (Hindi/Hinglish specialist) — only when a key is configured
+ *   2. Groq Whisper Large V3 — primary free-tier ASR (7 200 s/day)
+ *   3. NVIDIA Whisper Large V3 — last resort
  */
 object AsrEngine {
     sealed class Result {
@@ -38,28 +37,28 @@ object AsrEngine {
             when (val r = SarvamAsrClient.transcribe(sarvam, pcm, model)) {
                 is SarvamAsrClient.Result.Success -> return Result.Success(r.text, "Sarvam $model")
                 is SarvamAsrClient.Result.Error ->
-                    onLog?.invoke("Sarvam failed (${r.message}) — falling back to Whisper")
-                SarvamAsrClient.Result.NoApiKey -> { /* fall through to Whisper */ }
+                    onLog?.invoke("Sarvam failed (${r.message}) — trying Groq Whisper")
+                SarvamAsrClient.Result.NoApiKey -> { /* fall through */ }
             }
+        }
+
+        val groqKey = prefs.getString("groq_api_key", null).orEmpty().ifBlank { DefaultKeys.GROQ }
+        onLog?.invoke("Transcribing with Groq Whisper Large V3…")
+        when (val r = GroqAsrClient.transcribe(groqKey, pcm)) {
+            is GroqAsrClient.Result.Success -> return Result.Success(r.text, "Groq Whisper Large V3")
+            is GroqAsrClient.Result.Error ->
+                onLog?.invoke("Groq Whisper failed (${r.message}) — falling back to NVIDIA Whisper")
+            GroqAsrClient.Result.NoApiKey ->
+                onLog?.invoke("Groq key missing — falling back to NVIDIA Whisper")
         }
 
         val whisperKey = prefs.getString("nvidia_api_key", null).orEmpty()
             .ifBlank { DefaultKeys.NVIDIA_ASR }
         onLog?.invoke("Transcribing with NVIDIA Whisper Large V3…")
-        when (val r = NvidiaAsrClient.transcribe(whisperKey, pcm)) {
-            is NvidiaAsrClient.Result.Success -> return Result.Success(r.text, "Whisper Large V3")
-            is NvidiaAsrClient.Result.Error ->
-                onLog?.invoke("NVIDIA Whisper failed (${r.message}) — falling back to Groq Whisper")
-            NvidiaAsrClient.Result.NoApiKey ->
-                onLog?.invoke("NVIDIA Whisper key missing — falling back to Groq Whisper")
-        }
-
-        val groqKey = prefs.getString("groq_api_key", null).orEmpty().ifBlank { DefaultKeys.GROQ }
-        onLog?.invoke("Transcribing with Groq Whisper Large V3…")
-        return when (val r = GroqAsrClient.transcribe(groqKey, pcm)) {
-            is GroqAsrClient.Result.Success -> Result.Success(r.text, "Groq Whisper Large V3")
-            is GroqAsrClient.Result.Error -> Result.Error(r.message)
-            GroqAsrClient.Result.NoApiKey -> Result.Error("No ASR key available")
+        return when (val r = NvidiaAsrClient.transcribe(whisperKey, pcm)) {
+            is NvidiaAsrClient.Result.Success -> Result.Success(r.text, "NVIDIA Whisper Large V3")
+            is NvidiaAsrClient.Result.Error -> Result.Error(r.message)
+            NvidiaAsrClient.Result.NoApiKey -> Result.Error("No ASR key available")
         }
     }
 }

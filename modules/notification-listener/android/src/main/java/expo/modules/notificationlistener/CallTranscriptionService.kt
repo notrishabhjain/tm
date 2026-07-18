@@ -180,27 +180,7 @@ class CallTranscriptionService : Service() {
         val caller = CallerResolver.resolve(this, recording)
         val callTime = caller.endedAt
 
-        // Primary engine: ONE Gemini call — audio in, transcript + tasks out.
-        // Container metadata gives the duration without decoding.
-        val metaDurationSec = AudioDecoder.durationSeconds(recording.absolutePath) ?: -1
-        if (metaDurationSec >= MIN_ANALYSIS_DURATION_SEC) {
-            when (val g = GeminiCallAnalyzer.analyze(this, recording, callTime, caller.label)) {
-                is GeminiCallAnalyzer.Result.Success -> {
-                    CallRecordingFinder.markProcessed(this, recording)
-                    storeAndFinish(
-                        caller, recording.absolutePath,
-                        g.transcript.ifBlank { "[transcript unavailable]" },
-                        g.extraction, callTime
-                    )
-                    return
-                }
-                is GeminiCallAnalyzer.Result.Error ->
-                    Log.w(TAG, "Gemini failed (${g.message}) — falling back to Whisper + 70B")
-                GeminiCallAnalyzer.Result.NoApiKey -> { /* legacy path below */ }
-            }
-        }
-
-        // Legacy/fallback path: decode → cloud ASR → 70B extraction + verify.
+        // ASR → LLM pipeline: Groq Whisper (ASR) → Groq 70B → OpenRouter 70B → NVIDIA (last resort).
         val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
         if (pcm == null || pcm.isEmpty()) {
             Log.w(TAG, "Failed to decode ${recording.absolutePath}")
@@ -241,27 +221,32 @@ class CallTranscriptionService : Service() {
             return
         }
 
-        // LLM analysis: extraction + verification pass, strongest free model.
-        val llmKey = prefs.getString("ai_api_key", null).orEmpty()
-            .ifBlank { DefaultKeys.NVIDIA_LLM }
-        val model = prefs.getString("call_ai_model", null).orEmpty().ifBlank { DEFAULT_CALL_MODEL }
+        // LLM analysis: extraction + verification pass.
+        // Chain: Groq 70B → OpenRouter 70B → NVIDIA 70B (last resort).
         val capped = if (text.length > MAX_TRANSCRIPT_CHARS) {
             text.take(MAX_TRANSCRIPT_CHARS) + "\n[transcript truncated]"
         } else text
 
         val groqKey = prefs.getString("groq_api_key", null).orEmpty().ifBlank { DefaultKeys.GROQ }
+        val openrouterKey = prefs.getString("openrouter_api_key", null).orEmpty().ifBlank { DefaultKeys.OPENROUTER }
+        val nvidiaKey = prefs.getString("ai_api_key", null).orEmpty().ifBlank { DefaultKeys.NVIDIA_LLM }
+        val nvidiaModel = prefs.getString("call_ai_model", null).orEmpty().ifBlank { DEFAULT_CALL_MODEL }
 
-        // Try NVIDIA LLM first, then Groq as fallback.
-        var usedGroq = false
-        var llmResult = NvidiaLlmClient.extract(llmKey, model, capped, callTime, caller.label)
+        var usedEngine = "groq"
+        var llmResult = NvidiaLlmClient.extractWithGroq(groqKey, capped, callTime, caller.label)
         if (llmResult !is NvidiaLlmClient.Result.Success) {
-            Log.w(TAG, "NVIDIA LLM failed — falling back to Groq LLM")
-            llmResult = NvidiaLlmClient.extractWithGroq(groqKey, capped, callTime, caller.label)
-            usedGroq = true
+            Log.w(TAG, "Groq LLM failed — trying OpenRouter")
+            llmResult = NvidiaLlmClient.extractWithOpenRouter(openrouterKey, capped, callTime, caller.label)
+            usedEngine = "openrouter"
+        }
+        if (llmResult !is NvidiaLlmClient.Result.Success) {
+            Log.w(TAG, "OpenRouter LLM failed — trying NVIDIA as last resort")
+            llmResult = NvidiaLlmClient.extract(nvidiaKey, nvidiaModel, capped, callTime, caller.label)
+            usedEngine = "nvidia"
         }
 
         if (llmResult !is NvidiaLlmClient.Result.Success) {
-            // Both LLM engines failed — store transcript for JS-side retry on next app open.
+            // All LLM engines failed — store transcript for JS-side retry on next app open.
             CallRecordStore.storeCallResult(
                 this, caller, recording.absolutePath, text, extraction = null, callTimeMs = callTime
             )
@@ -274,10 +259,10 @@ class CallTranscriptionService : Service() {
 
         // Verify pass uses the same engine that succeeded at extraction.
         val verified = if (llmResult.extraction.tasks.isNotEmpty()) {
-            if (usedGroq) {
-                NvidiaLlmClient.verifyWithGroq(groqKey, capped, llmResult.extraction, callTime)
-            } else {
-                NvidiaLlmClient.verify(llmKey, model, capped, llmResult.extraction, callTime)
+            when (usedEngine) {
+                "openrouter" -> NvidiaLlmClient.verifyWithOpenRouter(openrouterKey, capped, llmResult.extraction, callTime)
+                "nvidia" -> NvidiaLlmClient.verify(nvidiaKey, nvidiaModel, capped, llmResult.extraction, callTime)
+                else -> NvidiaLlmClient.verifyWithGroq(groqKey, capped, llmResult.extraction, callTime)
             }
         } else llmResult.extraction
 
