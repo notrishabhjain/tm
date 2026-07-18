@@ -137,40 +137,31 @@ object CallTranscriptionDiagnostics {
         val sizeKb = recording.length() / 1024
         onLog?.invoke("find", "Found: ${recording.name} ($sizeKb KB, ${ageSec}s old)")
 
-        // Check API keys — Sarvam preferred when configured, Whisper otherwise.
+        // Check API keys — Sarvam preferred when configured, Groq Whisper otherwise.
         val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
         val sarvamKey = AsrEngine.sarvamKey(context)
-        val apiKey = prefs.getString("nvidia_api_key", null).orEmpty().ifBlank { DefaultKeys.NVIDIA_ASR }
-        if (apiKey.isBlank() && sarvamKey.isBlank()) {
-            onLog?.invoke("apikey", "FAILED — no transcription API key set")
-            return mapOf(
-                "ok" to false,
-                "stage" to "apikey",
-                "recordingPath" to recording.absolutePath,
-                "error" to "No transcription API key is set."
-            )
-        }
+        val groqKey = prefs.getString("groq_api_key", null).orEmpty().ifBlank { DefaultKeys.GROQ }
         onLog?.invoke(
             "apikey",
             if (sarvamKey.isNotBlank()) "Sarvam key present (${sarvamKey.take(6)}…) — Hindi specialist engine active"
-            else "Whisper key present (${apiKey.take(8)}…) — add a Sarvam key for better Hindi"
+            else "Groq key present (${groqKey.take(8)}…) — Groq Whisper Large V3 active"
         )
 
-        // Check network reachability to NVIDIA gRPC endpoint
-        onLog?.invoke("network", "Checking connectivity to ${NvidiaAsrClient.HOST}:${NvidiaAsrClient.PORT}…")
+        // Check network reachability to Groq (primary ASR + LLM endpoint).
+        onLog?.invoke("network", "Checking connectivity to api.groq.com:443…")
         val reachable = try {
             Socket().use { s ->
-                s.connect(InetSocketAddress(NvidiaAsrClient.HOST, NvidiaAsrClient.PORT), 5_000)
+                s.connect(InetSocketAddress("api.groq.com", 443), 5_000)
                 true
             }
         } catch (_: Exception) { false }
         if (!reachable) {
-            onLog?.invoke("network", "FAILED — cannot reach ${NvidiaAsrClient.HOST}:${NvidiaAsrClient.PORT}")
+            onLog?.invoke("network", "FAILED — cannot reach api.groq.com:443")
             return mapOf(
                 "ok" to false,
                 "stage" to "network",
                 "recordingPath" to recording.absolutePath,
-                "error" to "Cannot reach ${NvidiaAsrClient.HOST}:${NvidiaAsrClient.PORT}. Check internet connection."
+                "error" to "Cannot reach api.groq.com:443. Check internet connection."
             )
         }
         onLog?.invoke("network", "Network OK")
@@ -193,41 +184,6 @@ object CallTranscriptionDiagnostics {
 
         val durationSec = pcm.size / 16000.0
         onLog?.invoke("decode", "Decoded %.1fs of audio in %dms".format(durationSec, decodeMs))
-
-        // Primary engine first — same order as the live pipeline.
-        if (GeminiCallAnalyzer.apiKey(context).isNotBlank()) {
-            onLog?.invoke("gemini", "Analysing with Gemini 2.5 Flash (audio → transcript + tasks, one call)…")
-            val gStart = System.currentTimeMillis()
-            when (val g = GeminiCallAnalyzer.analyze(
-                context, recording, recording.lastModified(), "Pipeline test"
-            )) {
-                is GeminiCallAnalyzer.Result.Success -> {
-                    val gMs = System.currentTimeMillis() - gStart
-                    onLog?.invoke(
-                        "gemini",
-                        "Done in %.1fs — %d task(s) found. Transcript: %s".format(
-                            gMs / 1000.0,
-                            g.extraction.tasks.size,
-                            g.transcript.take(100).replace('\n', ' ')
-                        )
-                    )
-                    return mapOf(
-                        "ok" to true,
-                        "stage" to "transcribe",
-                        "recordingPath" to recording.absolutePath,
-                        "recordingAgeMs" to (now - recording.lastModified()).toDouble(),
-                        "decodedSamples" to pcm.size.toDouble(),
-                        "decodeMs" to decodeMs.toDouble(),
-                        "transcribeMs" to gMs.toDouble(),
-                        "engine" to "Gemini 2.5 Flash",
-                        "transcript" to g.transcript
-                    )
-                }
-                is GeminiCallAnalyzer.Result.Error ->
-                    onLog?.invoke("gemini", "Gemini failed (${g.message}) — testing fallback engines")
-                GeminiCallAnalyzer.Result.NoApiKey -> { /* fall through */ }
-            }
-        }
 
         onLog?.invoke("transcribe", "Sending %.1fs of audio to cloud ASR…".format(durationSec))
 

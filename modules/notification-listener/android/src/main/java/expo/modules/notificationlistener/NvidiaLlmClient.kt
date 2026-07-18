@@ -25,6 +25,7 @@ object NvidiaLlmClient {
     private const val TAG = "NvidiaLlmClient"
     private const val ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions"
     internal const val GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
+    internal const val OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
     private const val CONNECT_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 45_000
     private const val MAX_ATTEMPTS = 2
@@ -109,6 +110,22 @@ Be strict: when in doubt, drop. Return ONLY valid JSON, no markdown:
     {"index": <candidate index starting at 0>, "verdict": "keep|fix|drop", "title": "<corrected title if fix, else null>", "dueDate": "<corrected ISO date-time if fix, else null>", "reason": "<one short phrase>"}
   ]
 }"""
+
+    /** Convenience: extract via OpenRouter Llama 3.3 70B free tier. */
+    fun extractWithOpenRouter(
+        openrouterKey: String,
+        transcript: String,
+        callTimeMs: Long,
+        callerLabel: String
+    ): Result = extract(openrouterKey, "meta-llama/llama-3.3-70b-instruct:free", transcript, callTimeMs, callerLabel, OPENROUTER_ENDPOINT)
+
+    /** Convenience: verify pass via OpenRouter Llama 3.3 70B free tier. */
+    fun verifyWithOpenRouter(
+        openrouterKey: String,
+        transcript: String,
+        extraction: CallExtraction,
+        callTimeMs: Long
+    ): CallExtraction = verify(openrouterKey, "meta-llama/llama-3.3-70b-instruct:free", transcript, extraction, callTimeMs, OPENROUTER_ENDPOINT)
 
     /** Convenience: extract via Groq Llama 3.3 70B. */
     fun extractWithGroq(
