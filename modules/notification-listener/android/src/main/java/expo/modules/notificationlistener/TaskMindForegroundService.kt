@@ -6,7 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
+import android.util.Log
 
 /**
  * Minimal foreground service: keeps the process favoured by the OS so the
@@ -32,7 +35,21 @@ class TaskMindForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification())
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFICATION_ID, buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
+        } catch (t: Throwable) {
+            // Must never crash the app (a crash kills the notification listener).
+            Log.w("TaskMindFgs", "startForeground denied: ${t.message}")
+            stopSelf()
+            return START_NOT_STICKY
+        }
         // Re-attempt every time the service starts in case READ_PHONE_STATE was
         // not yet granted during onCreate (idempotent if already registered).
         CallStateMonitor.start(this)
