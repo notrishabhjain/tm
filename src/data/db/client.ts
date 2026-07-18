@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/expo-sqlite';
-import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
+import { openDatabaseSync, deleteDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 import * as schema from './schema';
 
 // Lazy, RETRYING open. The previous version opened at module load and treated
@@ -37,7 +37,62 @@ export const db: any = new Proxy(
 );
 export type Database = ReturnType<typeof drizzle<typeof schema>>;
 
+/** Corruption-class errors — the file is damaged and will NEVER work again. */
+function isCorruption(e: unknown): boolean {
+  const s = String(e).toLowerCase();
+  return s.includes('malformed') || s.includes('not a database') || s.includes('corrupt');
+}
+
+/**
+ * Deletes the damaged database (plus stray -wal/-shm journal files) so a
+ * fresh one can be created. The file only holds the activity log, dedup
+ * cache, and call history — all expendable; tasks live in Google Tasks.
+ * Hard crashes mid-write (the since-fixed OOM and Android 15 service bugs)
+ * are the known way it got corrupted.
+ */
+function destroyCorruptDatabase(): void {
+  try {
+    _sqlite?.closeSync();
+  } catch {
+    /* already unusable */
+  }
+  _sqlite = null;
+  _real = null;
+  // The -wal/-shm journals MUST go with the main file: a stale WAL beside a
+  // fresh database gets "recovered" into it on open, resurrecting the
+  // corruption. deleteDatabaseSync is a plain by-name file delete under the
+  // SQLite directory, so it removes the journals synchronously too.
+  for (const name of ['taskmind.db', 'taskmind.db-wal', 'taskmind.db-shm']) {
+    try {
+      deleteDatabaseSync(name);
+    } catch {
+      /* file absent or still locked — best effort */
+    }
+  }
+}
+
 export function initializeDatabase(): void {
+  try {
+    initializeDatabaseOnce();
+  } catch (e) {
+    if (!isCorruption(e)) throw e;
+    // The file is physically damaged — no retry can fix it. Rebuild fresh.
+    destroyCorruptDatabase();
+    initializeDatabaseOnce();
+    try {
+      _sqlite?.execSync(
+        `INSERT INTO activity_log (source, label, outcome, detail, created_at)
+         VALUES ('system', 'Storage', 'ERROR',
+                 'Corrupted database was auto-reset — pipeline restored, history cleared',
+                 ${Date.now()});`
+      );
+    } catch {
+      /* the reset itself succeeded; this note is best-effort */
+    }
+  }
+}
+
+function initializeDatabaseOnce(): void {
   ensureOpen(); // throws the real underlying error when SQLite cannot open
   if (!_sqlite) {
     throw new Error('SQLite failed to open');
