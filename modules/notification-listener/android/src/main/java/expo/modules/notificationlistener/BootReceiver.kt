@@ -17,6 +17,9 @@ class BootReceiver : BroadcastReceiver() {
             } catch (_: Throwable) {
                 // OEM restriction — the listener binding will start it instead.
             }
+            // Arm the watchdog alarm so the FGS is revived if OEM kills it
+            // before the notification listener binding fires.
+            WatchdogAlarmReceiver.schedule(context)
         }
     }
 }

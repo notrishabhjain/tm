@@ -19,13 +19,17 @@ import androidx.core.content.ContextCompat
  */
 object CallStateMonitor {
     private const val TAG = "CallStateMonitor"
+    private const val PREFS = "taskmind_prefs"
+
+    // Persisted across FGS restarts so a call in progress when the FGS is
+    // killed (OEM battery manager) is still transcribed when the call ends.
+    private const val KEY_WAS_OFFHOOK = "call_monitor_was_offhook"
 
     // Wait for the recorder to finish writing before scanning for the file.
     private const val TRANSCRIBE_DELAY_MS = 15_000L
 
     private val handler = Handler(Looper.getMainLooper())
     private var registered = false
-    private var wasOffhook = false
 
     /** True once the telephony callback has been successfully registered. */
     fun isRegistered(): Boolean = registered
@@ -47,6 +51,15 @@ object CallStateMonitor {
 
         val tm = context.getSystemService(TelephonyManager::class.java) ?: return
         telephonyManager = tm
+
+        // If we're registering mid-call (e.g. the FGS was killed and restarted
+        // while a call was in progress), mark wasOffhook immediately so the
+        // IDLE transition that follows the call end is not silently skipped.
+        @Suppress("DEPRECATION")
+        if (tm.callState == TelephonyManager.CALL_STATE_OFFHOOK) {
+            setWasOffhook(context, true)
+            Log.d(TAG, "Registered mid-call — wasOffhook set to true")
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val callback = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
@@ -81,29 +94,46 @@ object CallStateMonitor {
         legacyListener = null
         telephonyManager = null
         registered = false
-        wasOffhook = false
+        // Do NOT clear wasOffhook here — the FGS may be stopped mid-call
+        // (OEM kills it) and we need the persisted flag to survive the restart.
     }
 
     private fun handleState(context: Context, state: Int) {
         when (state) {
-            TelephonyManager.CALL_STATE_OFFHOOK -> wasOffhook = true
+            TelephonyManager.CALL_STATE_OFFHOOK -> setWasOffhook(context, true)
             TelephonyManager.CALL_STATE_IDLE -> {
-                if (wasOffhook) {
-                    wasOffhook = false
+                if (getWasOffhook(context)) {
+                    setWasOffhook(context, false)
                     scheduleTranscription(context)
                 }
             }
         }
     }
 
+    private fun getWasOffhook(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_WAS_OFFHOOK, false)
+
+    private fun setWasOffhook(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_WAS_OFFHOOK, value).apply()
+    }
+
     private fun scheduleTranscription(context: Context) {
         handler.postDelayed({
-            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (!prefs.getBoolean("call_transcription_enabled", false)) return@postDelayed
+            // Flag pending before attempting the start — if the start is blocked by
+            // OEM restrictions, the watchdog alarm and the notification-listener
+            // recovery sweep will pick this up within minutes.
+            prefs.edit()
+                .putLong(CallTranscriptionService.KEY_PENDING_CALL_SCAN, System.currentTimeMillis())
+                .apply()
             try {
                 context.startForegroundService(Intent(context, CallTranscriptionService::class.java))
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to start CallTranscriptionService: ${e.message}")
+                // Pending flag already set — watchdog will retry.
             }
         }, TRANSCRIBE_DELAY_MS)
     }

@@ -36,6 +36,9 @@ class NotificationListenerModule : Module() {
             // JS context just came alive — replay any notifications that were
             // queued while it was dead (OEM blocked the headless start).
             TaskMindNotificationListenerService.triggerDrain()
+            // Arm/re-arm the watchdog alarm. Covers the "fresh install / first
+            // open" path where boot hasn't happened yet to schedule it.
+            WatchdogAlarmReceiver.schedule(context)
         }
 
         OnDestroy {

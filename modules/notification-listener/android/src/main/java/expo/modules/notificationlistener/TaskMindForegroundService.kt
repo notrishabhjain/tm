@@ -53,6 +53,9 @@ class TaskMindForegroundService : Service() {
         // Re-attempt every time the service starts in case READ_PHONE_STATE was
         // not yet granted during onCreate (idempotent if already registered).
         CallStateMonitor.start(this)
+        // Keep the watchdog alarm alive — each FGS start reschedules it so the
+        // chain survives even if the alarm was cleared by a system event.
+        WatchdogAlarmReceiver.schedule(this)
         return START_STICKY
     }
 
