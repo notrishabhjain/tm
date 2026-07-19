@@ -59,6 +59,9 @@
         <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
       </intent-filter>
     </receiver>
+    <!-- Periodic watchdog: restarts the FGS and retries blocked call scans.
+         Not exported — only AlarmManager delivers intents to it. -->
+    <receiver android:name="expo.modules.notificationlistener.WatchdogAlarmReceiver" android:exported="false"/>
     <!-- Static phone-state receiver: triggers call transcription even when the
          foreground service has been killed by OEM battery optimisers. The
          android.intent.action.PHONE_STATE broadcast is exempt from Android 8+
