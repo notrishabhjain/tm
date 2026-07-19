@@ -68,6 +68,33 @@ const NotificationListenerModule = {
     return NativeModule.drainPendingNotifications() as Promise<void>;
   },
 
+  // Offline classifier: uses Android TextClassifier (HyperOS AI on Xiaomi) +
+  // Hindi/English pattern matching. Returns a PipelineDecision-shaped object,
+  // or null if the native module is unavailable.
+  localDecideNotification(
+    pkg: string,
+    senderName: string,
+    text: string,
+    isGroup: boolean
+  ): Promise<{
+    isTask: boolean;
+    title: string | null;
+    priority: string;
+    reasoning: string;
+    notes: string | null;
+    dueDate: null;
+  } | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.localDecideNotification(pkg, senderName, text, isGroup) as Promise<{
+      isTask: boolean;
+      title: string | null;
+      priority: string;
+      reasoning: string;
+      notes: string | null;
+      dueDate: null;
+    } | null>;
+  },
+
   addNotificationListener(listener: (data: NotificationData) => void) {
     if (!emitter) return { remove: () => undefined };
     // Signal native: a live JS listener is now registered. Native dispatch uses

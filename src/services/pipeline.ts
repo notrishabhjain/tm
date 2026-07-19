@@ -161,16 +161,51 @@ function buildUserContent(notification: NotificationData, history: StoredMessage
 // free tier, multiple backend providers) → Gemini 2.5 Flash (last resort).
 // Error classification: 401/403 = bad key → skip immediately; 429 = rate
 // limit → skip (next engine may not be); 5xx = transient → one retry.
+// onLog is optional; when provided (test path) each engine reports its exact
+// outcome so the user can see timeout / HTTP status / network error directly.
 async function decide(
   notification: NotificationData,
-  history: StoredMessage[]
+  history: StoredMessage[],
+  onLog?: (engine: string, detail: string) => void
 ): Promise<PipelineDecision | null> {
   const userContent = buildUserContent(notification, history);
-  return (
-    (await decideWithGroq(userContent)) ??
-    (await decideWithOpenRouter(userContent)) ??
-    (await decideWithGemini(userContent))
-  );
+  const networkResult =
+    (await decideWithGroq(userContent, onLog)) ??
+    (await decideWithOpenRouter(userContent, onLog)) ??
+    (await decideWithGemini(userContent, onLog));
+  if (networkResult !== null) return networkResult;
+
+  // All network engines failed — fall back to on-device classifier.
+  // On Xiaomi HyperOS this uses the system's built-in AI (TextClassifier backed
+  // by Xiaomi's on-device model) plus Hindi/English pattern matching.
+  // Never returns null (will return isTask=false if genuinely ambiguous).
+  return decideOffline(notification, onLog);
+}
+
+async function decideOffline(
+  notification: NotificationData,
+  onLog?: (engine: string, detail: string) => void
+): Promise<PipelineDecision | null> {
+  try {
+    const result = await NotificationListener.localDecideNotification(
+      notification.packageName,
+      notification.title || '',
+      notification.text || notification.bigText || '',
+      notification.isGroup ?? false
+    );
+    if (!result) return null;
+    onLog?.('HyperOS offline', result.reasoning);
+    return {
+      isTask: result.isTask,
+      reasoning: result.reasoning,
+      title: result.title ?? null,
+      priority: (result.priority as PipelineDecision['priority']) ?? 'MEDIUM',
+      dueDate: null,
+      notes: result.notes ?? null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // Shared OpenAI-compatible caller used by Groq and OpenRouter.
@@ -179,7 +214,8 @@ async function callOpenAiCompat(
   model: string,
   key: string,
   userContent: string,
-  extraHeaders: Record<string, string> = {}
+  extraHeaders: Record<string, string> = {},
+  onError?: (detail: string) => void
 ): Promise<PipelineDecision | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -211,12 +247,26 @@ async function callOpenAiCompat(
           const content: string = data?.choices?.[0]?.message?.content ?? '';
           return parseDecision(content);
         }
-        // Bad key or rate-limited: skip this engine, try the next one.
-        if (resp.status === 401 || resp.status === 403 || resp.status === 429) return null;
-        if (resp.status < 500) return null; // other 4xx — not retryable
+        if (resp.status === 401 || resp.status === 403) {
+          onError?.(`HTTP ${resp.status} — API key rejected`);
+          return null;
+        }
+        if (resp.status === 429) {
+          onError?.('HTTP 429 — rate limited');
+          return null;
+        }
+        if (resp.status < 500) {
+          onError?.(`HTTP ${resp.status}`);
+          return null;
+        }
         // 5xx: retry once after a short pause.
+        onError?.(`HTTP ${resp.status} on attempt ${attempt}`);
       } catch (e) {
-        if ((e as Error).name === 'AbortError') return null;
+        if ((e as Error).name === 'AbortError') {
+          onError?.(`timed out after ${TIMEOUT_MS / 1000}s`);
+          return null;
+        }
+        onError?.(`network error: ${(e as Error).message}`);
       }
       if (attempt === 1) await new Promise<void>((r) => setTimeout(r, 3000));
     }
@@ -226,33 +276,45 @@ async function callOpenAiCompat(
   }
 }
 
-async function decideWithGroq(userContent: string): Promise<PipelineDecision | null> {
+async function decideWithGroq(
+  userContent: string,
+  onLog?: (engine: string, detail: string) => void
+): Promise<PipelineDecision | null> {
   const key = getSetting('groq_api_key');
-  if (!key) return null;
+  if (!key) { onLog?.('Groq', 'no key configured'); return null; }
   return callOpenAiCompat(
     'https://api.groq.com/openai/v1/chat/completions',
     'llama-3.3-70b-versatile',
     key,
-    userContent
+    userContent,
+    {},
+    onLog ? (d) => onLog('Groq', d) : undefined
   );
 }
 
-async function decideWithOpenRouter(userContent: string): Promise<PipelineDecision | null> {
+async function decideWithOpenRouter(
+  userContent: string,
+  onLog?: (engine: string, detail: string) => void
+): Promise<PipelineDecision | null> {
   const key = getSetting('openrouter_api_key');
-  if (!key) return null;
+  if (!key) { onLog?.('OpenRouter', 'no key configured'); return null; }
   return callOpenAiCompat(
     'https://openrouter.ai/api/v1/chat/completions',
     'meta-llama/llama-3.3-70b-instruct:free',
     key,
     userContent,
-    { 'HTTP-Referer': 'https://taskmind.app', 'X-Title': 'TaskMind' }
+    { 'HTTP-Referer': 'https://taskmind.app', 'X-Title': 'TaskMind' },
+    onLog ? (d) => onLog('OpenRouter', d) : undefined
   );
 }
 
-async function decideWithGemini(userContent: string): Promise<PipelineDecision | null> {
+async function decideWithGemini(
+  userContent: string,
+  onLog?: (engine: string, detail: string) => void
+): Promise<PipelineDecision | null> {
   try {
     const key = getSetting('gemini_api_key').trim();
-    if (!key) return null;
+    if (!key) { onLog?.('Gemini', 'no key configured'); return null; }
     // AIzaSy keys → AI Studio endpoint (query-param auth)
     // AQ. keys → Vertex Express endpoint (query-param auth, different project)
     const encodedKey = encodeURIComponent(key);
@@ -276,7 +338,10 @@ async function decideWithGemini(userContent: string): Promise<PipelineDecision |
           },
         }),
       });
-      if (!resp.ok) return null;
+      if (!resp.ok) {
+        onLog?.('Gemini', `HTTP ${resp.status}`);
+        return null;
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = (await resp.json()) as any;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
@@ -289,7 +354,12 @@ async function decideWithGemini(userContent: string): Promise<PipelineDecision |
     } finally {
       clearTimeout(timer);
     }
-  } catch {
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') {
+      onLog?.('Gemini', `timed out after ${TIMEOUT_MS / 1000}s`);
+    } else {
+      onLog?.('Gemini', `network error: ${(e as Error).message}`);
+    }
     return null;
   }
 }
@@ -471,32 +541,38 @@ export async function runNotificationPipelineTest(log: (line: string) => void): 
 
   // Stage 2 — AI decision on a message that is unambiguously a task.
   log('Asking the AI to judge a test message ("send the quarterly report by tomorrow 5pm")…');
+  const engineLogs: string[] = [];
+  const testNotification = {
+    packageName: 'com.whatsapp',
+    appName: 'WhatsApp',
+    title: 'Pipeline Test',
+    text: 'Please send me the quarterly report by tomorrow 5pm',
+    bigText: '',
+    subText: '',
+    postTime: Date.now(),
+    notificationKey: `pipeline-test-${Date.now()}`,
+    isGroup: false,
+    thread: [],
+    category: 'msg',
+    channelId: '',
+    importance: 4,
+  };
   const decision = await decide(
-    {
-      packageName: 'com.whatsapp',
-      appName: 'WhatsApp',
-      title: 'Pipeline Test',
-      text: 'Please send me the quarterly report by tomorrow 5pm',
-      bigText: '',
-      subText: '',
-      postTime: Date.now(),
-      notificationKey: `pipeline-test-${Date.now()}`,
-      isGroup: false,
-      thread: [],
-      category: 'msg',
-      channelId: '',
-      importance: 4,
-    },
-    []
+    testNotification,
+    [],
+    (engine, detail) => {
+      const line = `  ${engine}: ${detail}`;
+      engineLogs.push(line);
+      log(line);
+    }
   );
   if (decision === null) {
-    log(
-      '✗ AI DECISION FAILED — all three engines failed (Groq, OpenRouter, and Gemini all unreachable or rejected the key). Every real message hits this same wall.'
-    );
+    log('✗ AI DECISION FAILED — all engines (including offline) returned nothing. See details above.');
     return;
   }
+  const isOffline = engineLogs.some((l) => l.includes('HyperOS offline') || l.includes('offline'));
   log(
-    `✓ AI decision: ${decision.isTask ? `TASK — "${decision.title ?? ''}"` : 'not a task'} · ${decision.reasoning.slice(0, 100)}`
+    `${isOffline ? '⚡ AI decision (OFFLINE — HyperOS on-device AI)' : '✓ AI decision'}: ${decision.isTask ? `TASK — "${decision.title ?? ''}"` : 'not a task'} · ${decision.reasoning.slice(0, 100)}`
   );
 
   // Stage 3 — Google Tasks (real create, visible in the TaskMind list).
