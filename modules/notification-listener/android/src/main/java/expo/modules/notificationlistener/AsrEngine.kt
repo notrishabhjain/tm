@@ -55,10 +55,24 @@ object AsrEngine {
         val whisperKey = prefs.getString("nvidia_api_key", null).orEmpty()
             .ifBlank { DefaultKeys.NVIDIA_ASR }
         onLog?.invoke("Transcribing with NVIDIA Whisper Large V3…")
-        return when (val r = NvidiaAsrClient.transcribe(whisperKey, pcm)) {
-            is NvidiaAsrClient.Result.Success -> Result.Success(r.text, "NVIDIA Whisper Large V3")
-            is NvidiaAsrClient.Result.Error -> Result.Error(r.message)
-            NvidiaAsrClient.Result.NoApiKey -> Result.Error("No ASR key available")
+        when (val r = NvidiaAsrClient.transcribe(whisperKey, pcm)) {
+            is NvidiaAsrClient.Result.Success -> return Result.Success(r.text, "NVIDIA Whisper Large V3")
+            is NvidiaAsrClient.Result.Error ->
+                onLog?.invoke("NVIDIA Whisper failed (${r.message}) — trying HyperOS on-device ASR")
+            NvidiaAsrClient.Result.NoApiKey ->
+                onLog?.invoke("NVIDIA key missing — trying HyperOS on-device ASR")
+        }
+
+        // Final fallback: HyperOS/system on-device speech recognizer.
+        // On Xiaomi devices this uses Xiaomi's built-in AI speech engine (no
+        // network, no model download). Returns null on devices that don't support
+        // file-based recognition via the system recognizer.
+        onLog?.invoke("Transcribing with HyperOS on-device speech recogniser…")
+        val transcript = OnDeviceSpeechRecognizer.transcribe(context, pcm)
+        return if (!transcript.isNullOrBlank()) {
+            Result.Success(transcript, "HyperOS on-device ASR")
+        } else {
+            Result.Error("All ASR engines failed — no network and on-device recognition unavailable")
         }
     }
 }

@@ -291,7 +291,11 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
     // this is what makes AI classification, task creation and the persistent
     // notification keep working without the user opening the app.
     private fun dispatchNotificationData(data: Map<String, Any>) {
-        if (NotificationListenerModule.instance != null) {
+        // Use the live path only when JS is both running AND has an active listener.
+        // The foreground service keeps the process (and thus the module instance)
+        // alive after the user swipes the app, so instance alone does not prove
+        // that the JS event listener is registered.
+        if (NotificationListenerModule.instance != null && NotificationListenerModule.hasActiveListener) {
             // JS is alive — first flush anything that was queued while it was dead,
             // then deliver the current notification. Guarded: a conversion or
             // emitter failure must fall through to the headless path, not
@@ -323,7 +327,9 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
             }
             val intent = Intent(this, TaskMindHeadlessTaskService::class.java)
             intent.putExtras(bundle)
-            startService(intent)
+            // Use startForegroundService so MIUI/HyperOS background-start
+            // restrictions cannot silently swallow the headless task start.
+            startForegroundService(intent)
             HeadlessJsTaskService.acquireWakeLockNow(this)
             bump("stat_headless")
         } catch (_: Throwable) {

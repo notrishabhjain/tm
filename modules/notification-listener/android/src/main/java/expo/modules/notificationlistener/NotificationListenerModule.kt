@@ -41,7 +41,32 @@ class NotificationListenerModule : Module() {
         OnDestroy {
             if (instance === this@NotificationListenerModule) {
                 instance = null
+                hasActiveListener = false
             }
+        }
+
+        // JS calls this when it registers/removes the onNotification listener so
+        // native dispatch can tell the difference between "JS is alive but nobody
+        // is listening" (foreground service keeps the process alive after a swipe,
+        // so instance stays non-null even though the React component has unmounted)
+        // vs "JS is alive and the listener is active".
+        AsyncFunction("setNotificationListenerActive") { active: Boolean ->
+            hasActiveListener = active
+        }
+
+        // Offline notification classifier — runs entirely on-device using Android's
+        // TextClassifier (backed by HyperOS AI on Xiaomi devices) plus English/Hindi
+        // pattern matching. Called by the JS pipeline when all network engines fail.
+        AsyncFunction("localDecideNotification") { pkg: String, senderName: String, text: String, isGroup: Boolean ->
+            val d = LocalNotificationDecider.decide(context, senderName, text, isGroup)
+            mapOf(
+                "isTask" to d.isTask,
+                "title" to d.title,
+                "priority" to d.priority,
+                "reasoning" to d.reasoning,
+                "notes" to d.notes,
+                "dueDate" to null
+            )
         }
 
         // ── Notification listener ────────────────────────────────────────────
@@ -392,6 +417,12 @@ class NotificationListenerModule : Module() {
     companion object {
         @Volatile
         var instance: NotificationListenerModule? = null
+
+        // True only while the JS onNotification listener is registered.
+        // The foreground service keeps the process alive after a swipe, so
+        // instance can be non-null even though there is no active listener.
+        @Volatile
+        var hasActiveListener: Boolean = false
 
         fun sendNotificationEvent(data: Map<String, Any>) {
             instance?.sendEvent("onNotification", data)

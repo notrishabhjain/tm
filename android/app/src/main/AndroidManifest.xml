@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.RECORD_AUDIO"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
   <uses-permission android:name="android.permission.INTERNET"/>
@@ -36,7 +37,7 @@
       <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Continuous monitoring of user-approved notifications and finished calls to create tasks"/>
     </service>
     <service android:name="expo.modules.notificationlistener.CallTranscriptionService" android:foregroundServiceType="dataSync" android:exported="false"/>
-    <service android:name="expo.modules.notificationlistener.TaskMindHeadlessTaskService" android:exported="false"/>
+    <service android:name="expo.modules.notificationlistener.TaskMindHeadlessTaskService" android:foregroundServiceType="dataSync" android:exported="false"/>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
