@@ -281,7 +281,10 @@ async function decideWithGroq(
   onLog?: (engine: string, detail: string) => void
 ): Promise<PipelineDecision | null> {
   const key = getSetting('groq_api_key');
-  if (!key) { onLog?.('Groq', 'no key configured'); return null; }
+  if (!key) {
+    onLog?.('Groq', 'no key configured');
+    return null;
+  }
   return callOpenAiCompat(
     'https://api.groq.com/openai/v1/chat/completions',
     'llama-3.3-70b-versatile',
@@ -297,7 +300,10 @@ async function decideWithOpenRouter(
   onLog?: (engine: string, detail: string) => void
 ): Promise<PipelineDecision | null> {
   const key = getSetting('openrouter_api_key');
-  if (!key) { onLog?.('OpenRouter', 'no key configured'); return null; }
+  if (!key) {
+    onLog?.('OpenRouter', 'no key configured');
+    return null;
+  }
   return callOpenAiCompat(
     'https://openrouter.ai/api/v1/chat/completions',
     'meta-llama/llama-3.3-70b-instruct:free',
@@ -314,7 +320,10 @@ async function decideWithGemini(
 ): Promise<PipelineDecision | null> {
   try {
     const key = getSetting('gemini_api_key').trim();
-    if (!key) { onLog?.('Gemini', 'no key configured'); return null; }
+    if (!key) {
+      onLog?.('Gemini', 'no key configured');
+      return null;
+    }
     // AIzaSy keys → AI Studio endpoint (query-param auth)
     // AQ. keys → Vertex Express endpoint (query-param auth, different project)
     const encodedKey = encodeURIComponent(key);
@@ -557,17 +566,15 @@ export async function runNotificationPipelineTest(log: (line: string) => void): 
     channelId: '',
     importance: 4,
   };
-  const decision = await decide(
-    testNotification,
-    [],
-    (engine, detail) => {
-      const line = `  ${engine}: ${detail}`;
-      engineLogs.push(line);
-      log(line);
-    }
-  );
+  const decision = await decide(testNotification, [], (engine, detail) => {
+    const line = `  ${engine}: ${detail}`;
+    engineLogs.push(line);
+    log(line);
+  });
   if (decision === null) {
-    log('✗ AI DECISION FAILED — all engines (including offline) returned nothing. See details above.');
+    log(
+      '✗ AI DECISION FAILED — all engines (including offline) returned nothing. See details above.'
+    );
     return;
   }
   const isOffline = engineLogs.some((l) => l.includes('HyperOS offline') || l.includes('offline'));
