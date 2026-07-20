@@ -376,13 +376,45 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
     }
 
     internal fun drainPendingQueue() {
-        if (NotificationListenerModule.instance == null) return
         try {
             val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
             val raw = prefs.getString(KEY_PENDING_QUEUE, null) ?: return
             val arr = org.json.JSONArray(raw)
             if (arr.length() == 0) return
             prefs.edit().remove(KEY_PENDING_QUEUE).apply()
+
+            if (NotificationListenerModule.instance == null) {
+                // RN bridge not running — dispatch each item as a new headless task.
+                // The notification listener is system-bound, so startForegroundService()
+                // is permitted here even when regular background starts are restricted.
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val bundle = android.os.Bundle().apply {
+                        putString("packageName", obj.optString("packageName", ""))
+                        putString("appName", obj.optString("appName", ""))
+                        putString("title", obj.optString("title", ""))
+                        putString("text", obj.optString("text", ""))
+                        putString("bigText", obj.optString("bigText", ""))
+                        putString("subText", obj.optString("subText", ""))
+                        putDouble("postTime", obj.optLong("postTime", 0L).toDouble())
+                        putString("notificationKey", obj.optString("notificationKey", ""))
+                        putBoolean("isGroup", obj.optBoolean("isGroup", false))
+                        putString("category", obj.optString("category", ""))
+                        putString("channelId", obj.optString("channelId", ""))
+                        putInt("importance", obj.optInt("importance", 3))
+                        putString("threadJson", obj.optJSONArray("thread")?.toString() ?: "[]")
+                    }
+                    try {
+                        startForegroundService(
+                            Intent(this, TaskMindHeadlessTaskService::class.java).putExtras(bundle)
+                        )
+                        HeadlessJsTaskService.acquireWakeLockNow(this)
+                    } catch (_: Throwable) { /* system at capacity — item lost, acceptable */ }
+                }
+                return
+            }
+
+            // Live path — JS bridge is running; deliver events directly.
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
                 val thread = mutableListOf<Map<String, Any>>()
