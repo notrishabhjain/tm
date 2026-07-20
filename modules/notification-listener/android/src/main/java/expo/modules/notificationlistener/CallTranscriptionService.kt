@@ -246,14 +246,24 @@ class CallTranscriptionService : Service() {
         }
 
         if (llmResult !is NvidiaLlmClient.Result.Success) {
-            // All LLM engines failed — store transcript for JS-side retry on next app open.
-            CallRecordStore.storeCallResult(
-                this, caller, recording.absolutePath, text, extraction = null, callTimeMs = callTime
-            )
-            CallRecordStore.logActivity(
-                this, "call", caller.label, "ERROR",
-                "AI analysis failed — will retry when app opens"
-            )
+            // All network LLM engines failed — try fully on-device analysis.
+            // Quality is lower than LLM (pattern-matching, not semantic understanding)
+            // but works offline and reliably catches explicit spoken commitments.
+            Log.d(TAG, "All network LLMs failed — running on-device LocalCallAnalyzer")
+            val onDeviceExtraction = LocalCallAnalyzer.analyze(this, capped, callTime, caller.label)
+            if (onDeviceExtraction.tasks.isNotEmpty()) {
+                storeAndFinish(caller, recording.absolutePath, text, onDeviceExtraction, callTime)
+            } else {
+                // On-device found nothing — store transcript so the next time the
+                // app opens it can re-analyse with a network LLM.
+                CallRecordStore.storeCallResult(
+                    this, caller, recording.absolutePath, text, extraction = null, callTimeMs = callTime
+                )
+                CallRecordStore.logActivity(
+                    this, "call", caller.label, "ERROR",
+                    "AI analysis failed (offline — no explicit tasks detected) — will retry when app opens"
+                )
+            }
             return
         }
 
