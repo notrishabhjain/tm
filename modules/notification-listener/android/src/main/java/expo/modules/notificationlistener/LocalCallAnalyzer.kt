@@ -261,10 +261,10 @@ object LocalCallAnalyzer {
                 val req = TextLinks.Request.Builder(rawSentence).build()
                 val links = classifier.generateLinks(req)
                 for (link in links.links) {
-                    val types = link.entities.map { it.entityType }
-                    if (TextClassifier.TYPE_DATE_TIME in types ||
-                        "date_time" in types
-                    ) {
+                    val hasDate = (0 until link.entityCount).any { i ->
+                        link.getEntity(i) == TextClassifier.TYPE_DATE_TIME
+                    }
+                    if (hasDate) {
                         // TextClassifier doesn't resolve dates to timestamps —
                         // it only marks the span. Flag that a date exists so we
                         // can at least assign a default due date of +2 days.
