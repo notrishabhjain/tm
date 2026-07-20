@@ -100,5 +100,11 @@ class WatchdogAlarmReceiver : BroadcastReceiver() {
                 Log.w(TAG, "CallTranscriptionService start failed: ${e.message}")
             }
         }
+
+        // 3. Drain any notifications that were queued because the headless start
+        //    was blocked (Autostart off or OEM killed the service). If the listener
+        //    is bound but the RN bridge isn't alive, drainPendingQueue() now
+        //    dispatches each item as a fresh headless task instead of silently dropping.
+        TaskMindNotificationListenerService.triggerDrain()
     }
 }

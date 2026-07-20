@@ -180,7 +180,23 @@ class CallTranscriptionService : Service() {
         val caller = CallerResolver.resolve(this, recording)
         val callTime = caller.endedAt
 
-        // ASR → LLM pipeline: Groq Whisper (ASR) → Groq 70B → OpenRouter 70B → NVIDIA (last resort).
+        // Primary path: Gemini audio→tasks in a single API call — no separate ASR step,
+        // better Hindi/Hinglish understanding, lower latency.
+        val geminiKey = GeminiCallAnalyzer.apiKey(this)
+        if (geminiKey.isNotBlank()) {
+            when (val r = GeminiCallAnalyzer.analyze(this, recording, callTime, caller.label)) {
+                is GeminiCallAnalyzer.Result.Success -> {
+                    CallRecordingFinder.markProcessed(this, recording)
+                    storeAndFinish(caller, recording.absolutePath, r.transcript, r.extraction, callTime)
+                    return
+                }
+                is GeminiCallAnalyzer.Result.Error ->
+                    Log.w(TAG, "Gemini failed (${r.message}) — falling back to ASR+LLM chain")
+                GeminiCallAnalyzer.Result.NoApiKey -> { /* fall through */ }
+            }
+        }
+
+        // Fallback ASR → LLM pipeline: Groq Whisper → Groq 70B → OpenRouter 70B → NVIDIA.
         val pcm = AudioDecoder.decodeToWhisperPcm(recording.absolutePath)
         if (pcm == null || pcm.isEmpty()) {
             Log.w(TAG, "Failed to decode ${recording.absolutePath}")
@@ -230,7 +246,7 @@ class CallTranscriptionService : Service() {
         val groqKey = prefs.getString("groq_api_key", null).orEmpty().ifBlank { DefaultKeys.GROQ }
         val openrouterKey = prefs.getString("openrouter_api_key", null).orEmpty().ifBlank { DefaultKeys.OPENROUTER }
         val nvidiaKey = prefs.getString("ai_api_key", null).orEmpty().ifBlank { DefaultKeys.NVIDIA_LLM }
-        val nvidiaModel = prefs.getString("call_ai_model", null).orEmpty().ifBlank { DEFAULT_CALL_MODEL }
+        val nvidiaModel = prefs.getString("ai_model", null).orEmpty().ifBlank { DEFAULT_CALL_MODEL }
 
         var usedEngine = "groq"
         var llmResult = NvidiaLlmClient.extractWithGroq(groqKey, capped, callTime, caller.label)
@@ -315,7 +331,9 @@ class CallTranscriptionService : Service() {
         try {
             val intent = Intent(this, TaskMindHeadlessTaskService::class.java)
             intent.putExtra("jobType", "flush_outbox")
-            startService(intent)
+            // startForegroundService is required — MIUI/HyperOS blocks plain
+            // startService() from any background context unconditionally.
+            startForegroundService(intent)
             HeadlessJsTaskService.acquireWakeLockNow(this)
         } catch (e: Exception) {
             // Background-start restrictions — the app-open sweep will flush instead.
