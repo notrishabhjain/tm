@@ -118,6 +118,8 @@ class CallTranscriptionService : Service() {
         val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("call_transcription_enabled", false)) return
 
+        CallRecordStore.logActivity(this, "call", "Call", "SCANNING", "Transcription service started — scanning for recording…")
+
         // Recorders flush within seconds of hangup; retry covers slow OEMs.
         var recording = CallRecordingFinder.findLatestUnprocessed(this)
         if (recording == null) {
@@ -130,6 +132,11 @@ class CallTranscriptionService : Service() {
         }
         if (recording == null) {
             Log.d(TAG, "No new call recording found after retries")
+            CallRecordStore.logActivity(
+                this, "call", "Call", "ERROR",
+                "No call recording found — ensure call recording is enabled in your Phone app and storage permission is granted. " +
+                "Open the debug screen → 'Test call pipeline' to verify which folders are checked."
+            )
             return
         }
         // A recovery sweep may already have stored it — don't spend an ASR call.
@@ -155,12 +162,28 @@ class CallTranscriptionService : Service() {
         val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("call_transcription_enabled", false)) return
 
+        val hasPendingFlag = prefs.getLong(KEY_PENDING_CALL_SCAN, 0L) != 0L
+
         val candidates = CallRecordingFinder
             .findRecentRecordings(this, SWEEP_WINDOW_MS, SWEEP_MAX_RECORDINGS)
             .filter { !CallRecordStore.hasRecording(this, it.absolutePath) }
 
         if (candidates.isEmpty()) {
             prefs.edit().remove(KEY_PENDING_CALL_SCAN).apply()
+            // Log when: (a) a call trigger flagged a pending scan but we still can't find
+            // the file, OR (b) throttled once per hour so the user can see the sweep ran.
+            val lastSweepLog = prefs.getLong("call_sweep_no_file_logged_at", 0L)
+            val now = System.currentTimeMillis()
+            if (hasPendingFlag || now - lastSweepLog > 60 * 60 * 1000L) {
+                prefs.edit().putLong("call_sweep_no_file_logged_at", now).apply()
+                val msg = if (hasPendingFlag) {
+                    "Recovery sweep: call was detected but no recording found in 24h. " +
+                    "Enable call recording in your Phone app settings."
+                } else {
+                    "Sweep ran: no unprocessed call recordings found in the last 24h."
+                }
+                CallRecordStore.logActivity(this, "call", "Call", "SCAN", msg)
+            }
             return
         }
 

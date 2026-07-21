@@ -72,6 +72,14 @@ export default function RootLayout(): React.JSX.Element {
     } catch {
       /* non-fatal */
     }
+    // Mirror the Gemini key so the native call pipeline (GeminiCallAnalyzer) picks
+    // up any user-set key — without this the native side only uses the bundled default.
+    try {
+      const geminiKey = getSetting('gemini_api_key');
+      if (geminiKey) void NotificationListener.setGeminiApiKey(geminiKey).catch(() => {});
+    } catch {
+      /* non-fatal */
+    }
     const t = setTimeout(() => void SplashScreen.hideAsync(), 300);
     return () => clearTimeout(t);
   }, []);

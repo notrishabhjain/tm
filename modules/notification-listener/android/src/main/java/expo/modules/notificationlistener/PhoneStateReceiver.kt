@@ -57,6 +57,11 @@ class PhoneStateReceiver : BroadcastReceiver() {
                     return
                 }
 
+                CallRecordStore.logActivity(
+                    context, "call", "Call", "TRIGGER",
+                    "Call ended — PhoneStateReceiver fired, starting transcription"
+                )
+
                 // Flag the pending call FIRST: if the service start below is
                 // blocked (MIUI/HyperOS autostart off, background restrictions),
                 // the recovery sweep — triggered from the notification listener
@@ -73,6 +78,10 @@ class PhoneStateReceiver : BroadcastReceiver() {
                     )
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to start CallTranscriptionService: ${e.message}")
+                    CallRecordStore.logActivity(
+                        context, "call", "Call", "ERROR",
+                        "Could not start transcription service — watchdog will retry: ${e.message}"
+                    )
                 }
             }
         }

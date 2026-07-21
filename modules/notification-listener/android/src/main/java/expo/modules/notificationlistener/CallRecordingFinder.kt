@@ -1,6 +1,7 @@
 package expo.modules.notificationlistener
 
 import android.content.Context
+import android.provider.MediaStore
 import java.io.File
 
 /**
@@ -33,10 +34,14 @@ object CallRecordingFinder {
         "/storage/emulated/0/Call",
         "/storage/emulated/0/CallRecordings",
         "/storage/emulated/0/CallRecorder",
-        // Xiaomi / MIUI / HyperOS
+        // Xiaomi / MIUI / HyperOS — classic paths
         "/storage/emulated/0/MIUI/sound_recorder/call_rec",
         "/storage/emulated/0/MIUI/sounds/Call",
         "/storage/emulated/0/MIUI/sounds",
+        // Xiaomi HyperOS 1.x / 2.x — newer recorder paths
+        "/storage/emulated/0/Recordings/Call recordings",
+        "/storage/emulated/0/Recordings/Call Recording",
+        "/storage/emulated/0/Sound Recorder",
         // OnePlus legacy (OxygenOS 11 and older)
         "/storage/emulated/0/Sounds/Call",
         "/storage/emulated/0/Record",
@@ -54,6 +59,9 @@ object CallRecordingFinder {
     )
 
     private val AUDIO_EXTENSIONS = setOf("m4a", "amr", "3gp", "mp3", "wav", "aac", "opus", "ogg")
+
+    // Path keywords that indicate a file is a call recording (used by MediaStore scan).
+    private val CALL_RECORDING_KEYWORDS = listOf("call", "record", "phone", "voice", "dialer", "rec")
 
     /** Max age (ms) for a recording to be considered "from this call".
      *  Extended to 30 min to cover retry attempts inside CallTranscriptionService. */
@@ -77,6 +85,9 @@ object CallRecordingFinder {
      * Scans each candidate directory plus ONE level of subdirectories — several
      * OEM recorders group recordings into per-contact or per-date folders
      * (e.g. ColorOS "Call Recordings/<contact name>/xxx.mp3").
+     *
+     * Falls back to a MediaStore query if the directory scan finds nothing —
+     * this catches recordings saved to any path not in the hardcoded list.
      */
     fun findLatestUnprocessed(context: Context): File? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -102,6 +113,12 @@ object CallRecordingFinder {
             }
         }
 
+        // MediaStore fallback: catches recordings saved to any path not in DEFAULT_DIRS.
+        if (newest == null) {
+            val cutoff = System.currentTimeMillis() - MAX_AGE_MS
+            for (f in queryMediaStore(context, cutoff, 5)) consider(f)
+        }
+
         val found = newest ?: return null
         if (found.absolutePath == lastProcessed) return null
 
@@ -122,6 +139,9 @@ object CallRecordingFinder {
      * at [limit]. Unlike [findLatestUnprocessed] this ignores the last-processed
      * marker and the 30-minute freshness window — deduplication against
      * already-processed recordings is the caller's job (CallRecordStore).
+     *
+     * Also performs a MediaStore scan so recordings in non-standard paths are
+     * included. Results are deduped by absolute path before returning.
      */
     fun findRecentRecordings(context: Context, maxAgeMs: Long, limit: Int): List<File> {
         val cutoff = System.currentTimeMillis() - maxAgeMs
@@ -140,6 +160,53 @@ object CallRecordingFinder {
                 }
             }
         }
+
+        // MediaStore fallback — merge in any recordings outside the known directories.
+        for (f in queryMediaStore(context, cutoff, limit)) {
+            if (found.none { it.absolutePath == f.absolutePath }) found.add(f)
+        }
+
         return found.sortedByDescending { it.lastModified() }.take(limit)
+    }
+
+    /**
+     * Queries MediaStore.Audio for recently modified files whose path suggests
+     * they are call recordings. Returns up to [limit] files sorted newest-first.
+     *
+     * This is a best-effort fallback — it only runs when the directory scan
+     * finds nothing, so false positives from keyword-matching are acceptable;
+     * the LLM analysis step will discard non-call audio gracefully.
+     */
+    private fun queryMediaStore(context: Context, cutoffMs: Long, limit: Int): List<File> {
+        return try {
+            val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            val projection = arrayOf(
+                MediaStore.Audio.Media.DATA,
+                MediaStore.Audio.Media.DATE_MODIFIED
+            )
+            // DATE_MODIFIED is stored in seconds in MediaStore.
+            val selection = "${MediaStore.Audio.Media.DATE_MODIFIED} >= ?"
+            val selectionArgs = arrayOf("${cutoffMs / 1000}")
+            val sortOrder = "${MediaStore.Audio.Media.DATE_MODIFIED} DESC"
+
+            context.contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)
+                ?.use { cursor ->
+                    val dataIdx = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                    val results = mutableListOf<File>()
+                    while (cursor.moveToNext() && results.size < limit) {
+                        val path = cursor.getString(dataIdx) ?: continue
+                        val lower = path.lowercase()
+                        if (CALL_RECORDING_KEYWORDS.any { lower.contains(it) }) {
+                            val f = File(path)
+                            if (f.isFile && AUDIO_EXTENSIONS.contains(f.extension.lowercase())) {
+                                results.add(f)
+                            }
+                        }
+                    }
+                    results
+                } ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 }

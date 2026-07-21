@@ -142,6 +142,11 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         } catch (_: Throwable) { }
         // If any notifications were queued while the binding was down, replay them.
         drainPendingQueue()
+        // Immediately check for a pending call scan — the listener connect event fires
+        // even when MIUI blocks background broadcasts, making this the most reliable
+        // recovery path for calls whose end-of-call trigger was blocked.
+        lastCallSweepAt = 0L
+        maybeTriggerCallRecoverySweep()
     }
 
     // Android periodically tears down the notification-listener binding (memory
