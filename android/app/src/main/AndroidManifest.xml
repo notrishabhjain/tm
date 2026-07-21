@@ -1,18 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-  <uses-permission android:name="android.permission.RECORD_AUDIO"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
   <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+  <uses-permission android:name="android.permission.READ_CALENDAR"/>
   <uses-permission android:name="android.permission.READ_CALL_LOG"/>
   <uses-permission android:name="android.permission.READ_CONTACTS"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
-  <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
+  <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
   <queries>
     <intent>
@@ -30,9 +34,6 @@
         <action android:name="android.service.notification.NotificationListenerService"/>
       </intent-filter>
     </service>
-    <!-- specialUse, NOT dataSync: this watcher runs all day, and Android 15
-         caps dataSync at ~6h/day — after which every restart crashed the app
-         (ForegroundServiceStartNotAllowedException) and killed the listener. -->
     <service android:name="expo.modules.notificationlistener.TaskMindForegroundService" android:foregroundServiceType="specialUse" android:exported="false">
       <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Continuous monitoring of user-approved notifications and finished calls to create tasks"/>
     </service>
@@ -59,16 +60,8 @@
         <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
       </intent-filter>
     </receiver>
-    <!-- Periodic watchdog: restarts the FGS and retries blocked call scans.
-         Not exported — only AlarmManager delivers intents to it. -->
     <receiver android:name="expo.modules.notificationlistener.WatchdogAlarmReceiver" android:exported="false"/>
-    <!-- Static phone-state receiver: triggers call transcription even when the
-         foreground service has been killed by OEM battery optimisers. The
-         android.intent.action.PHONE_STATE broadcast is exempt from Android 8+
-         implicit-broadcast restrictions, so this static declaration is safe. -->
-    <receiver
-        android:name="expo.modules.notificationlistener.PhoneStateReceiver"
-        android:exported="true">
+    <receiver android:name="expo.modules.notificationlistener.PhoneStateReceiver" android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.PHONE_STATE"/>
       </intent-filter>

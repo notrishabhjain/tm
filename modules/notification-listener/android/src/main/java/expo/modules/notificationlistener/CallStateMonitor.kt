@@ -123,6 +123,10 @@ object CallStateMonitor {
         handler.postDelayed({
             val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             if (!prefs.getBoolean("call_transcription_enabled", false)) return@postDelayed
+            CallRecordStore.logActivity(
+                context, "call", "Call", "TRIGGER",
+                "Call ended — CallStateMonitor fired, starting transcription in background"
+            )
             // Flag pending before attempting the start — if the start is blocked by
             // OEM restrictions, the watchdog alarm and the notification-listener
             // recovery sweep will pick this up within minutes.
