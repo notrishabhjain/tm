@@ -27,8 +27,10 @@ class CallTranscriptionService : Service() {
 
         private const val SAMPLE_RATE = 16000
         // Calls shorter than this skip LLM analysis entirely (token thrift).
-        private const val MIN_ANALYSIS_DURATION_SEC = 60
-        private const val MIN_ANALYSIS_TRANSCRIPT_CHARS = 150
+        // Keep threshold low — short Indian business calls are frequently action-dense.
+        // A 15-second "let's complete the PPT by tomorrow" is as actionable as a 5-minute call.
+        private const val MIN_ANALYSIS_DURATION_SEC = 15
+        private const val MIN_ANALYSIS_TRANSCRIPT_CHARS = 30
         private const val MAX_TRANSCRIPT_CHARS = 8_000
         private const val DEFAULT_CALL_MODEL = "meta/llama-3.3-70b-instruct"
 

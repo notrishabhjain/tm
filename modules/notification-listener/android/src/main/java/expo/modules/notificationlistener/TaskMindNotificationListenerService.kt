@@ -6,9 +6,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.database.ContentObserver
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.CallLog
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.facebook.react.HeadlessJsTaskService
 import java.util.LinkedHashMap
@@ -91,6 +97,14 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
 
     private var monitoredApps: Set<String> = emptySet()
 
+    // ── Call-log observer: fires even when MIUI/HyperOS blocks PHONE_STATE ──────
+    // The notification listener is system-bound and can always start foreground
+    // services, so this is the most reliable call-end trigger on MIUI/HyperOS
+    // devices that have Autostart disabled.
+    private val callLogHandler = Handler(Looper.getMainLooper())
+    private var callLogObserver: ContentObserver? = null
+    @Volatile private var callLogDebounceAt = 0L
+
     private val refreshReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             loadMonitoredApps()
@@ -122,6 +136,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
     override fun onDestroy() {
         super.onDestroy()
         if (serviceInstance === this) serviceInstance = null
+        unregisterCallLogObserver()
         try {
             unregisterReceiver(refreshReceiver)
         } catch (_: Exception) { }
@@ -147,6 +162,8 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         // recovery path for calls whose end-of-call trigger was blocked.
         lastCallSweepAt = 0L
         maybeTriggerCallRecoverySweep()
+        // Register call-log observer so future calls are caught even without Autostart.
+        registerCallLogObserver()
     }
 
     // Android periodically tears down the notification-listener binding (memory
@@ -156,6 +173,7 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         listenerBound = false
+        unregisterCallLogObserver()
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             try {
                 requestRebind(
@@ -163,6 +181,84 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
                 )
             } catch (_: Exception) { }
         }
+    }
+
+    private fun registerCallLogObserver() {
+        if (checkSelfPermission(android.Manifest.permission.READ_CALL_LOG)
+            != PackageManager.PERMISSION_GRANTED) return
+        if (callLogObserver != null) return
+        val observer = object : ContentObserver(callLogHandler) {
+            override fun onChange(selfChange: Boolean) {
+                // Debounce: call log fires several times per call lifecycle
+                val stamp = System.currentTimeMillis()
+                callLogDebounceAt = stamp
+                callLogHandler.postDelayed({
+                    if (callLogDebounceAt == stamp) onCallLogChanged()
+                }, 5_000L)
+            }
+        }
+        callLogObserver = observer
+        try {
+            contentResolver.registerContentObserver(CallLog.Calls.CONTENT_URI, true, observer)
+            Log.d("TaskMindListener", "CallLog observer registered")
+        } catch (e: Exception) {
+            Log.w("TaskMindListener", "Failed to register call-log observer: ${e.message}")
+            callLogObserver = null
+        }
+    }
+
+    private fun unregisterCallLogObserver() {
+        callLogObserver?.let {
+            try { contentResolver.unregisterContentObserver(it) } catch (_: Exception) {}
+        }
+        callLogObserver = null
+    }
+
+    private fun onCallLogChanged() {
+        Thread {
+            try {
+                val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                if (!prefs.getBoolean("call_transcription_enabled", false)) return@Thread
+
+                contentResolver.query(
+                    CallLog.Calls.CONTENT_URI,
+                    arrayOf(CallLog.Calls.DATE, CallLog.Calls.DURATION, CallLog.Calls.TYPE),
+                    null, null,
+                    "${CallLog.Calls.DATE} DESC"
+                )?.use { cursor ->
+                    if (!cursor.moveToFirst()) return@Thread
+                    val callDate = cursor.getLong(0)
+                    val duration = cursor.getLong(1)
+                    val type = cursor.getInt(2)
+
+                    val now = System.currentTimeMillis()
+                    // Only act on incoming/outgoing calls ended within the last 5 minutes
+                    // with a non-zero duration (missed calls have duration=0).
+                    if (now - callDate > 5 * 60 * 1000L) return@Thread
+                    if (duration <= 0) return@Thread
+                    if (type != CallLog.Calls.INCOMING_TYPE && type != CallLog.Calls.OUTGOING_TYPE) return@Thread
+
+                    // Avoid double-trigger if PhoneStateReceiver or CallStateMonitor
+                    // already flagged this call in the last 5 minutes.
+                    val pendingAt = prefs.getLong(CallTranscriptionService.KEY_PENDING_CALL_SCAN, 0L)
+                    if (pendingAt != 0L && now - pendingAt < 5 * 60 * 1000L) return@Thread
+
+                    Log.d("TaskMindListener", "Call-log observer: ${duration}s call ended — starting transcription")
+                    CallRecordStore.logActivity(
+                        this, "call", "Call", "TRIGGER",
+                        "Call ended — CallLog observer fired (${duration}s), starting transcription"
+                    )
+                    prefs.edit()
+                        .putLong(CallTranscriptionService.KEY_PENDING_CALL_SCAN, now)
+                        .apply()
+                    try {
+                        startForegroundService(Intent(this, CallTranscriptionService::class.java))
+                    } catch (e: Exception) {
+                        Log.w("TaskMindListener", "FGS start from call-log observer failed: ${e.message}")
+                    }
+                }
+            } catch (_: Exception) {}
+        }.start()
     }
 
     @Volatile
