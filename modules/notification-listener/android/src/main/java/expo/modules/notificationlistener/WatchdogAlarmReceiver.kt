@@ -86,11 +86,13 @@ class WatchdogAlarmReceiver : BroadcastReceiver() {
             }
         }
 
-        // 2. Retry pending call transcription if a scan was flagged but the
-        //    initial service start was blocked by background restrictions.
-        val pendingAt = prefs.getLong(CallTranscriptionService.KEY_PENDING_CALL_SCAN, 0L)
-        if (pendingAt != 0L) {
-            Log.d(TAG, "Pending call scan flagged at $pendingAt — starting CallTranscriptionService")
+        // 2. Recovery sweep: always start when call transcription is enabled so
+        //    new recordings are processed even when ALL three triggers are blocked
+        //    (PhoneStateReceiver, CallStateMonitor, ContentObserver) — the alarm fires
+        //    every ~5 min and is the last-resort safety net. The service is cheap to
+        //    start when nothing is found (filesystem scan only, no network call).
+        if (prefs.getBoolean("call_transcription_enabled", false)) {
+            Log.d(TAG, "Watchdog sweep — checking for unprocessed call recordings")
             try {
                 context.startForegroundService(
                     Intent(context, CallTranscriptionService::class.java)
