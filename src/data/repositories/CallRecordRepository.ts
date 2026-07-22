@@ -55,7 +55,7 @@ export class CallRecordRepository {
    * Calls whose background LLM analysis failed (status TRANSCRIBED) and that
    * were long enough to analyse. Retried when the app opens.
    */
-  async getPendingAnalysis(minDurationSec = 60): Promise<CallRecord[]> {
+  async getPendingAnalysis(minDurationSec = 15): Promise<CallRecord[]> {
     const rows = await this.db
       .select()
       .from(callRecords)

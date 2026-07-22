@@ -28,6 +28,7 @@ import {
 } from '@/services/google-tasks';
 import { appDisplayName } from '@/services/app-name-map';
 import { runNotificationPipelineTest } from '@/services/pipeline';
+import { retryFailedCallAnalyses } from '@/services/call-retry';
 import NotificationListener from '../../modules/notification-listener/src';
 import type { OemInfo } from '../../modules/notification-listener/src/types';
 
@@ -221,13 +222,25 @@ export default function StatusScreen(): React.JSX.Element {
       setTestLogs((prev) => [
         ...prev,
         res.ok
-          ? '✓ PASS — the call pipeline works end-to-end on this device'
+          ? '✓ PASS — call audio decoded; now scanning DB for unextracted calls and triggering native sweep…'
           : `✗ FAIL at "${res.stage}": ${res.error ?? 'unknown error'}`,
+      ]);
+      // Whether the diagnostic passed or failed, try to extract tasks from any
+      // TRANSCRIBED records already in the DB (the diagnostic never does this).
+      setTestLogs((prev) => [...prev, 'Extracting tasks from transcribed calls…']);
+      await retryFailedCallAnalyses();
+      // Also kick the native service so it picks up any recording it may have
+      // just found (or ones from the last call that weren't processed yet).
+      void NotificationListener.scanForMissedCalls().catch(() => {});
+      setTestLogs((prev) => [
+        ...prev,
+        '✓ Done — check Recent Activity and Google Tasks for results',
       ]);
     } catch (e) {
       setTestLogs((prev) => [...prev, `✗ FAIL: ${e instanceof Error ? e.message : String(e)}`]);
     } finally {
       setTesting(false);
+      void refetch();
     }
   };
 
