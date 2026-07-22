@@ -1,6 +1,7 @@
 import { Linking } from 'react-native';
 import { getSetting, setSetting } from '@/data/storage/settings';
 import { appDisplayName } from './app-name-map';
+import NotificationListener from '../../modules/notification-listener/src';
 
 const TASKS_API = 'https://tasks.googleapis.com/tasks/v1';
 const OAUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -204,10 +205,20 @@ export async function handleOAuthCallback(callbackUrl: string): Promise<boolean>
   }
 }
 
-async function getValidAccessToken(): Promise<string | null> {
+/**
+ * Returns a usable access token, refreshing when the cached one is expired (or
+ * when [forceRefresh] is set — used after a 401, where Google rejected a token
+ * whose stored expiry hadn't elapsed yet).
+ *
+ * The refresh POST is retried once on a transient failure (network error /
+ * timeout / 5xx). Without this, a single blip at the ~1h token boundary while
+ * the app is backgrounded drops that notification's task to the outbox — the
+ * root cause of "tasks stop appearing after a few hours in the background".
+ */
+async function getValidAccessToken(forceRefresh = false): Promise<string | null> {
   const expiry = getSetting('google_tasks_token_expiry');
   const accessToken = getSetting('google_tasks_access_token');
-  if (accessToken && Date.now() < expiry - 60_000) return accessToken;
+  if (!forceRefresh && accessToken && Date.now() < expiry - 60_000) return accessToken;
 
   // Refresh — fall back to bundled credentials if stored values were cleared
   // (e.g. after a disconnect/reconnect that didn't re-store them). Desktop app
@@ -221,20 +232,32 @@ async function getValidAccessToken(): Promise<string | null> {
     return null;
   }
 
-  try {
-    const refreshParams: Record<string, string> = {
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'refresh_token',
-    };
+  const refreshParams = new URLSearchParams({
+    refresh_token: refreshToken,
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'refresh_token',
+  }).toString();
 
-    const resp = await fetchWithTimeout(TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(refreshParams).toString(),
-    });
-    if (!resp.ok) {
+  // Two attempts: a transient network/5xx failure on attempt 1 is retried after
+  // a short pause. invalid_grant / 4xx are permanent — no retry.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const resp = await fetchWithTimeout(TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: refreshParams,
+      });
+      if (resp.ok) {
+        const tokens = (await resp.json()) as { access_token: string; expires_in: number };
+        setSetting('google_tasks_access_token', tokens.access_token);
+        // Re-store client credentials alongside the refreshed token so they
+        // survive a future disconnect/reconnect cycle.
+        setSetting('google_tasks_client_id', clientId);
+        setSetting('google_tasks_client_secret', clientSecret);
+        setSetting('google_tasks_token_expiry', Date.now() + tokens.expires_in * 1000);
+        return tokens.access_token;
+      }
       const err = (await resp.json().catch(() => ({}))) as {
         error?: string;
         error_description?: string;
@@ -247,28 +270,30 @@ async function getValidAccessToken(): Promise<string | null> {
         err.error_description
       );
       if (err.error === 'invalid_grant') {
-        // Refresh token revoked / expired — auto-disconnect so the settings screen
-        // shows "not connected" rather than silently no-opping on every sync.
+        // Refresh token revoked / expired (e.g. Google's 7-day refresh-token
+        // limit on OAuth apps still in "Testing" publishing status). Auto-
+        // disconnect so the settings screen shows "not connected", and tell the
+        // user with a notification — otherwise the pipeline silently no-ops on
+        // every sync for the rest of the session with no clue to reconnect.
         setSetting('google_tasks_access_token', '');
         setSetting('google_tasks_refresh_token', '');
         setSetting('google_tasks_token_expiry', 0);
         setSetting('google_tasks_enabled', false);
+        void NotificationListener.postConfirmation(
+          'Reconnect Google Tasks',
+          'TaskMind was signed out of Google. Open TaskMind and tap Connect to resume creating tasks.'
+        ).catch(() => {});
+        return null;
       }
-      return null;
+      // Any other 4xx is permanent for this refresh token — don't retry.
+      if (resp.status < 500) return null;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[GoogleTasks] token refresh error', e);
     }
-    const tokens = (await resp.json()) as { access_token: string; expires_in: number };
-    setSetting('google_tasks_access_token', tokens.access_token);
-    // Re-store client credentials alongside the refreshed token so they survive
-    // a future disconnect/reconnect cycle.
-    setSetting('google_tasks_client_id', clientId);
-    setSetting('google_tasks_client_secret', clientSecret);
-    setSetting('google_tasks_token_expiry', Date.now() + tokens.expires_in * 1000);
-    return tokens.access_token;
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn('[GoogleTasks] token refresh error', e);
-    return null;
+    if (attempt === 1) await new Promise<void>((r) => setTimeout(r, 3000));
   }
+  return null;
 }
 
 const TASKMIND_LIST_TITLE = 'TaskMind';
@@ -365,26 +390,41 @@ export function buildGoogleTaskNotes(input: GoogleTaskNotesInput): string {
 
 export async function createGoogleTask(task: GoogleTaskInput): Promise<string | null> {
   if (!getSetting('google_tasks_enabled')) return null;
-  const token = await getValidAccessToken();
+  let token = await getValidAccessToken();
   if (!token) return null;
 
-  try {
-    const listId = await getTaskMindListId(token);
-    const body: Record<string, string> = { title: task.title };
-    if (task.notes) body['notes'] = task.notes;
-    // Always set a due date — use the extracted one or default to today.
-    // Google Tasks only honors the date portion and expects it encoded as UTC
-    // midnight, so take the LOCAL calendar date (an IST "by 3am" deadline must
-    // not slip to the previous day) and encode that as UTC midnight.
-    const dueTs = task.dueDate ?? Date.now();
-    const d = new Date(dueTs);
-    body['due'] = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
-    const resp = await fetchWithTimeout(`${TASKS_API}/lists/${listId}/tasks`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) {
+  // One reissue: if Google rejects the token with 401 despite our stored expiry
+  // not having elapsed (clock skew, server-side early revocation), force a
+  // refresh and retry once before giving up. Without this the task is needlessly
+  // dropped to the outbox even though a fresh token would have worked.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const listId = await getTaskMindListId(token);
+      const body: Record<string, string> = { title: task.title };
+      if (task.notes) body['notes'] = task.notes;
+      // Always set a due date — use the extracted one or default to today.
+      // Google Tasks only honors the date portion and expects it encoded as UTC
+      // midnight, so take the LOCAL calendar date (an IST "by 3am" deadline must
+      // not slip to the previous day) and encode that as UTC midnight.
+      const dueTs = task.dueDate ?? Date.now();
+      const d = new Date(dueTs);
+      body['due'] = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
+      const resp = await fetchWithTimeout(`${TASKS_API}/lists/${listId}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (resp.ok) {
+        const created = (await resp.json()) as { id: string };
+        return created.id ?? null;
+      }
+      // 401 on the first attempt → force-refresh the token and retry once.
+      if (resp.status === 401 && attempt === 1) {
+        const fresh = await getValidAccessToken(true);
+        if (!fresh) return null;
+        token = fresh;
+        continue;
+      }
       // eslint-disable-next-line no-console
       console.warn(
         '[GoogleTasks] createGoogleTask failed',
@@ -397,14 +437,13 @@ export async function createGoogleTask(task: GoogleTaskInput): Promise<string | 
         setSetting('google_tasks_taskmind_list_id', '');
       }
       return null;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[GoogleTasks] createGoogleTask error', e);
+      return null;
     }
-    const created = (await resp.json()) as { id: string };
-    return created.id ?? null;
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn('[GoogleTasks] createGoogleTask error', e);
-    return null;
   }
+  return null;
 }
 
 export async function completeGoogleTask(googleTaskId: string): Promise<void> {
