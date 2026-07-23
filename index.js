@@ -36,6 +36,12 @@ AppRegistry.registerHeadlessTask('TaskMindNotificationHandler', () => async (tas
     importance: typeof taskData?.importance === 'number' ? taskData.importance : 3,
   };
   await handleNotification({ notification });
+  // Opportunistically drain the Google Tasks outbox on the same background wake.
+  // The outbox is otherwise only flushed when the app is foregrounded, so any
+  // task queued by an earlier token blip would stay invisible for hours while
+  // the app runs in the background. flushOutbox() is cheap when empty and stops
+  // at the first failure, so this stays well within the headless time budget.
+  await flushOutbox().catch(() => {});
 });
 
 registerRootComponent(App);

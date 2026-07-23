@@ -279,11 +279,14 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
             try {
                 val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
                 if (!prefs.getBoolean("call_transcription_enabled", false)) return@Thread
-                val pendingCall =
-                    prefs.getLong(CallTranscriptionService.KEY_PENDING_CALL_SCAN, 0L) != 0L
-                val freshRecording =
-                    pendingCall || CallRecordingFinder.findLatestUnprocessed(this) != null
-                if (!freshRecording) return@Thread
+                // Start the service's own recovery sweep directly. We deliberately
+                // do NOT pre-check findLatestUnprocessed here: right after a call
+                // ends the recording is often still being flushed to disk (or not
+                // yet indexed by MediaStore), so a pre-check races the recorder and
+                // returns null, skipping the sweep until the next notification 3+
+                // min later. runSweep dedups against the DB and is a cheap no-op
+                // when nothing is new, so an unconditional (throttled) start is safe
+                // and lets the service's retry loop catch a just-written file.
                 startForegroundService(
                     Intent(this, CallTranscriptionService::class.java)
                         .putExtra(CallTranscriptionService.EXTRA_MODE, CallTranscriptionService.MODE_SWEEP)

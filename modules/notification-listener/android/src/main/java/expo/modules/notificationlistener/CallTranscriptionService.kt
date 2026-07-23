@@ -41,6 +41,10 @@ class CallTranscriptionService : Service() {
         const val KEY_PENDING_CALL_SCAN = "pending_call_scan_at"
         private const val SWEEP_WINDOW_MS = 24 * 60 * 60 * 1000L
         private const val SWEEP_MAX_RECORDINGS = 6
+        // How long a "call just ended" pending flag survives an empty sweep before
+        // being cleared. Covers the window where the recorder is still flushing the
+        // file to disk / MediaStore hasn't indexed it, so later sweeps keep retrying.
+        private const val PENDING_SCAN_GRACE_MS = 5 * 60 * 1000L
     }
 
     private lateinit var notificationManager: NotificationManager
@@ -164,21 +168,30 @@ class CallTranscriptionService : Service() {
         val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("call_transcription_enabled", false)) return
 
-        val hasPendingFlag = prefs.getLong(KEY_PENDING_CALL_SCAN, 0L) != 0L
+        val pendingAt = prefs.getLong(KEY_PENDING_CALL_SCAN, 0L)
+        val hasPendingFlag = pendingAt != 0L
 
         val candidates = CallRecordingFinder
             .findRecentRecordings(this, SWEEP_WINDOW_MS, SWEEP_MAX_RECORDINGS)
             .filter { !CallRecordStore.hasRecording(this, it.absolutePath) }
 
         if (candidates.isEmpty()) {
-            prefs.edit().remove(KEY_PENDING_CALL_SCAN).apply()
-            // Log when: (a) a call trigger flagged a pending scan but we still can't find
-            // the file, OR (b) throttled once per hour so the user can see the sweep ran.
-            val lastSweepLog = prefs.getLong("call_sweep_no_file_logged_at", 0L)
             val now = System.currentTimeMillis()
-            if (hasPendingFlag || now - lastSweepLog > 60 * 60 * 1000L) {
+            // A just-ended call's recording is frequently not on disk (or not yet
+            // indexed by MediaStore) for a few seconds to a couple of minutes.
+            // Keep a fresh pending flag so the next sweep retries instead of giving
+            // up on the first miss; only clear it once past the grace window.
+            val flagIsFresh = hasPendingFlag && now - pendingAt < PENDING_SCAN_GRACE_MS
+            if (!flagIsFresh) {
+                prefs.edit().remove(KEY_PENDING_CALL_SCAN).apply()
+            }
+            // Log when: (a) a call trigger flagged a pending scan that has now aged
+            // out without a file, OR (b) throttled once per hour so the user can see
+            // the sweep ran. A still-fresh pending flag stays quiet — it will retry.
+            val lastSweepLog = prefs.getLong("call_sweep_no_file_logged_at", 0L)
+            if ((hasPendingFlag && !flagIsFresh) || now - lastSweepLog > 60 * 60 * 1000L) {
                 prefs.edit().putLong("call_sweep_no_file_logged_at", now).apply()
-                val msg = if (hasPendingFlag) {
+                val msg = if (hasPendingFlag && !flagIsFresh) {
                     "Recovery sweep: call was detected but no recording found in 24h. " +
                     "Enable call recording in your Phone app settings."
                 } else {
