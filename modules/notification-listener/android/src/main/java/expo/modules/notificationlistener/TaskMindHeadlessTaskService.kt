@@ -44,12 +44,39 @@ class TaskMindHeadlessTaskService : HeadlessJsTaskService() {
             // pipeline budget usually completes well within the ANR window.
         }
         val result = super.onStartCommand(intent, flags, startId)
-        // Remove the foreground state once the JS task timeout elapses so we
-        // don't hold the dataSync budget longer than needed.
+        // Safety cap: if the JS task never signals completion, drop foreground
+        // after the task budget so we don't hold the dataSync FGS indefinitely.
+        // The primary release is onHeadlessJsTaskFinish below, which fires as soon
+        // as the JS finishes — critical because Android 15 caps cumulative dataSync
+        // FGS time at ~6h/day, and holding a fixed 65s per start (e.g. a 1-second
+        // outbox flush) exhausts that budget and crashes the app with
+        // ForegroundServiceDidNotStopInTimeException.
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (_: Throwable) {}
         }, 65_000L)
         return result
+    }
+
+    // Release the dataSync foreground state the instant the JS task completes,
+    // rather than holding it for the full 65s cap. A trivial flush_outbox job
+    // finishes in ~1s; without this it would still pin the FGS for 65s and burn
+    // through the Android 15 daily dataSync budget.
+    override fun onHeadlessJsTaskFinish(taskId: Int) {
+        super.onHeadlessJsTaskFinish(taskId)
+        try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (_: Throwable) {}
+    }
+
+    // Android 15 (API 35) calls the two-arg form for dataSync when the daily time
+    // budget is hit; Android 14 (API 34) calls the one-arg form. Stop promptly on
+    // either — failing to stop crashes the app.
+    override fun onTimeout(startId: Int) {
+        try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (_: Throwable) {}
+        stopSelf()
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (_: Throwable) {}
+        stopSelf()
     }
 
     override fun getTaskConfig(intent: Intent): HeadlessJsTaskConfig? {

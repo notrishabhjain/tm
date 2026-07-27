@@ -112,10 +112,23 @@ class CallTranscriptionService : Service() {
     }
 
     // Android 15 calls this when the dataSync time budget runs out mid-run; the
-    // service must stop promptly or the system kills the app. The worker thread
-    // survives the service stop and finishes its current recording.
+    // service must stop promptly or the system throws
+    // ForegroundServiceDidNotStopInTimeException and crashes the app (which takes
+    // the notification listener down with it). The worker thread survives the
+    // service stop and finishes its current recording.
+    //
+    // Two signatures exist: Android 14 (API 34) calls onTimeout(startId); Android
+    // 15 (API 35) calls onTimeout(startId, fgsType) for the timeout-enforced types
+    // INCLUDING dataSync — so the one-arg override alone never fires on API 35 and
+    // the app crashes. Both are overridden here to cover both platforms.
     override fun onTimeout(startId: Int) {
         Log.w(TAG, "dataSync time budget exhausted — stopping service")
+        try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (_: Throwable) {}
+        stopSelf()
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        Log.w(TAG, "dataSync time budget exhausted (type $fgsType) — stopping service")
         try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (_: Throwable) {}
         stopSelf()
     }
