@@ -420,6 +420,15 @@ class CallTranscriptionService : Service() {
             .setContentText("Analysing your last call…")
             .setOngoing(true)
             .setShowWhen(false)
+            .apply {
+                // Defer the FGS notification by ~10s. A recovery sweep that finds
+                // nothing (the common case) stops in well under a second, so the
+                // notification is never shown — no more "Analysing…" flashing every
+                // few minutes. Only a real, longer transcription surfaces it.
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
+                }
+            }
             .build()
     }
 

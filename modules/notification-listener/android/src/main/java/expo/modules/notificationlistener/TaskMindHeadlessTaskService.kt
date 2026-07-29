@@ -96,6 +96,15 @@ class TaskMindHeadlessTaskService : HeadlessJsTaskService() {
             .setContentText("Checking notification for tasks…")
             .setOngoing(true)
             .setShowWhen(false)
+            .apply {
+                // Defer by ~10s so a fast pipeline run (or a ~1s outbox flush)
+                // finishes before the notification is ever shown — the service now
+                // releases foreground in onHeadlessJsTaskFinish, so most runs stay
+                // invisible instead of flashing a notification on every message.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
+                }
+            }
             .build()
 
     private fun ensureChannel() {

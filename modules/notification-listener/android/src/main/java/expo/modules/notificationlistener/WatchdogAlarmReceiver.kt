@@ -107,20 +107,9 @@ class WatchdogAlarmReceiver : BroadcastReceiver() {
         //    was blocked (Autostart off or OEM killed the service). If the listener
         //    is bound but the RN bridge isn't alive, drainPendingQueue() now
         //    dispatches each item as a fresh headless task instead of silently dropping.
+        //    Draining a notification also flushes the Google Tasks outbox (see
+        //    index.js), so a separate periodic flush FGS here is unnecessary — and
+        //    starting one every tick made a background notification pop every ~5 min.
         TaskMindNotificationListenerService.triggerDrain()
-
-        // 4. Flush the Google Tasks outbox in the background. Tasks that failed to
-        //    reach Google (a token blip at the ~1h refresh boundary) are otherwise
-        //    only retried when the app is next foregrounded — so on a quiet device
-        //    they stay invisible for hours. Dispatch the JS "flush_outbox" job; it
-        //    returns immediately when the outbox is empty.
-        try {
-            val bundle = android.os.Bundle().apply { putString("jobType", "flush_outbox") }
-            context.startForegroundService(
-                Intent(context, TaskMindHeadlessTaskService::class.java).putExtras(bundle)
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "Outbox flush dispatch failed: ${e.message}")
-        }
     }
 }
