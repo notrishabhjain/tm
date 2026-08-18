@@ -57,9 +57,11 @@ class NotificationListenerModule : Module() {
             hasActiveListener = active
         }
 
-        // Offline notification classifier — runs entirely on-device using Android's
+        // On-device notification classifier — runs entirely locally using Android's
         // TextClassifier (backed by HyperOS AI on Xiaomi devices) plus English/Hindi
-        // pattern matching. Called by the JS pipeline when all network engines fail.
+        // pattern matching. Since v3 this is the FIRST stage of the pipeline, not a
+        // network fallback: it scores every candidate, and the confidence it returns
+        // decides whether the result is auto-created, queued for review, or dropped.
         AsyncFunction("localDecideNotification") { pkg: String, senderName: String, text: String, isGroup: Boolean ->
             val d = LocalNotificationDecider.decide(context, senderName, text, isGroup)
             mapOf(
@@ -68,6 +70,7 @@ class NotificationListenerModule : Module() {
                 "priority" to d.priority,
                 "reasoning" to d.reasoning,
                 "notes" to d.notes,
+                "confidence" to d.confidence,
                 "dueDate" to null
             )
         }

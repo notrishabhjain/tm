@@ -39,7 +39,18 @@ export async function recordFingerprint(fingerprint: string): Promise<void> {
 
 // ── Activity log ──────────────────────────────────────────────────────────────
 
-export type ActivityOutcome = 'TASK_CREATED' | 'SKIPPED' | 'QUEUED' | 'ERROR';
+// REVIEW is written when a low-confidence extraction goes to the Review Inbox.
+// SCANNING/SCAN/TRIGGER are written by the native call pipeline, which has
+// always used them — the type simply had not kept up.
+export type ActivityOutcome =
+  | 'TASK_CREATED'
+  | 'REVIEW'
+  | 'SKIPPED'
+  | 'QUEUED'
+  | 'ERROR'
+  | 'SCANNING'
+  | 'SCAN'
+  | 'TRIGGER';
 
 export interface ActivityEntry {
   id: number;

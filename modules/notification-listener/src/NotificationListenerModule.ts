@@ -8,6 +8,7 @@ import type {
   OemInfo,
   ListenerHealth,
   ListenerStats,
+  LocalDecision,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,31 +69,23 @@ const NotificationListenerModule = {
     return NativeModule.drainPendingNotifications() as Promise<void>;
   },
 
-  // Offline classifier: uses Android TextClassifier (HyperOS AI on Xiaomi) +
-  // Hindi/English pattern matching. Returns a PipelineDecision-shaped object,
-  // or null if the native module is unavailable.
+  // On-device classifier: Android TextClassifier (HyperOS AI on Xiaomi) plus
+  // Hindi/English pattern matching. First stage of the v3 pipeline — `confidence`
+  // (0..1) drives the auto-create / review / discard gate in task-intake.ts.
+  // Returns null if the native module is unavailable.
   localDecideNotification(
     pkg: string,
     senderName: string,
     text: string,
     isGroup: boolean
-  ): Promise<{
-    isTask: boolean;
-    title: string | null;
-    priority: string;
-    reasoning: string;
-    notes: string | null;
-    dueDate: null;
-  } | null> {
+  ): Promise<LocalDecision | null> {
     if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.localDecideNotification(pkg, senderName, text, isGroup) as Promise<{
-      isTask: boolean;
-      title: string | null;
-      priority: string;
-      reasoning: string;
-      notes: string | null;
-      dueDate: null;
-    } | null>;
+    return NativeModule.localDecideNotification(
+      pkg,
+      senderName,
+      text,
+      isGroup
+    ) as Promise<LocalDecision | null>;
   },
 
   addNotificationListener(listener: (data: NotificationData) => void) {

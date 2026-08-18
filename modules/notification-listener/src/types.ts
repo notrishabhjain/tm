@@ -104,3 +104,21 @@ export interface CallTranscriptionTestResult {
   transcript?: string;
   error?: string;
 }
+
+/**
+ * Result of the on-device notification classifier.
+ *
+ * `confidence` (0..1) is the gate input in task-intake.ts: high values are
+ * auto-created, the middle band queues for review, and low values are dropped.
+ * The heuristic classifier deliberately never returns 1.0 — see
+ * LocalNotificationDecider.HEURISTIC_CEILING.
+ */
+export interface LocalDecision {
+  isTask: boolean;
+  title: string | null;
+  priority: string;
+  reasoning: string;
+  notes: string | null;
+  confidence: number;
+  dueDate: number | null;
+}

@@ -47,6 +47,12 @@ export interface AppSettings {
   gemini_api_key: string;
   ai_api_key: string;
   ai_model: string;
+  /**
+   * Whether an uncertain on-device verdict may be escalated to a cloud model.
+   * OFF by default: with it off, no message content leaves the device and
+   * uncertain extractions go to the Review Inbox instead.
+   */
+  cloud_fallback_enabled: boolean;
   // Google Tasks OAuth + list cache
   google_tasks_enabled: boolean;
   google_tasks_client_id: string;
@@ -68,6 +74,7 @@ const DEFAULTS: AppSettings = {
   gemini_api_key: DEFAULT_GEMINI_KEY,
   ai_api_key: DEFAULT_AI_API_KEY,
   ai_model: 'meta/llama-3.3-70b-instruct',
+  cloud_fallback_enabled: false,
   google_tasks_enabled: false,
   google_tasks_client_id: '',
   google_tasks_client_secret: '',

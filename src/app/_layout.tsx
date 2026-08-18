@@ -125,6 +125,8 @@ export default function RootLayout(): React.JSX.Element {
           <ThemeProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
+              <Stack.Screen name="tasks" />
+              <Stack.Screen name="review" />
               <Stack.Screen name="oauth/google" />
             </Stack>
           </ThemeProvider>
