@@ -82,6 +82,34 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
             RegexOption.IGNORE_CASE
         )
 
+        // Recorder apps whose "transcription finished" notification is worth
+        // acting on. Xiaomi has shipped the recorder under several package names
+        // across MIUI/HyperOS versions, so all the known ones are listed.
+        private val RECORDER_PACKAGES = setOf(
+            "com.android.soundrecorder",
+            "com.miui.soundrecorder",
+            "com.xiaomi.soundrecorder",
+            "com.android.recorder",
+            "com.miui.recorder"
+        )
+
+        /**
+         * Words that appear in a "transcription complete" notification. Matched
+         * case-insensitively against title + text, in English and Hindi, plus the
+         * Chinese strings some HyperOS builds ship untranslated.
+         */
+        private val TRANSCRIPT_DONE_HINTS = listOf(
+            "transcri", "transcript", "text conver", "speech to text", "to text",
+            "टेक्स्ट", "लिप्यंतर", "प्रतिलेख",
+            "转文本", "转写", "文本转换"
+        )
+
+        private const val KEY_TRANSCRIPT_PROMPT_AT = "transcript_prompt_at"
+        const val KEY_TRANSCRIPT_IMPORT_PENDING = "transcript_import_pending"
+
+        /** At most one import prompt per window — a prompt is still a notification. */
+        private const val TRANSCRIPT_PROMPT_THROTTLE_MS = 10 * 60_000L
+
         private val SYSTEM_PACKAGE_PREFIXES = listOf(
             "com.android.",
             "com.google.android.gms",
@@ -299,11 +327,71 @@ class TaskMindNotificationListenerService : NotificationListenerService() {
         }.start()
     }
 
+    /**
+     * Notices that the recorder app has finished transcribing a call, and offers
+     * the user a one-tap route into the import screen.
+     *
+     * The HyperOS Recorder does not expose a share action — the transcript can
+     * only be copied from its three-dot menu — so TaskMind cannot pull the text
+     * itself. What it CAN do is notice the moment the text exists, and be one tap
+     * away when the user copies it.
+     *
+     * Deliberately conservative about noise, since a prompt the user did not ask
+     * for is exactly the behaviour that made earlier builds unusable:
+     *  - only while call transcription is enabled,
+     *  - only for known recorder packages,
+     *  - only for notifications whose text suggests a finished transcription,
+     *  - and at most once per throttle window.
+     */
+    private fun maybePromptTranscriptImport(sbn: StatusBarNotification, packageName: String) {
+        try {
+            if (!RECORDER_PACKAGES.contains(packageName)) return
+            val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("call_transcription_enabled", false)) return
+
+            val now = System.currentTimeMillis()
+            val lastPrompt = prefs.getLong(KEY_TRANSCRIPT_PROMPT_AT, 0L)
+            if (now - lastPrompt < TRANSCRIPT_PROMPT_THROTTLE_MS) return
+
+            // An ongoing notification is the recorder actively recording or
+            // transcribing, not a finished result.
+            if (sbn.notification.flags and Notification.FLAG_ONGOING_EVENT != 0) return
+
+            val extras = sbn.notification.extras
+            val blob = listOfNotNull(
+                extras.getCharSequence("android.title")?.toString(),
+                extras.getCharSequence("android.text")?.toString(),
+                extras.getCharSequence("android.bigText")?.toString()
+            ).joinToString(" ").lowercase()
+            if (blob.isBlank()) return
+            if (TRANSCRIPT_DONE_HINTS.none { blob.contains(it) }) return
+
+            prefs.edit()
+                .putLong(KEY_TRANSCRIPT_PROMPT_AT, now)
+                .putBoolean(KEY_TRANSCRIPT_IMPORT_PENDING, true)
+                .apply()
+
+            NotificationListenerModule.postConfirmationNotification(
+                this,
+                "Call transcript ready",
+                "Copy it from the recorder, then tap here to turn it into tasks"
+            )
+        } catch (t: Throwable) {
+            Log.w("TaskMindListener", "Transcript prompt failed: ${t.message}")
+        }
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName ?: return
 
         // Any notification traffic doubles as a heartbeat for missed calls.
         maybeTriggerCallRecoverySweep()
+
+        // The recorder app announces a finished transcription this way. It offers
+        // no share, so this notification is the only signal that a transcript now
+        // exists — catching it is what turns a five-step manual chore into
+        // "copy, tap, confirm".
+        maybePromptTranscriptImport(sbn, packageName)
 
         // Skip our own notifications
         if (packageName == applicationContext.packageName) return

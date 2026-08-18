@@ -277,6 +277,23 @@ class NotificationListenerModule : Module() {
         }
 
         /**
+         * True when the recorder announced a finished transcription since the app
+         * was last opened. Read-and-clear, so the prompt is acted on once.
+         */
+        AsyncFunction("consumeTranscriptImportPending") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            val pending = prefs.getBoolean(
+                TaskMindNotificationListenerService.KEY_TRANSCRIPT_IMPORT_PENDING, false
+            )
+            if (pending) {
+                prefs.edit()
+                    .remove(TaskMindNotificationListenerService.KEY_TRANSCRIPT_IMPORT_PENDING)
+                    .apply()
+            }
+            pending
+        }
+
+        /**
          * Returns and clears a transcript shared into the app from the recorder,
          * or an empty string when there is none. Cleared on read so the import
          * screen cannot re-present the same text after the user has dealt with it.

@@ -72,6 +72,15 @@ const NotificationListenerModule = {
   },
 
   /**
+   * True when the recorder app announced a finished transcription since the app
+   * was last opened. Read-and-clear, so the prompt is acted on exactly once.
+   */
+  consumeTranscriptImportPending(): Promise<boolean> {
+    if (!NativeModule) return Promise.resolve(false);
+    return NativeModule.consumeTranscriptImportPending() as Promise<boolean>;
+  },
+
+  /**
    * Returns and clears a transcript shared into the app from the recorder app,
    * or an empty string when there is none. Cleared on read so the import screen
    * cannot re-present text the user has already dealt with.

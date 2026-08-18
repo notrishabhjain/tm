@@ -89,22 +89,38 @@ export default function RootLayout(): React.JSX.Element {
     if (fontsLoaded) void SplashScreen.hideAsync();
   }, [fontsLoaded]);
 
-  // A transcript shared from the recorder app is stashed natively, then the app
-  // is brought forward. Check on launch and on every foreground so the share
-  // lands on the import screen rather than sitting unnoticed.
+  // Two routes into the transcript importer, both checked on launch and on every
+  // foreground:
+  //
+  //  - text shared in from another app (stashed natively before we were brought
+  //    forward), and
+  //  - the recorder having announced a finished transcription. The HyperOS
+  //    Recorder offers no share, only "copy", so that notification is the only
+  //    signal a transcript now exists; opening the importer puts the user one
+  //    step from tasks instead of leaving them to remember.
   useEffect(() => {
-    const checkShared = (): void => {
-      void NotificationListener.consumeSharedTranscript()
-        .then((text) => {
-          if (text && text.trim()) {
-            router.push({ pathname: '/import-transcript', params: { text } });
+    const check = (): void => {
+      void (async () => {
+        try {
+          const shared = await NotificationListener.consumeSharedTranscript();
+          if (shared?.trim()) {
+            router.push({ pathname: '/import-transcript', params: { text: shared } });
+            return;
           }
-        })
-        .catch(() => {});
+          const pending = await NotificationListener.consumeTranscriptImportPending();
+          if (pending) {
+            // No text passed: the importer reads the clipboard itself, which is
+            // where the transcript will be once the user has copied it.
+            router.push('/import-transcript');
+          }
+        } catch {
+          /* native unavailable */
+        }
+      })();
     };
-    checkShared();
+    check();
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') checkShared();
+      if (state === 'active') check();
     });
     return () => sub.remove();
   }, [router]);

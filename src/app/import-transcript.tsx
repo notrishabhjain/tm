@@ -26,19 +26,46 @@ export default function ImportTranscriptScreen(): React.JSX.Element {
   const [caller, setCaller] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [source, setSource] = useState<'clipboard' | 'shared' | null>(null);
 
-  // Text can arrive three ways: pushed as a route param, stashed by the share
-  // activity before the app was brought forward, or pasted by the user.
+  // The recorder app offers no share — only "copy" behind its three-dot menu —
+  // so the clipboard is the real transport, and the screen reads it on open
+  // rather than making the user tap Paste after they have already tapped Copy.
+  // Reading is gated on the text actually looking like a transcript, so an
+  // unrelated clipboard (a URL, a phone number) is ignored rather than loaded.
   useEffect(() => {
-    if (params.text) {
-      setRaw(String(params.text));
-      return;
-    }
-    void NotificationListener.consumeSharedTranscript()
-      .then((shared) => {
-        if (shared) setRaw(shared);
-      })
-      .catch(() => {});
+    let cancelled = false;
+
+    void (async () => {
+      if (params.text) {
+        setRaw(String(params.text));
+        return;
+      }
+      // A share, if some other app ever offers one.
+      try {
+        const shared = await NotificationListener.consumeSharedTranscript();
+        if (!cancelled && shared?.trim()) {
+          setRaw(shared);
+          setSource('shared');
+          return;
+        }
+      } catch {
+        /* native unavailable */
+      }
+      try {
+        const clip = await Clipboard.getStringAsync();
+        if (!cancelled && clip?.trim() && looksLikeTranscript(clip)) {
+          setRaw(clip);
+          setSource('clipboard');
+        }
+      } catch {
+        /* clipboard unreadable — the manual paste button still works */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [params.text]);
 
   const pasteFromClipboard = useCallback((): void => {
@@ -50,6 +77,7 @@ export default function ImportTranscriptScreen(): React.JSX.Element {
           return;
         }
         setRaw(text);
+        setSource('clipboard');
       } catch {
         Alert.alert('Could not read clipboard');
       }
@@ -104,9 +132,13 @@ export default function ImportTranscriptScreen(): React.JSX.Element {
           >
             <Text style={[styles.h, { color: theme.onSurface }]}>Bring a transcript in</Text>
             <Text style={[styles.p, { color: theme.onSurfaceVariant }]}>
-              In your recorder app, open a transcribed call and use{' '}
-              <Text style={{ fontWeight: '700' }}>Share → TaskMind</Text>. Or copy the transcript
-              and paste it here.
+              In your Recorder app: open the call, tap{' '}
+              <Text style={{ fontWeight: '700' }}>Show text</Text>, pick{' '}
+              <Text style={{ fontWeight: '700' }}>Hindi</Text>, and wait for it to finish. Then the
+              three-dot menu → <Text style={{ fontWeight: '700' }}>Copy</Text>.
+            </Text>
+            <Text style={[styles.p, { color: theme.onSurfaceVariant }]}>
+              Come back here and it will pick the transcript up from your clipboard automatically.
             </Text>
             <Pressable
               onPress={pasteFromClipboard}
@@ -131,6 +163,11 @@ export default function ImportTranscriptScreen(): React.JSX.Element {
                   ? `${parsed.turns.length} turns · ${parsed.speakerCount} speakers`
                   : `${raw.trim().split(/\s+/).length} words`}
               </Text>
+              {source === 'clipboard' && (
+                <Text style={[styles.p, { color: theme.onSurfaceVariant }]}>
+                  Read from your clipboard.
+                </Text>
+              )}
               {!usable && (
                 <Text style={[styles.warn, { color: '#B45309' }]}>
                   This does not look like a call transcript. Import it anyway only if you are sure.
