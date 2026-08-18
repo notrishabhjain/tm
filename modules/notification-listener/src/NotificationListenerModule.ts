@@ -9,6 +9,8 @@ import type {
   ListenerHealth,
   ListenerStats,
   LocalDecision,
+  RecorderTranscriptScan,
+  TranscriptSourcePrefs,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,6 +69,30 @@ const NotificationListenerModule = {
   drainPendingNotifications(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.drainPendingNotifications() as Promise<void>;
+  },
+
+  /**
+   * Reports which transcripts the phone's own recorder app has produced and
+   * which recordings they pair with. Used to confirm the recorder's storage
+   * layout on a real device instead of hardcoding a guess.
+   */
+  scanRecorderTranscripts(): Promise<RecorderTranscriptScan | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.scanRecorderTranscripts() as Promise<RecorderTranscriptScan | null>;
+  },
+
+  /** Chooses where call transcripts may come from. */
+  setTranscriptSourcePrefs(useRecorderTranscript: boolean, ownAsrEnabled: boolean): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setTranscriptSourcePrefs(
+      useRecorderTranscript,
+      ownAsrEnabled
+    ) as Promise<void>;
+  },
+
+  getTranscriptSourcePrefs(): Promise<TranscriptSourcePrefs | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.getTranscriptSourcePrefs() as Promise<TranscriptSourcePrefs | null>;
   },
 
   // On-device classifier: Android TextClassifier (HyperOS AI on Xiaomi) plus

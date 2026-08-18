@@ -280,6 +280,54 @@ class NotificationListenerModule : Module() {
             CallTranscriptionDiagnostics.inspect(context)
         }
 
+        /**
+         * Reports which transcript files the device recorder has produced and
+         * which recordings they pair with.
+         *
+         * The recorder's storage layout is undocumented and varies by HyperOS
+         * build, so this reads the answer off the device rather than assuming a
+         * path. Run once to confirm the real convention.
+         */
+        AsyncFunction("scanRecorderTranscripts") { promise: Promise ->
+            Thread {
+                try {
+                    promise.resolve(CallTranscriptSidecar.scanForDiagnostics(context))
+                } catch (e: Exception) {
+                    promise.resolve(
+                        mapOf("error" to (e.message ?: "scan failed"), "pairs" to emptyList<Any>())
+                    )
+                }
+            }.start()
+        }
+
+        /**
+         * Controls where call transcripts come from.
+         *
+         * [useRecorderTranscript] prefers a transcript the phone's own recorder
+         * produced — on HyperOS that is Xiaomi's cloud AI, which is better than
+         * anything available here and costs nothing.
+         * [ownAsrEnabled] decides what happens when no such transcript exists:
+         * transcribe the audio ourselves, or park the call and wait for the user
+         * to transcribe it in the recorder app.
+         */
+        AsyncFunction("setTranscriptSourcePrefs") { useRecorderTranscript: Boolean, ownAsrEnabled: Boolean ->
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(CallTranscriptionService.KEY_USE_RECORDER_TRANSCRIPT, useRecorderTranscript)
+                .putBoolean(CallTranscriptionService.KEY_OWN_ASR_ENABLED, ownAsrEnabled)
+                .apply()
+        }
+
+        AsyncFunction("getTranscriptSourcePrefs") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            mapOf(
+                "useRecorderTranscript" to
+                    prefs.getBoolean(CallTranscriptionService.KEY_USE_RECORDER_TRANSCRIPT, true),
+                "ownAsrEnabled" to
+                    prefs.getBoolean(CallTranscriptionService.KEY_OWN_ASR_ENABLED, true)
+            )
+        }
+
         AsyncFunction("runCallTranscriptionTest") { promise: Promise ->
             Thread {
                 try {

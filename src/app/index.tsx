@@ -284,6 +284,62 @@ export default function StatusScreen(): React.JSX.Element {
     }
   };
 
+  /**
+   * Reports which transcripts the phone's recorder app has produced and which
+   * recordings they pair with. The recorder's storage layout is undocumented
+   * and varies by HyperOS build, so this reads the answer off the device
+   * rather than assuming a path.
+   */
+  const scanRecorderTranscripts = (): void => {
+    if (testing) return;
+    setTesting(true);
+    setTestLogs(['Looking for transcripts made by your recorder app…']);
+    void (async () => {
+      try {
+        const scan = await NotificationListener.scanRecorderTranscripts();
+        if (!scan) {
+          setTestLogs((prev) => [...prev, '✗ Native module unavailable']);
+          return;
+        }
+        if (scan.error) {
+          setTestLogs((prev) => [...prev, `✗ Scan failed: ${scan.error ?? 'unknown'}`]);
+          return;
+        }
+        const lines: string[] = [`Checked ${scan.recordingsChecked} recent recording(s).`];
+        const paired = scan.pairs.filter((p) => p.transcriptFound);
+        if (paired.length > 0) {
+          lines.push(
+            `✓ Found ${paired.length} transcript(s) — calls will use these automatically:`
+          );
+          for (const p of paired) {
+            lines.push(`   ${p.transcriptPath}`);
+            lines.push(`   ${p.transcriptChars} chars — "${p.preview.slice(0, 80)}…"`);
+          }
+        } else {
+          lines.push('✗ No transcript found next to any recording.');
+          lines.push('Open a call in your recorder app, tap transcribe, then run this again.');
+        }
+        if (scan.looseTextFiles.length > 0) {
+          lines.push(`Other text files in the recorder folders (${scan.looseTextFiles.length}):`);
+          for (const f of scan.looseTextFiles.slice(0, 12)) {
+            lines.push(`   ${f.readable ? '•' : '·'} ${f.path} (${Math.round(f.bytes)}B)`);
+          }
+        } else {
+          lines.push('No text files at all in the recorder folders.');
+          lines.push(
+            'That likely means the recorder keeps transcripts in its own private storage, which no other app can read.'
+          );
+        }
+        lines.push(`Searched: ${scan.rootsSearched.join(', ') || 'no readable folders'}`);
+        setTestLogs((prev) => [...prev, ...lines].slice(-60));
+      } catch (e) {
+        setTestLogs((prev) => [...prev, `✗ ${e instanceof Error ? e.message : String(e)}`]);
+      } finally {
+        setTesting(false);
+      }
+    })();
+  };
+
   const checkNow = (): void => {
     void (async () => {
       // The tray scan silently does nothing when the listener binding is dead,
@@ -572,6 +628,22 @@ export default function StatusScreen(): React.JSX.Element {
                 <Ionicons name="chatbubble-ellipses-outline" size={16} color={Colors.primary500} />
                 <Text style={[styles.troubleshootText, { color: theme.onSurface }]}>
                   {testing ? 'Testing…' : 'Test notifications (DB → AI → Google)'}
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.troubleshootRow}>
+              <Pressable
+                onPress={scanRecorderTranscripts}
+                disabled={testing}
+                style={({ pressed }) => [
+                  styles.troubleshootBtn,
+                  { borderColor: theme.outline, backgroundColor: theme.surface },
+                  (pressed || testing) && { opacity: 0.6 },
+                ]}
+              >
+                <Ionicons name="document-text-outline" size={16} color={Colors.primary500} />
+                <Text style={[styles.troubleshootText, { color: theme.onSurface }]}>
+                  {testing ? 'Scanning…' : 'Find recorder transcripts'}
                 </Text>
               </Pressable>
             </View>

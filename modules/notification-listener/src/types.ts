@@ -122,3 +122,44 @@ export interface LocalDecision {
   confidence: number;
   dueDate: number | null;
 }
+
+/** One recording and the transcript (if any) the device recorder produced for it. */
+export interface TranscriptPair {
+  recording: string;
+  recordingModified: number;
+  transcriptFound: boolean;
+  transcriptPath: string;
+  transcriptChars: number;
+  preview: string;
+}
+
+/** A text-shaped file found in the recorder's storage tree. */
+export interface LooseTextFile {
+  path: string;
+  bytes: number;
+  modified: number;
+  readable: boolean;
+}
+
+/**
+ * Result of scanning for recorder-produced transcripts.
+ *
+ * `looseTextFiles` matters as much as `pairs`: if the recorder uses a naming
+ * convention we do not recognise, the file still shows up there, which is how
+ * the real layout gets confirmed rather than guessed.
+ */
+export interface RecorderTranscriptScan {
+  recordingsChecked: number;
+  pairs: TranscriptPair[];
+  looseTextFiles: LooseTextFile[];
+  rootsSearched: string[];
+  error?: string;
+}
+
+/** Where call transcripts are allowed to come from. */
+export interface TranscriptSourcePrefs {
+  /** Prefer a transcript the phone's own recorder app produced. */
+  useRecorderTranscript: boolean;
+  /** Allow TaskMind to transcribe the audio itself when no such transcript exists. */
+  ownAsrEnabled: boolean;
+}

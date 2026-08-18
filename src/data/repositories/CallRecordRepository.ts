@@ -1,4 +1,4 @@
-import { desc, eq, and, gte } from 'drizzle-orm';
+import { desc, eq, and, gte, or, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { callRecords } from '../db/schema';
 
@@ -52,15 +52,26 @@ export class CallRecordRepository {
   }
 
   /**
-   * Calls whose background LLM analysis failed (status TRANSCRIBED) and that
-   * were long enough to analyse. Retried when the app opens.
+   * Calls that have a transcript but no tasks yet (status TRANSCRIBED).
+   * Retried on app open, and whenever a transcript is newly attached.
+   *
+   * Rows with an UNKNOWN duration are included deliberately. `duration >= n` is
+   * false for NULL in SQL, so the previous filter silently dropped every call
+   * whose length could not be determined — which is the normal case for a
+   * transcript produced by the device recorder app, where we have the text but
+   * never measured the audio. Those calls would keep their transcript forever
+   * and never produce a task. Length is a cost heuristic, not a correctness
+   * one, so not knowing it must not mean discarding the call.
    */
   async getPendingAnalysis(minDurationSec = 15): Promise<CallRecord[]> {
     const rows = await this.db
       .select()
       .from(callRecords)
       .where(
-        and(eq(callRecords.status, 'TRANSCRIBED'), gte(callRecords.durationSec, minDurationSec))
+        and(
+          eq(callRecords.status, 'TRANSCRIBED'),
+          or(isNull(callRecords.durationSec), gte(callRecords.durationSec, minDurationSec))
+        )
       )
       .orderBy(desc(callRecords.createdAt))
       .limit(5);
