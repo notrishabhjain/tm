@@ -72,6 +72,16 @@ const NotificationListenerModule = {
   },
 
   /**
+   * Returns and clears a transcript shared into the app from the recorder app,
+   * or an empty string when there is none. Cleared on read so the import screen
+   * cannot re-present text the user has already dealt with.
+   */
+  consumeSharedTranscript(): Promise<string> {
+    if (!NativeModule) return Promise.resolve('');
+    return NativeModule.consumeSharedTranscript() as Promise<string>;
+  },
+
+  /**
    * Reports which transcripts the phone's own recorder app has produced and
    * which recordings they pair with. Used to confirm the recorder's storage
    * layout on a real device instead of hardcoding a guess.

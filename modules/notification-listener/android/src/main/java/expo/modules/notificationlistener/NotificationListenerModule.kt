@@ -276,6 +276,15 @@ class NotificationListenerModule : Module() {
             context.startActivity(intent)
         }
 
+        /**
+         * Returns and clears a transcript shared into the app from the recorder,
+         * or an empty string when there is none. Cleared on read so the import
+         * screen cannot re-present the same text after the user has dealt with it.
+         */
+        AsyncFunction("consumeSharedTranscript") {
+            TranscriptShareActivity.consume(context)
+        }
+
         AsyncFunction("getCallDiagnostics") {
             CallTranscriptionDiagnostics.inspect(context)
         }

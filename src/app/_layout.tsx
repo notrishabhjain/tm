@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { AppState, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -45,6 +45,7 @@ class AppErrorBoundary extends React.Component<
 }
 
 export default function RootLayout(): React.JSX.Element {
+  const router = useRouter();
   const bootedRef = useRef(false);
   const [fontsLoaded] = useFonts({
     'Inter-Regular': require('../../assets/fonts/Inter-Regular.ttf'),
@@ -88,6 +89,26 @@ export default function RootLayout(): React.JSX.Element {
     if (fontsLoaded) void SplashScreen.hideAsync();
   }, [fontsLoaded]);
 
+  // A transcript shared from the recorder app is stashed natively, then the app
+  // is brought forward. Check on launch and on every foreground so the share
+  // lands on the import screen rather than sitting unnoticed.
+  useEffect(() => {
+    const checkShared = (): void => {
+      void NotificationListener.consumeSharedTranscript()
+        .then((text) => {
+          if (text && text.trim()) {
+            router.push({ pathname: '/import-transcript', params: { text } });
+          }
+        })
+        .catch(() => {});
+    };
+    checkShared();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkShared();
+    });
+    return () => sub.remove();
+  }, [router]);
+
   // Live notifications (app open) run the same pipeline as headless.
   useEffect(() => {
     const sub = NotificationListener.addNotificationListener((data) => {
@@ -127,6 +148,7 @@ export default function RootLayout(): React.JSX.Element {
               <Stack.Screen name="index" />
               <Stack.Screen name="tasks" />
               <Stack.Screen name="review" />
+              <Stack.Screen name="import-transcript" />
               <Stack.Screen name="oauth/google" />
             </Stack>
           </ThemeProvider>

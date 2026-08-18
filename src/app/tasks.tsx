@@ -262,6 +262,22 @@ export default function TasksScreen(): React.JSX.Element {
         </Pressable>
       )}
 
+      <Pressable
+        onPress={() => router.push('/import-transcript')}
+        style={({ pressed }) => [
+          styles.importRow,
+          { borderColor: theme.outline },
+          pressed && { opacity: 0.7 },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Import a call transcript from your recorder app"
+      >
+        <Ionicons name="download-outline" size={16} color={theme.primary} />
+        <Text style={[styles.importText, { color: theme.onSurfaceVariant }]}>
+          Import a call transcript
+        </Text>
+      </Pressable>
+
       {composing && (
         <View style={[styles.composer, { borderColor: theme.outline }]}>
           <TextInput
@@ -369,6 +385,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   reviewText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  importRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  importText: { fontSize: 13, fontWeight: '600' },
   composer: {
     flexDirection: 'row',
     alignItems: 'center',

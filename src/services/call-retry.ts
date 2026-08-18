@@ -3,6 +3,7 @@ import { CallRecordRepository } from '@/data/repositories/CallRecordRepository';
 import { logActivity } from '@/data/pipeline-store';
 import { getSetting } from '@/data/storage/settings';
 import { extractTasksFromTranscript } from './transcript-extractor';
+import { parseSpeakerTranscript } from './transcript-format';
 import { intakeCandidates, type TaskCandidate } from './task-intake';
 import NotificationListener from '../../modules/notification-listener/src';
 
@@ -50,7 +51,13 @@ export async function retryFailedCallAnalyses(): Promise<void> {
         continue;
       }
 
-      const extracted = await extractTasksFromTranscript(record.transcript, {
+      // Normalise before extracting. A transcript stored by the native path may
+      // still carry the recorder's "Speaker 1 00:00:03" markup; stripping the
+      // timestamps and keeping speaker attribution both saves context and tells
+      // the extractor who was asking whom.
+      const transcript = parseSpeakerTranscript(record.transcript).text || record.transcript;
+
+      const extracted = await extractTasksFromTranscript(transcript, {
         referenceTime: record.callTime,
         callerLabel: record.callerLabel,
       });
@@ -95,7 +102,7 @@ export async function retryFailedCallAnalyses(): Promise<void> {
         sourceRef: record.id,
         sourceLabel: record.callerLabel,
         sourceApp: 'call',
-        sourceText: record.transcript.slice(0, 1000),
+        sourceText: transcript.slice(0, 1000),
         inferenceOrigin: getSetting('cloud_fallback_enabled') ? 'CLOUD' : 'LOCAL_LLM',
       }));
 

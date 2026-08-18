@@ -60,6 +60,34 @@ function withNotificationListenerManifest(config) {
       });
     }
 
+    // TranscriptShareActivity — appears in the recorder app's share sheet so a
+    // transcribed call can be handed to TaskMind without guessing where the
+    // recorder writes its files. Exported because that is what a share target is.
+    application.activity = application.activity || [];
+    const shareExists = application.activity.some(
+      (a) => a.$?.['android:name'] === 'expo.modules.notificationlistener.TranscriptShareActivity'
+    );
+    if (!shareExists) {
+      application.activity.push({
+        $: {
+          'android:name': 'expo.modules.notificationlistener.TranscriptShareActivity',
+          'android:exported': 'true',
+          'android:excludeFromRecents': 'true',
+          'android:noHistory': 'true',
+          'android:taskAffinity': '',
+          'android:label': 'Import call transcript',
+          'android:theme': '@android:style/Theme.NoDisplay',
+        },
+        'intent-filter': [
+          {
+            action: [{ $: { 'android:name': 'android.intent.action.SEND' } }],
+            category: [{ $: { 'android:name': 'android.intent.category.DEFAULT' } }],
+            data: [{ $: { 'android:mimeType': 'text/plain' } }],
+          },
+        ],
+      });
+    }
+
     // BootReceiver
     const bootExists = application.receiver.some(
       (r) => r.$?.['android:name'] === 'expo.modules.notificationlistener.BootReceiver'
