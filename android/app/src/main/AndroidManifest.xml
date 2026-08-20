@@ -40,6 +40,22 @@
     <service android:name="expo.modules.notificationlistener.CallTranscriptionService" android:foregroundServiceType="dataSync" android:exported="false"/>
     <service android:name="expo.modules.notificationlistener.TaskMindHeadlessTaskService" android:foregroundServiceType="dataSync" android:exported="false"/>
 
+    <!-- UI automation for the Recorder app. Exported and permission-guarded as
+         the platform requires for an accessibility service; it acts only during
+         a run the user explicitly starts. -->
+    <service
+      android:name="expo.modules.notificationlistener.TaskMindAccessibilityService"
+      android:exported="true"
+      android:label="TaskMind automation"
+      android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+      <intent-filter>
+        <action android:name="android.accessibilityservice.AccessibilityService"/>
+      </intent-filter>
+      <meta-data
+        android:name="android.accessibilityservice"
+        android:resource="@xml/taskmind_accessibility_config"/>
+    </service>
+
     <!-- Receives a transcript shared from the phone's recorder app. Exported by
          necessity: it exists to appear in another app's share sheet. It stores
          the text and opens the app to confirm, so nothing reaches the task list

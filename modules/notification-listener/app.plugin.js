@@ -60,6 +60,39 @@ function withNotificationListenerManifest(config) {
       });
     }
 
+    // TaskMindAccessibilityService — drives the Recorder app's UI so a
+    // transcribed call becomes tasks without the user pressing every button.
+    // Exported and permission-guarded exactly as the platform requires.
+    const a11yExists = application.service.some(
+      (s) =>
+        s.$?.['android:name'] === 'expo.modules.notificationlistener.TaskMindAccessibilityService'
+    );
+    if (!a11yExists) {
+      application.service.push({
+        $: {
+          'android:name': 'expo.modules.notificationlistener.TaskMindAccessibilityService',
+          'android:exported': 'true',
+          'android:label': 'TaskMind automation',
+          'android:permission': 'android.permission.BIND_ACCESSIBILITY_SERVICE',
+        },
+        'intent-filter': [
+          {
+            action: [
+              { $: { 'android:name': 'android.accessibilityservice.AccessibilityService' } },
+            ],
+          },
+        ],
+        'meta-data': [
+          {
+            $: {
+              'android:name': 'android.accessibilityservice',
+              'android:resource': '@xml/taskmind_accessibility_config',
+            },
+          },
+        ],
+      });
+    }
+
     // TranscriptShareActivity — appears in the recorder app's share sheet so a
     // transcribed call can be handed to TaskMind without guessing where the
     // recorder writes its files. Exported because that is what a share target is.

@@ -28,7 +28,8 @@ class NotificationListenerModule : Module() {
 
         Events(
             "onNotification",
-            "onCallTranscriptionTestLog"
+            "onCallTranscriptionTestLog",
+            "onAutomationLog"
         )
 
         OnCreate {
@@ -274,6 +275,98 @@ class NotificationListenerModule : Module() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
+        }
+
+        // ── UI automation (accessibility) ────────────────────────────────
+
+        AsyncFunction("getAutomationStatus") {
+            val recorder = RecorderAutomation.installedPackage(context)
+            mapOf(
+                "enabled" to isAccessibilityEnabled(context),
+                "connected" to TaskMindAccessibilityService.isRunning(),
+                "recorderPackage" to (recorder ?: ""),
+                "recorderFound" to (recorder != null)
+            )
+        }
+
+        AsyncFunction("openAccessibilitySettings") {
+            try {
+                context.startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (_: Exception) { }
+        }
+
+        /**
+         * Dumps the foreground window's controls.
+         *
+         * The whole automation depends on knowing what another app's buttons are
+         * actually called, which cannot be guessed from outside. Run this on each
+         * Recorder screen to read the real labels and view ids.
+         */
+        AsyncFunction("inspectForegroundScreen") {
+            TaskMindAccessibilityService.dumpForegroundWindow()
+        }
+
+        AsyncFunction("abortAutomation") {
+            TaskMindAccessibilityService.abort()
+        }
+
+        /**
+         * Runs the Recorder transcription flow. [readOnScreen] uses the variant
+         * that reads text off the screen instead of using the ⋮ → Copy menu,
+         * which needs two fewer controls to match.
+         */
+        AsyncFunction("runRecorderAutomation") { recordingLabel: String?, readOnScreen: Boolean, promise: Promise ->
+            Thread {
+                try {
+                    val pkg = RecorderAutomation.installedPackage(context)
+                    if (pkg == null) {
+                        promise.resolve(
+                            mapOf(
+                                "ok" to false,
+                                "error" to "No recorder app found on this device",
+                                "log" to emptyList<String>(),
+                                "captured" to ""
+                            )
+                        )
+                        return@Thread
+                    }
+                    val label = recordingLabel?.takeIf { it.isNotBlank() }
+                    val script = if (readOnScreen) {
+                        RecorderAutomation.buildReadOnScreenScript(pkg, label)
+                    } else {
+                        RecorderAutomation.buildScript(pkg, label)
+                    }
+
+                    val log = mutableListOf<String>()
+                    val result = TaskMindAccessibilityService.run(script) { line ->
+                        log += line
+                        instance?.sendEvent(
+                            "onAutomationLog",
+                            mapOf("message" to line, "ts" to System.currentTimeMillis().toDouble())
+                        )
+                    }
+                    promise.resolve(
+                        mapOf(
+                            "ok" to result.ok,
+                            "error" to (result.error ?: ""),
+                            "log" to log,
+                            "captured" to result.captured.joinToString("\n")
+                        )
+                    )
+                } catch (e: Exception) {
+                    promise.resolve(
+                        mapOf(
+                            "ok" to false,
+                            "error" to (e.message ?: "automation failed"),
+                            "log" to emptyList<String>(),
+                            "captured" to ""
+                        )
+                    )
+                }
+            }.start()
         }
 
         /**

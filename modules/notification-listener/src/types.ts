@@ -163,3 +163,49 @@ export interface TranscriptSourcePrefs {
   /** Allow TaskMind to transcribe the audio itself when no such transcript exists. */
   ownAsrEnabled: boolean;
 }
+
+/** State of the UI-automation (accessibility) service. */
+export interface AutomationStatus {
+  /** The user has enabled TaskMind in Android's Accessibility settings. */
+  enabled: boolean;
+  /** The system currently has the service bound. */
+  connected: boolean;
+  /** Package name of the recorder app found on this device, or ''. */
+  recorderPackage: string;
+  recorderFound: boolean;
+}
+
+/** One control found on screen by the inspector. */
+export interface InspectedNode {
+  depth: number;
+  text: string;
+  desc: string;
+  viewId: string;
+  class: string;
+  clickable: boolean;
+  scrollable: boolean;
+  enabled: boolean;
+}
+
+/**
+ * Dump of the foreground window.
+ *
+ * This is how the automation gets written against reality: another app's labels
+ * and view ids cannot be known from outside, so they are read off the device.
+ */
+export interface ScreenInspection {
+  package?: string;
+  nodes?: InspectedNode[];
+  error?: string;
+}
+
+/** Outcome of an automation run. */
+export interface AutomationResult {
+  ok: boolean;
+  /** Which step failed, when the run did not finish. */
+  error: string;
+  /** Step-by-step trace — the only way to see where a broken script went wrong. */
+  log: string[];
+  /** Text read off the screen, when the script collected any. */
+  captured: string;
+}

@@ -141,6 +141,20 @@ export default function ImportTranscriptScreen(): React.JSX.Element {
               Come back here and it will pick the transcript up from your clipboard automatically.
             </Text>
             <Pressable
+              onPress={() => router.push('/automation')}
+              style={({ pressed }) => [
+                styles.btn,
+                { borderColor: theme.outline },
+                pressed && { opacity: 0.6 },
+              ]}
+              accessibilityRole="button"
+            >
+              <Ionicons name="flash-outline" size={16} color={theme.primary} />
+              <Text style={[styles.btnText, { color: theme.onSurface }]}>
+                Let TaskMind do it for me
+              </Text>
+            </Pressable>
+            <Pressable
               onPress={pasteFromClipboard}
               style={({ pressed }) => [
                 styles.btn,

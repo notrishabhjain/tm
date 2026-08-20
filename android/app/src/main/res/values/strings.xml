@@ -1,5 +1,6 @@
 <resources>
   <string name="app_name">TaskMind</string>
+  <string name="taskmind_accessibility_description">Lets TaskMind press the buttons in your Recorder app for you, so a transcribed call becomes tasks without you doing it by hand. It only acts when you start a run, and only in the apps that run needs.</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
 </resources>

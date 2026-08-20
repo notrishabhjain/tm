@@ -11,6 +11,9 @@ import type {
   LocalDecision,
   RecorderTranscriptScan,
   TranscriptSourcePrefs,
+  AutomationStatus,
+  ScreenInspection,
+  AutomationResult,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,6 +72,72 @@ const NotificationListenerModule = {
   drainPendingNotifications(): Promise<void> {
     if (!NativeModule) return Promise.resolve();
     return NativeModule.drainPendingNotifications() as Promise<void>;
+  },
+
+  // ── UI automation (accessibility) ──────────────────────────────────────────
+
+  getAutomationStatus(): Promise<AutomationStatus> {
+    if (!NativeModule) {
+      return Promise.resolve({
+        enabled: false,
+        connected: false,
+        recorderPackage: '',
+        recorderFound: false,
+      });
+    }
+    return NativeModule.getAutomationStatus() as Promise<AutomationStatus>;
+  },
+
+  openAccessibilitySettings(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.openAccessibilitySettings() as Promise<void>;
+  },
+
+  /**
+   * Dumps the controls on whatever is currently on screen. Used to read the
+   * Recorder's real button labels and view ids, which cannot be guessed.
+   */
+  inspectForegroundScreen(): Promise<ScreenInspection> {
+    if (!NativeModule) return Promise.resolve({ error: 'Native module unavailable' });
+    return NativeModule.inspectForegroundScreen() as Promise<ScreenInspection>;
+  },
+
+  /** Stops an in-flight automation run at the next step boundary. */
+  abortAutomation(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.abortAutomation() as Promise<void>;
+  },
+
+  /**
+   * Drives the Recorder through transcription and copies the result.
+   * `readOnScreen` uses the variant that reads text off the screen instead of
+   * the three-dot Copy menu — fewer controls to match, less complete output.
+   */
+  runRecorderAutomation(
+    recordingLabel: string | null,
+    readOnScreen: boolean
+  ): Promise<AutomationResult> {
+    if (!NativeModule) {
+      return Promise.resolve({
+        ok: false,
+        error: 'Native module unavailable',
+        log: [],
+        captured: '',
+      });
+    }
+    return NativeModule.runRecorderAutomation(
+      recordingLabel,
+      readOnScreen
+    ) as Promise<AutomationResult>;
+  },
+
+  addAutomationLogListener(listener: (e: { message: string; ts: number }) => void) {
+    if (!emitter) return { remove: () => undefined };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sub = (emitter as any).addListener('onAutomationLog', listener) as {
+      remove: () => void;
+    };
+    return sub;
   },
 
   /**

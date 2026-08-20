@@ -165,6 +165,7 @@ export default function RootLayout(): React.JSX.Element {
               <Stack.Screen name="tasks" />
               <Stack.Screen name="review" />
               <Stack.Screen name="import-transcript" />
+              <Stack.Screen name="automation" />
               <Stack.Screen name="oauth/google" />
             </Stack>
           </ThemeProvider>
