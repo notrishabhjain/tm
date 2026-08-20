@@ -45,6 +45,19 @@ class CallTranscriptionService : Service() {
         // being cleared. Covers the window where the recorder is still flushing the
         // file to disk / MediaStore hasn't indexed it, so later sweeps keep retrying.
         private const val PENDING_SCAN_GRACE_MS = 5 * 60 * 1000L
+
+        /** Prefer a transcript the device recorder produced over transcribing here. */
+        const val KEY_USE_RECORDER_TRANSCRIPT = "use_recorder_transcript"
+
+        /** Whether TaskMind may transcribe audio itself when no recorder transcript exists. */
+        const val KEY_OWN_ASR_ENABLED = "own_asr_enabled"
+
+        /**
+         * How long a call keeps waiting for the user to transcribe it before the
+         * sweep stops re-checking. Generous because transcription is manual and
+         * people get to it when they get to it.
+         */
+        private const val AWAITING_TRANSCRIPT_WINDOW_MS = 7L * 24 * 60 * 60 * 1000
     }
 
     private lateinit var notificationManager: NotificationManager
@@ -181,6 +194,10 @@ class CallTranscriptionService : Service() {
         val prefs = getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("call_transcription_enabled", false)) return
 
+        // Before looking for new recordings, see whether any call that was
+        // waiting on the user has since been transcribed in the recorder app.
+        runAwaitingTranscriptSweep(prefs)
+
         val pendingAt = prefs.getLong(KEY_PENDING_CALL_SCAN, 0L)
         val hasPendingFlag = pendingAt != 0L
 
@@ -227,9 +244,96 @@ class CallTranscriptionService : Service() {
         prefs.edit().remove(KEY_PENDING_CALL_SCAN).apply()
     }
 
+    /**
+     * Re-checks calls parked in AWAITING_TRANSCRIPT to see whether the user has
+     * since transcribed them in the recorder app.
+     *
+     * This is what makes the recorder-transcript route workable at all: the
+     * transcript is created by a human action minutes or hours after the call,
+     * so the only way to catch it is to keep looking. Attaching it flips the
+     * record to TRANSCRIBED, which the JS extraction pass already picks up.
+     */
+    private fun runAwaitingTranscriptSweep(prefs: android.content.SharedPreferences) {
+        if (!prefs.getBoolean(KEY_USE_RECORDER_TRANSCRIPT, true)) return
+        val waiting = CallRecordStore.listAwaitingTranscript(this, AWAITING_TRANSCRIPT_WINDOW_MS)
+        if (waiting.isEmpty()) return
+
+        var attached = 0
+        for (call in waiting) {
+            val file = java.io.File(call.recordingPath)
+            // The user may have deleted the recording while it waited; drop the
+            // wait rather than re-checking a path that will never resolve.
+            if (!file.isFile) continue
+            val sidecar = try {
+                CallTranscriptSidecar.findFor(this, file)
+            } catch (t: Throwable) {
+                Log.w(TAG, "Awaiting-sweep lookup failed: ${t.message}")
+                null
+            } ?: continue
+
+            if (CallRecordStore.attachTranscript(this, call.id, sidecar.text)) {
+                attached++
+                CallRecordStore.logActivity(
+                    this, "call", call.callerLabel, "SCAN",
+                    "Transcript found in your recorder app — extracting tasks"
+                )
+            }
+        }
+        // Hand off to JS once, not per call: extraction and task creation live
+        // there, and one dispatch covers every record we just flipped.
+        if (attached > 0) startCallExtraction()
+    }
+
     private fun processRecording(prefs: android.content.SharedPreferences, recording: java.io.File) {
         val caller = CallerResolver.resolve(this, recording)
         val callTime = caller.endedAt
+
+        // Preferred path: a transcript the phone's own recorder already produced.
+        // On HyperOS the Recorder app transcribes call audio with Xiaomi's cloud
+        // AI, which is better than anything we can run here, costs nothing and
+        // needs no key — so if one exists, use it and skip transcription entirely.
+        if (prefs.getBoolean(KEY_USE_RECORDER_TRANSCRIPT, true)) {
+            val sidecar = try {
+                CallTranscriptSidecar.findFor(this, recording)
+            } catch (t: Throwable) {
+                Log.w(TAG, "Sidecar lookup failed: ${t.message}")
+                null
+            }
+            if (sidecar != null) {
+                Log.d(TAG, "Using recorder transcript: ${sidecar.file.name}")
+                CallRecordingFinder.markProcessed(this, recording)
+                CallRecordStore.logActivity(
+                    this, "call", caller.label, "SCAN",
+                    "Using transcript from your recorder app (${sidecar.text.length} chars)"
+                )
+                // Stored as TRANSCRIBED with no extraction: the JS pass owns task
+                // extraction, so there is one extraction path rather than two.
+                CallRecordStore.storeCallResult(
+                    this, caller, recording.absolutePath, sidecar.text,
+                    extraction = null, callTimeMs = callTime
+                )
+                startCallExtraction()
+                return
+            }
+        }
+
+        // No recorder transcript yet. When we are not allowed to transcribe it
+        // ourselves, park the call instead of failing: the user transcribes in
+        // the recorder app on their own schedule, and the sweep attaches it when
+        // it appears (see runAwaitingTranscriptSweep).
+        if (!prefs.getBoolean(KEY_OWN_ASR_ENABLED, true)) {
+            val stored = CallRecordStore.storeAwaitingTranscript(
+                this, caller, recording.absolutePath, callTime
+            )
+            CallRecordingFinder.markProcessed(this, recording)
+            if (stored) {
+                CallRecordStore.logActivity(
+                    this, "call", caller.label, "SCAN",
+                    "Waiting for you to transcribe this call in your recorder app"
+                )
+            }
+            return
+        }
 
         // Primary path: Gemini audio→tasks in a single API call — no separate ASR step,
         // better Hindi/Hinglish understanding, lower latency.
@@ -377,6 +481,25 @@ class CallTranscriptionService : Service() {
         }
     }
 
+    /**
+     * Starts the headless JS task that turns stored transcripts into tasks.
+     *
+     * Extraction and task creation live in JS so there is exactly one path that
+     * writes tasks, with one set of validation and dedup rules. Native's job
+     * ends at "transcript is stored"; this is the handoff.
+     */
+    private fun startCallExtraction() {
+        try {
+            val intent = Intent(this, TaskMindHeadlessTaskService::class.java)
+            intent.putExtra("jobType", "extract_calls")
+            startForegroundService(intent)
+            HeadlessJsTaskService.acquireWakeLockNow(this)
+        } catch (e: Exception) {
+            // Background-start restrictions — the app-open sweep extracts instead.
+            Log.w(TAG, "Could not start call extraction: ${e.message}")
+        }
+    }
+
     /** Starts the headless JS task that flushes the outbox to Google Tasks. */
     private fun startOutboxFlush() {
         try {
@@ -420,6 +543,15 @@ class CallTranscriptionService : Service() {
             .setContentText("Analysing your last call…")
             .setOngoing(true)
             .setShowWhen(false)
+            .apply {
+                // Defer the FGS notification by ~10s. A recovery sweep that finds
+                // nothing (the common case) stops in well under a second, so the
+                // notification is never shown — no more "Analysing…" flashing every
+                // few minutes. Only a real, longer transcription surfaces it.
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
+                }
+            }
             .build()
     }
 

@@ -8,6 +8,12 @@ import type {
   OemInfo,
   ListenerHealth,
   ListenerStats,
+  LocalDecision,
+  RecorderTranscriptScan,
+  TranscriptSourcePrefs,
+  AutomationStatus,
+  ScreenInspection,
+  AutomationResult,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,31 +74,132 @@ const NotificationListenerModule = {
     return NativeModule.drainPendingNotifications() as Promise<void>;
   },
 
-  // Offline classifier: uses Android TextClassifier (HyperOS AI on Xiaomi) +
-  // Hindi/English pattern matching. Returns a PipelineDecision-shaped object,
-  // or null if the native module is unavailable.
+  // ── UI automation (accessibility) ──────────────────────────────────────────
+
+  getAutomationStatus(): Promise<AutomationStatus> {
+    if (!NativeModule) {
+      return Promise.resolve({
+        enabled: false,
+        connected: false,
+        recorderPackage: '',
+        recorderFound: false,
+      });
+    }
+    return NativeModule.getAutomationStatus() as Promise<AutomationStatus>;
+  },
+
+  openAccessibilitySettings(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.openAccessibilitySettings() as Promise<void>;
+  },
+
+  /**
+   * Dumps the controls on whatever is currently on screen. Used to read the
+   * Recorder's real button labels and view ids, which cannot be guessed.
+   */
+  inspectForegroundScreen(): Promise<ScreenInspection> {
+    if (!NativeModule) return Promise.resolve({ error: 'Native module unavailable' });
+    return NativeModule.inspectForegroundScreen() as Promise<ScreenInspection>;
+  },
+
+  /** Stops an in-flight automation run at the next step boundary. */
+  abortAutomation(): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.abortAutomation() as Promise<void>;
+  },
+
+  /**
+   * Drives the Recorder through transcription and copies the result.
+   * `readOnScreen` uses the variant that reads text off the screen instead of
+   * the three-dot Copy menu — fewer controls to match, less complete output.
+   */
+  runRecorderAutomation(
+    recordingLabel: string | null,
+    readOnScreen: boolean
+  ): Promise<AutomationResult> {
+    if (!NativeModule) {
+      return Promise.resolve({
+        ok: false,
+        error: 'Native module unavailable',
+        log: [],
+        captured: '',
+      });
+    }
+    return NativeModule.runRecorderAutomation(
+      recordingLabel,
+      readOnScreen
+    ) as Promise<AutomationResult>;
+  },
+
+  addAutomationLogListener(listener: (e: { message: string; ts: number }) => void) {
+    if (!emitter) return { remove: () => undefined };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sub = (emitter as any).addListener('onAutomationLog', listener) as {
+      remove: () => void;
+    };
+    return sub;
+  },
+
+  /**
+   * True when the recorder app announced a finished transcription since the app
+   * was last opened. Read-and-clear, so the prompt is acted on exactly once.
+   */
+  consumeTranscriptImportPending(): Promise<boolean> {
+    if (!NativeModule) return Promise.resolve(false);
+    return NativeModule.consumeTranscriptImportPending() as Promise<boolean>;
+  },
+
+  /**
+   * Returns and clears a transcript shared into the app from the recorder app,
+   * or an empty string when there is none. Cleared on read so the import screen
+   * cannot re-present text the user has already dealt with.
+   */
+  consumeSharedTranscript(): Promise<string> {
+    if (!NativeModule) return Promise.resolve('');
+    return NativeModule.consumeSharedTranscript() as Promise<string>;
+  },
+
+  /**
+   * Reports which transcripts the phone's own recorder app has produced and
+   * which recordings they pair with. Used to confirm the recorder's storage
+   * layout on a real device instead of hardcoding a guess.
+   */
+  scanRecorderTranscripts(): Promise<RecorderTranscriptScan | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.scanRecorderTranscripts() as Promise<RecorderTranscriptScan | null>;
+  },
+
+  /** Chooses where call transcripts may come from. */
+  setTranscriptSourcePrefs(useRecorderTranscript: boolean, ownAsrEnabled: boolean): Promise<void> {
+    if (!NativeModule) return Promise.resolve();
+    return NativeModule.setTranscriptSourcePrefs(
+      useRecorderTranscript,
+      ownAsrEnabled
+    ) as Promise<void>;
+  },
+
+  getTranscriptSourcePrefs(): Promise<TranscriptSourcePrefs | null> {
+    if (!NativeModule) return Promise.resolve(null);
+    return NativeModule.getTranscriptSourcePrefs() as Promise<TranscriptSourcePrefs | null>;
+  },
+
+  // On-device classifier: Android TextClassifier (HyperOS AI on Xiaomi) plus
+  // Hindi/English pattern matching. First stage of the v3 pipeline — `confidence`
+  // (0..1) drives the auto-create / review / discard gate in task-intake.ts.
+  // Returns null if the native module is unavailable.
   localDecideNotification(
     pkg: string,
     senderName: string,
     text: string,
     isGroup: boolean
-  ): Promise<{
-    isTask: boolean;
-    title: string | null;
-    priority: string;
-    reasoning: string;
-    notes: string | null;
-    dueDate: null;
-  } | null> {
+  ): Promise<LocalDecision | null> {
     if (!NativeModule) return Promise.resolve(null);
-    return NativeModule.localDecideNotification(pkg, senderName, text, isGroup) as Promise<{
-      isTask: boolean;
-      title: string | null;
-      priority: string;
-      reasoning: string;
-      notes: string | null;
-      dueDate: null;
-    } | null>;
+    return NativeModule.localDecideNotification(
+      pkg,
+      senderName,
+      text,
+      isGroup
+    ) as Promise<LocalDecision | null>;
   },
 
   addNotificationListener(listener: (data: NotificationData) => void) {

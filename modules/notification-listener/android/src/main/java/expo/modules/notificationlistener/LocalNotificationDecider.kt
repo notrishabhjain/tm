@@ -28,7 +28,35 @@ object LocalNotificationDecider {
         val title: String?,
         val priority: String,
         val reasoning: String,
-        val notes: String?
+        val notes: String?,
+        /**
+         * 0..1 strength of the signal, consumed by the confidence gate in
+         * task-intake.ts. Deliberately capped below the auto-create threshold
+         * unless several independent signals agree: a regex classifier that
+         * claims certainty would write wrong tasks straight into the user's
+         * list, which costs more trust than a task that waits in review.
+         */
+        val confidence: Double
+    )
+
+    // Signal weights. They sum to more than 1.0 on purpose — the score is
+    // clamped, so agreement between independent signals is what produces a
+    // high number, not any single one of them firing.
+    private const val W_ACTION_VERB = 0.34
+    private const val W_DEADLINE = 0.22
+    private const val W_DIRECT_ADDRESS = 0.20
+    private const val W_IMPERATIVE = 0.12
+    private const val W_CLASSIFIER = 0.12
+    private const val PENALTY_GROUP_INDIRECT = 0.22
+
+    /** Ceiling for a purely heuristic verdict — see [Decision.confidence]. */
+    private const val HEURISTIC_CEILING = 0.80
+
+    // Second-person address, the strongest indicator that the request is aimed
+    // at the reader rather than being narration or a broadcast.
+    private val DIRECT_ADDRESS = Regex(
+        """\b(you|your|u r|ur|aap|aapko|aapse|tum|tumhe|tumko|tere|tera|teri|bhai|sir|madam)\b""",
+        RegexOption.IGNORE_CASE
     )
 
     // ── English action verbs that indicate the USER must do something ──────────
@@ -103,12 +131,16 @@ object LocalNotificationDecider {
         val trimmedSender = senderName.trim()
         val lower = text.lowercase()
 
-        // Hard exclusions
+        // Hard exclusions. These are certainties, so they carry confidence 0.0 —
+        // the gate discards them outright rather than queueing them for review.
+        if (text.isBlank()) {
+            return Decision(false, null, "LOW", "Empty message", null, 0.0)
+        }
         if (AUTO_SENDER.matches(trimmedSender)) {
-            return Decision(false, null, "LOW", "Auto-sender — not a person", null)
+            return Decision(false, null, "LOW", "Auto-sender — not a person", null, 0.0)
         }
         if (INFO_SUBSTRINGS.any { lower.contains(it) }) {
-            return Decision(false, null, "LOW", "Informational/transactional content", null)
+            return Decision(false, null, "LOW", "Informational/transactional content", null, 0.0)
         }
 
         // Android TextClassifier: entity detection
@@ -125,12 +157,39 @@ object LocalNotificationDecider {
         // Deadline / urgency
         val deadlineHit = DEADLINE_PATTERNS.firstOrNull { it.containsMatchIn(lower) }
 
-        val isTask = hasEnVerb || hasHiVerb || deadlineHit != null || tcSignals.hasActionEntity
+        val hasVerb = hasEnVerb || hasHiVerb
+        val isDirect = DIRECT_ADDRESS.containsMatchIn(text)
+        // An imperative opener ("send me the deck") is a strong request signal
+        // that verb-anywhere matching alone does not distinguish from narration
+        // ("I already sent the deck").
+        val firstWord = words.firstOrNull()?.trimEnd('!', '?', '.', ',') ?: ""
+        val isImperativeOpen = EN_TASK_VERBS.contains(firstWord) ||
+            HI_TASK_VERBS.any { lower.startsWith(it) }
+
+        val isTask = hasVerb || deadlineHit != null || tcSignals.hasActionEntity
 
         if (!isTask) {
             return Decision(false, null, "LOW",
-                "No task verb, deadline, or action entity detected offline", null)
+                "No task verb, deadline, or action entity detected offline", null, 0.0)
         }
+
+        // ── Score ─────────────────────────────────────────────────────────────
+        var score = 0.0
+        if (hasVerb) score += W_ACTION_VERB
+        if (deadlineHit != null) score += W_DEADLINE
+        if (isDirect) score += W_DIRECT_ADDRESS
+        if (isImperativeOpen) score += W_IMPERATIVE
+        if (tcSignals.hasActionEntity) score += W_CLASSIFIER
+        // In a group with no second-person address, the request may well be
+        // aimed at somebody else in the room. Worth surfacing, not worth
+        // asserting — so the penalty pushes it toward review, not discard.
+        if (isGroup && !isDirect) score -= PENALTY_GROUP_INDIRECT
+
+        // A bare date entity with no verb at all is the weakest thing that still
+        // reaches here; keep it clearly inside the review band.
+        if (!hasVerb) score = minOf(score, 0.45)
+
+        val confidence = score.coerceIn(0.0, HEURISTIC_CEILING)
 
         val priority = when {
             lower.contains("urgent") || lower.contains("asap") || lower.contains("abhi") ||
@@ -146,20 +205,26 @@ object LocalNotificationDecider {
         val reasonParts = buildList {
             if (hasEnVerb) add("action verb")
             if (hasHiVerb) add("Hindi action verb")
+            if (isImperativeOpen) add("imperative phrasing")
+            if (isDirect) add("addressed to you")
             if (deadlineHit != null) add("deadline/urgency")
             if (tcSignals.hasActionEntity) add("system classifier action")
+            if (isGroup && !isDirect) add("group chat, no direct address")
         }
 
-        val title = buildTitle(trimmedSender, text)
-        val groupNote = if (isGroup) "Group chat — verify if this is meant for you. " else ""
-        val offlineNote = "${groupNote}Analysed offline (network unavailable) — please verify."
+        val title = buildTitle(text)
+        val groupNote = if (isGroup && !isDirect) {
+            "Group chat — verify this is meant for you. "
+        } else ""
+        val note = "${groupNote}Classified on-device from: \"${text.trim().take(160)}\""
 
         return Decision(
             isTask = true,
             title = title,
             priority = priority,
-            reasoning = "Offline analysis: ${reasonParts.joinToString(", ")}",
-            notes = offlineNote
+            reasoning = "On-device analysis: ${reasonParts.joinToString(", ")}",
+            notes = note,
+            confidence = confidence
         )
     }
 
@@ -196,10 +261,38 @@ object LocalNotificationDecider {
 
     // ── Title construction ─────────────────────────────────────────────────────
 
-    private fun buildTitle(sender: String, text: String): String {
-        val words = text.trim().split(Regex("\\s+"))
-        val snippet = words.take(9).joinToString(" ")
-        val truncated = if (words.size > 9) "$snippet…" else snippet
-        return "[$sender] $truncated".take(60)
+    /**
+     * Builds the task title from the message itself.
+     *
+     * The previous version prefixed every title with "[Sender]" and then took
+     * the first nine words, which produced titles like "[Sharma Ji] haan to
+     * phir main keh raha…" — the sender is already carried separately as the
+     * task's source label, and the opening words of a message are usually
+     * greeting rather than request. This picks the clause that actually
+     * contains the action instead.
+     */
+    private fun buildTitle(text: String): String {
+        val cleaned = text.trim().replace(Regex("\\s+"), " ")
+        // Split into clauses on sentence and clause boundaries, keeping order.
+        val clauses = cleaned.split(Regex("(?<=[.!?।])\\s+|,\\s+|\\s+-\\s+"))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+        val lowerOf = { s: String -> s.lowercase() }
+        // Prefer the first clause carrying an action verb; fall back to the
+        // longest clause, which is more informative than the first.
+        val actionClause = clauses.firstOrNull { clause ->
+            val l = lowerOf(clause)
+            val w = l.split(Regex("\\s+")).map { it.trimEnd('!', '?', '.', ',') }
+            EN_TASK_VERBS.any { v -> w.contains(v) || l.contains(" $v ") || l.startsWith("$v ") } ||
+                HI_TASK_VERBS.any { v -> l.contains(v) }
+        } ?: clauses.maxByOrNull { it.length } ?: cleaned
+
+        val words = actionClause.split(Regex("\\s+"))
+        val snippet = words.take(14).joinToString(" ")
+        val title = if (words.size > 14) "$snippet…" else snippet
+        // Capitalise so the list reads like a task list rather than chat log.
+        val shaped = title.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        return shaped.take(100)
     }
 }

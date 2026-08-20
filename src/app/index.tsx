@@ -11,7 +11,7 @@ import {
   RefreshControl,
   TextInput,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/ui/theme';
@@ -28,6 +28,8 @@ import {
 } from '@/services/google-tasks';
 import { appDisplayName } from '@/services/app-name-map';
 import { runNotificationPipelineTest } from '@/services/pipeline';
+import { TaskRepository } from '@/data/repositories/TaskRepository';
+import { db } from '@/data/db/client';
 import { retryFailedCallAnalyses } from '@/services/call-retry';
 import NotificationListener from '../../modules/notification-listener/src';
 import type { OemInfo } from '../../modules/notification-listener/src/types';
@@ -54,8 +56,11 @@ const DEFAULT_STATUS: PipelineStatus = {
   geminiKeySet: false,
 };
 
+const taskRepo = new TaskRepository(db);
+
 export default function StatusScreen(): React.JSX.Element {
   const theme = useTheme();
+  const router = useRouter();
   const [status, setStatus] = useState<PipelineStatus>(DEFAULT_STATUS);
   const [oem, setOem] = useState<OemInfo | null>(null);
   const [testing, setTesting] = useState(false);
@@ -120,11 +125,27 @@ export default function StatusScreen(): React.JSX.Element {
     })();
   }, []);
 
+  // Counts for the Tasks entry point. Kept separate from the activity query so
+  // a storage failure blanks the counts rather than the whole screen.
+  const { data: taskCounts, refetch: refetchCounts } = useQuery({
+    queryKey: ['taskCounts'],
+    queryFn: async () => {
+      try {
+        initializeDatabase();
+        return await taskRepo.counts();
+      } catch {
+        return null;
+      }
+    },
+    refetchInterval: 10000,
+  });
+
   useFocusEffect(
     useCallback(() => {
       refresh();
       checkStorage();
-    }, [refresh, checkStorage])
+      void refetchCounts();
+    }, [refresh, checkStorage, refetchCounts])
   );
 
   const saveGeminiKey = async (): Promise<void> => {
@@ -263,6 +284,62 @@ export default function StatusScreen(): React.JSX.Element {
     }
   };
 
+  /**
+   * Reports which transcripts the phone's recorder app has produced and which
+   * recordings they pair with. The recorder's storage layout is undocumented
+   * and varies by HyperOS build, so this reads the answer off the device
+   * rather than assuming a path.
+   */
+  const scanRecorderTranscripts = (): void => {
+    if (testing) return;
+    setTesting(true);
+    setTestLogs(['Looking for transcripts made by your recorder app…']);
+    void (async () => {
+      try {
+        const scan = await NotificationListener.scanRecorderTranscripts();
+        if (!scan) {
+          setTestLogs((prev) => [...prev, '✗ Native module unavailable']);
+          return;
+        }
+        if (scan.error) {
+          setTestLogs((prev) => [...prev, `✗ Scan failed: ${scan.error ?? 'unknown'}`]);
+          return;
+        }
+        const lines: string[] = [`Checked ${scan.recordingsChecked} recent recording(s).`];
+        const paired = scan.pairs.filter((p) => p.transcriptFound);
+        if (paired.length > 0) {
+          lines.push(
+            `✓ Found ${paired.length} transcript(s) — calls will use these automatically:`
+          );
+          for (const p of paired) {
+            lines.push(`   ${p.transcriptPath}`);
+            lines.push(`   ${p.transcriptChars} chars — "${p.preview.slice(0, 80)}…"`);
+          }
+        } else {
+          lines.push('✗ No transcript found next to any recording.');
+          lines.push('Open a call in your recorder app, tap transcribe, then run this again.');
+        }
+        if (scan.looseTextFiles.length > 0) {
+          lines.push(`Other text files in the recorder folders (${scan.looseTextFiles.length}):`);
+          for (const f of scan.looseTextFiles.slice(0, 12)) {
+            lines.push(`   ${f.readable ? '•' : '·'} ${f.path} (${Math.round(f.bytes)}B)`);
+          }
+        } else {
+          lines.push('No text files at all in the recorder folders.');
+          lines.push(
+            'That likely means the recorder keeps transcripts in its own private storage, which no other app can read.'
+          );
+        }
+        lines.push(`Searched: ${scan.rootsSearched.join(', ') || 'no readable folders'}`);
+        setTestLogs((prev) => [...prev, ...lines].slice(-60));
+      } catch (e) {
+        setTestLogs((prev) => [...prev, `✗ ${e instanceof Error ? e.message : String(e)}`]);
+      } finally {
+        setTesting(false);
+      }
+    })();
+  };
+
   const checkNow = (): void => {
     void (async () => {
       // The tray scan silently does nothing when the listener binding is dead,
@@ -312,8 +389,31 @@ export default function StatusScreen(): React.JSX.Element {
     <Screen>
       <LargeHeader
         title="TaskMind"
-        subtitle={allGood ? 'Pipeline active — tasks flow to Google Tasks' : 'Finish setup below'}
+        subtitle={allGood ? 'Capturing tasks from messages and calls' : 'Finish setup below'}
       />
+
+      <Pressable
+        onPress={() => router.push('/tasks')}
+        style={({ pressed }) => [
+          styles.tasksCta,
+          { backgroundColor: theme.surface, borderColor: theme.outline },
+          pressed && { opacity: 0.7 },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Open your tasks"
+      >
+        <Ionicons name="checkbox-outline" size={22} color={theme.primary} />
+        <View style={styles.rowText}>
+          <Text style={[styles.rowLabel, { color: theme.onSurface }]}>Your tasks</Text>
+          <Text style={[styles.rowHint, { color: theme.onSurfaceVariant }]}>
+            {taskCounts
+              ? `${taskCounts.today} due today · ${taskCounts.overdue} overdue` +
+                (taskCounts.review > 0 ? ` · ${taskCounts.review} to review` : '')
+              : 'Captured from your messages and calls'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.onSurfaceVariant} />
+      </Pressable>
 
       <FlatList
         data={activity}
@@ -531,6 +631,22 @@ export default function StatusScreen(): React.JSX.Element {
                 </Text>
               </Pressable>
             </View>
+            <View style={styles.troubleshootRow}>
+              <Pressable
+                onPress={scanRecorderTranscripts}
+                disabled={testing}
+                style={({ pressed }) => [
+                  styles.troubleshootBtn,
+                  { borderColor: theme.outline, backgroundColor: theme.surface },
+                  (pressed || testing) && { opacity: 0.6 },
+                ]}
+              >
+                <Ionicons name="document-text-outline" size={16} color={Colors.primary500} />
+                <Text style={[styles.troubleshootText, { color: theme.onSurface }]}>
+                  {testing ? 'Scanning…' : 'Find recorder transcripts'}
+                </Text>
+              </Pressable>
+            </View>
             {testLogs.length > 0 && (
               <View style={[styles.logBox, { borderColor: theme.outline }]}>
                 {testLogs.map((line, i) => (
@@ -662,6 +778,17 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   rowText: { flex: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600' },
+  rowHint: { fontSize: 12.5, marginTop: 2 },
+  tasksCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
   rowDetail: { fontSize: 12, marginTop: 2, lineHeight: 17 },
   actionBtn: {
     backgroundColor: Colors.primary500,

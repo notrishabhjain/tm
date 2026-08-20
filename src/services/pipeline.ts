@@ -7,14 +7,14 @@ import {
   hasFingerprint,
   recordFingerprint,
   logActivity,
-  enqueueOutbox,
   getOutbox,
   removeOutboxRow,
   bumpOutboxAttempts,
 } from '@/data/pipeline-store';
-import { createGoogleTask, buildGoogleTaskNotes } from './google-tasks';
+import { createGoogleTask } from './google-tasks';
 import { appDisplayName } from './app-name-map';
 import { getSetting } from '@/data/storage/settings';
+import { intakeCandidate } from './task-intake';
 
 // ── The single decision-maker ─────────────────────────────────────────────────
 // TaskMind v2 has exactly one intelligence: this LLM call. There is no scorer,
@@ -82,7 +82,23 @@ export interface PipelineDecision {
   priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate: number | null;
   notes: string | null;
+  /**
+   * 0..1. Drives the auto-create / review / discard gate in task-intake.ts.
+   * A cloud model that does not report one is treated as high confidence
+   * (CLOUD_ASSUMED_CONFIDENCE) because it is a far larger model than anything
+   * running on the device; the on-device classifier always reports its own.
+   */
+  confidence: number;
+  /** Which engine produced this — recorded against the resulting task. */
+  origin: 'LOCAL_HEURISTIC' | 'LOCAL_LLM' | 'CLOUD';
 }
+
+/**
+ * Confidence assigned to a cloud verdict that carries no explicit score.
+ * Below 1.0 so that a task from any automated source stays distinguishable
+ * from one the user typed, but above the auto-create threshold.
+ */
+const CLOUD_ASSUMED_CONFIDENCE = 0.9;
 
 function formatNow(): string {
   return new Date().toLocaleString('en-IN', {
@@ -133,6 +149,11 @@ export function parseDecision(raw: string): PipelineDecision | null {
         typeof p['notes'] === 'string' && p['notes'].trim() && p['notes'] !== 'null'
           ? p['notes'].trim()
           : null,
+      confidence:
+        typeof p['confidence'] === 'number' && Number.isFinite(p['confidence'])
+          ? Math.min(1, Math.max(0, p['confidence']))
+          : CLOUD_ASSUMED_CONFIDENCE,
+      origin: 'CLOUD',
     };
   } catch {
     return null;
@@ -156,31 +177,65 @@ function buildUserContent(notification: NotificationData, history: StoredMessage
   return parts.join('\n');
 }
 
-// Three independent judges, same prompt, same output contract.
-// Order: Groq (Llama 3.3 70B, 14 400 req/day free) → OpenRouter (Llama 3.3 70B
-// free tier, multiple backend providers) → Gemini 2.5 Flash (last resort).
-// Error classification: 401/403 = bad key → skip immediately; 429 = rate
-// limit → skip (next engine may not be); 5xx = transient → one retry.
-// onLog is optional; when provided (test path) each engine reports its exact
-// outcome so the user can see timeout / HTTP status / network error directly.
+/**
+ * v3 decision chain — LOCAL FIRST, cloud only as a bounded fallback.
+ *
+ * This is inverted from v2, which asked three cloud models first and only fell
+ * back on-device when all of them failed. Now:
+ *
+ *   1. The on-device classifier judges every message. It costs no network, no
+ *      API key and no per-message money, and it returns a confidence score.
+ *   2. Cloud is consulted ONLY when the local verdict is uncertain — never to
+ *      second-guess a confident local answer, and never merely because the
+ *      network happens to be available.
+ *
+ * Escalation is additionally gated on `cloud_fallback_enabled`, which is off by
+ * default: with it off the pipeline is fully local and no message content ever
+ * leaves the device.
+ */
 async function decide(
   notification: NotificationData,
   history: StoredMessage[],
   onLog?: (engine: string, detail: string) => void
 ): Promise<PipelineDecision | null> {
+  // Stage 1 — on-device.
+  const local = await decideOffline(notification, onLog);
+
+  // A confident local verdict is final, in either direction. This is what keeps
+  // the escalation rate (and therefore cost and egress) low.
+  if (local && local.confidence >= LOCAL_CONFIDENT_THRESHOLD) {
+    onLog?.('On-device', `confident (${local.confidence.toFixed(2)}) — no escalation`);
+    return local;
+  }
+
+  // Stage 2 — cloud, only for the uncertain middle.
+  if (!getSetting('cloud_fallback_enabled')) {
+    onLog?.('On-device', 'uncertain, cloud fallback disabled — routing to review');
+    return local;
+  }
+
+  onLog?.(
+    'On-device',
+    `uncertain (${local ? local.confidence.toFixed(2) : 'no verdict'}) — escalating`
+  );
   const userContent = buildUserContent(notification, history);
-  const networkResult =
+  const cloud =
     (await decideWithGroq(userContent, onLog)) ??
     (await decideWithOpenRouter(userContent, onLog)) ??
     (await decideWithGemini(userContent, onLog));
-  if (networkResult !== null) return networkResult;
 
-  // All network engines failed — fall back to on-device classifier.
-  // On Xiaomi HyperOS this uses the system's built-in AI (TextClassifier backed
-  // by Xiaomi's on-device model) plus Hindi/English pattern matching.
-  // Never returns null (will return isTask=false if genuinely ambiguous).
-  return decideOffline(notification, onLog);
+  // Cloud unreachable is not a reason to lose the message: the local verdict,
+  // uncertain as it is, still routes to the Review Inbox rather than vanishing.
+  return cloud ?? local;
 }
+
+/**
+ * Above this, the on-device verdict is accepted without consulting the cloud.
+ * Sits below the auto-create threshold on purpose: a local verdict in the band
+ * between the two is confident enough to skip escalation but still lands in the
+ * Review Inbox rather than being written straight to the task list.
+ */
+const LOCAL_CONFIDENT_THRESHOLD = 0.7;
 
 async function decideOffline(
   notification: NotificationData,
@@ -194,14 +249,22 @@ async function decideOffline(
       notification.isGroup ?? false
     );
     if (!result) return null;
-    onLog?.('HyperOS offline', result.reasoning);
+    onLog?.('On-device', result.reasoning);
     return {
       isTask: result.isTask,
       reasoning: result.reasoning,
       title: result.title ?? null,
       priority: (result.priority as PipelineDecision['priority']) ?? 'MEDIUM',
-      dueDate: null,
+      // The heuristic classifier detects that a deadline EXISTS but does not
+      // resolve it to a timestamp; leaving this null is honest, and the user
+      // sees the deadline wording in the notes.
+      dueDate: typeof result.dueDate === 'number' ? result.dueDate : null,
       notes: result.notes ?? null,
+      confidence:
+        typeof result.confidence === 'number' && Number.isFinite(result.confidence)
+          ? Math.min(1, Math.max(0, result.confidence))
+          : 0,
+      origin: 'LOCAL_HEURISTIC',
     };
   } catch {
     return null;
@@ -450,34 +513,39 @@ export async function handleNotification(taskData: {
       return;
     }
 
-    const notes = buildGoogleTaskNotes({
-      priority: decision.priority,
-      sender: notification.title,
-      sourceApp: notification.packageName,
-      dueDate: decision.dueDate,
-      body: decision.notes ? `${decision.notes}\n\n${text}` : text,
-    });
-
-    const googleTaskId = await createGoogleTask({
+    // The task now lands in THIS app's task list. Intake owns validation,
+    // confidence gating, dedup and the optional Google mirror, so this call
+    // site does not decide any of them.
+    const result = await intakeCandidate({
       title: decision.title,
-      notes,
+      notes: decision.notes,
       dueDate: decision.dueDate,
+      priority: decision.priority,
+      confidence: decision.confidence,
+      reasoning: decision.reasoning,
+      sourceType: 'NOTIFICATION',
+      sourceRef: fingerprint,
+      sourceLabel: label,
+      sourceApp: notification.packageName,
+      sourceText: text,
+      inferenceOrigin: decision.origin,
     });
 
-    // Decision is final — record it so re-deliveries can't double-create the
-    // task (a failed Google call is covered by the outbox, not a retry).
-    await recordFingerprint(fingerprint);
+    // Record the fingerprint for every terminal disposition so a re-delivery
+    // cannot re-run the pipeline. INVALID is deliberately excluded: it means we
+    // failed to store the result, so the message deserves another attempt.
+    if (result.disposition !== 'INVALID') {
+      await recordFingerprint(fingerprint);
+    }
 
-    if (googleTaskId) {
-      await logActivity(notification.packageName, label, 'TASK_CREATED', decision.title);
+    if (result.disposition === 'CREATED') {
       void NotificationListener.postConfirmation(
         'Task added',
         `${decision.title} — from ${label}`
       ).catch(() => {});
-    } else {
-      await enqueueOutbox(decision.title, notes, decision.dueDate);
-      await logActivity(notification.packageName, label, 'QUEUED', decision.title);
     }
+    // REVIEW, DUPLICATE and DISCARDED are all logged inside intake; posting a
+    // notification for them would be noise, and silence is the v3 default.
   } catch (e) {
     await logActivity(
       notification.packageName,

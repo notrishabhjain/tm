@@ -18,6 +18,14 @@ import java.io.File
 object CallRecordStore {
     private const val TAG = "CallRecordStore"
 
+    /**
+     * A call whose recording exists but whose transcript does not yet.
+     * Distinct from TRANSCRIBED (has text, awaiting extraction) and from a
+     * failure stub — this one is expected to resolve later, once the user
+     * transcribes the recording in the device recorder app.
+     */
+    const val STATUS_AWAITING_TRANSCRIPT = "AWAITING_TRANSCRIPT"
+
     private fun open(context: Context): SQLiteDatabase? {
         val dbFile = File(context.filesDir, "SQLite/taskmind.db")
         if (!dbFile.exists()) {
@@ -170,6 +178,103 @@ object CallRecordStore {
         } catch (e: Exception) {
             Log.w(TAG, "storeCallResult failed: ${e.message}")
             -1
+        }
+    }
+
+    /**
+     * Records a call whose recording exists but which has no transcript yet.
+     *
+     * This is the normal state when the device recorder does the transcription:
+     * the audio lands at hang-up, but the transcript only exists once the user
+     * opens the recorder and asks for it. Storing the call now — rather than
+     * failing — means the recovery sweep can attach the transcript whenever it
+     * appears, and the call is never lost in the meantime.
+     *
+     * Returns true if a new row was written (false if this recording is known).
+     */
+    fun storeAwaitingTranscript(
+        context: Context,
+        caller: CallerResolver.ResolvedCaller,
+        recordingPath: String,
+        callTimeMs: Long
+    ): Boolean {
+        val db = open(context) ?: return false
+        return try {
+            db.use { d ->
+                ensureTables(d)
+                val cv = ContentValues().apply {
+                    put("id", generateId())
+                    put("caller_label", caller.label)
+                    if (caller.number != null) put("caller_number", caller.number)
+                    put("call_time", callTimeMs)
+                    if (caller.durationSec != null) put("duration_sec", caller.durationSec)
+                    put("recording_path", recordingPath)
+                    put("transcript", "")
+                    put("status", STATUS_AWAITING_TRANSCRIPT)
+                    put("created_at", System.currentTimeMillis())
+                }
+                d.insertWithOnConflict(
+                    "call_records", null, cv, SQLiteDatabase.CONFLICT_IGNORE
+                ) != -1L
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "storeAwaitingTranscript failed: ${e.message}")
+            false
+        }
+    }
+
+    /** A call still waiting for the user to transcribe it in the recorder app. */
+    data class AwaitingCall(val id: String, val recordingPath: String, val callerLabel: String)
+
+    /**
+     * Calls awaiting a transcript, newest first, bounded by age so the sweep
+     * does not re-check recordings the user is clearly never going to transcribe.
+     */
+    fun listAwaitingTranscript(context: Context, maxAgeMs: Long, limit: Int = 10): List<AwaitingCall> {
+        val db = open(context) ?: return emptyList()
+        return try {
+            db.use { d ->
+                ensureTables(d)
+                val cutoff = System.currentTimeMillis() - maxAgeMs
+                d.rawQuery(
+                    "SELECT id, recording_path, caller_label FROM call_records " +
+                        "WHERE status = ? AND recording_path IS NOT NULL AND created_at >= ? " +
+                        "ORDER BY created_at DESC LIMIT ?",
+                    arrayOf(STATUS_AWAITING_TRANSCRIPT, cutoff.toString(), limit.toString())
+                ).use { c ->
+                    val out = mutableListOf<AwaitingCall>()
+                    while (c.moveToNext()) {
+                        val path = c.getString(1) ?: continue
+                        out += AwaitingCall(c.getString(0), path, c.getString(2) ?: "Unknown")
+                    }
+                    out
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "listAwaitingTranscript failed: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * Attaches a transcript to a waiting call and moves it to TRANSCRIBED, which
+     * is the state the JS extraction pass picks up. Task creation deliberately
+     * stays in JS so there is one extraction path, not two.
+     */
+    fun attachTranscript(context: Context, id: String, transcript: String): Boolean {
+        val db = open(context) ?: return false
+        return try {
+            db.use { d ->
+                ensureTables(d)
+                val cv = ContentValues().apply {
+                    put("transcript", transcript)
+                    put("status", "TRANSCRIBED")
+                }
+                d.update("call_records", cv, "id = ?", arrayOf(id)) > 0
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "attachTranscript failed: ${e.message}")
+            false
         }
     }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { AppState, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -45,6 +45,7 @@ class AppErrorBoundary extends React.Component<
 }
 
 export default function RootLayout(): React.JSX.Element {
+  const router = useRouter();
   const bootedRef = useRef(false);
   const [fontsLoaded] = useFonts({
     'Inter-Regular': require('../../assets/fonts/Inter-Regular.ttf'),
@@ -88,6 +89,42 @@ export default function RootLayout(): React.JSX.Element {
     if (fontsLoaded) void SplashScreen.hideAsync();
   }, [fontsLoaded]);
 
+  // Two routes into the transcript importer, both checked on launch and on every
+  // foreground:
+  //
+  //  - text shared in from another app (stashed natively before we were brought
+  //    forward), and
+  //  - the recorder having announced a finished transcription. The HyperOS
+  //    Recorder offers no share, only "copy", so that notification is the only
+  //    signal a transcript now exists; opening the importer puts the user one
+  //    step from tasks instead of leaving them to remember.
+  useEffect(() => {
+    const check = (): void => {
+      void (async () => {
+        try {
+          const shared = await NotificationListener.consumeSharedTranscript();
+          if (shared?.trim()) {
+            router.push({ pathname: '/import-transcript', params: { text: shared } });
+            return;
+          }
+          const pending = await NotificationListener.consumeTranscriptImportPending();
+          if (pending) {
+            // No text passed: the importer reads the clipboard itself, which is
+            // where the transcript will be once the user has copied it.
+            router.push('/import-transcript');
+          }
+        } catch {
+          /* native unavailable */
+        }
+      })();
+    };
+    check();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') check();
+    });
+    return () => sub.remove();
+  }, [router]);
+
   // Live notifications (app open) run the same pipeline as headless.
   useEffect(() => {
     const sub = NotificationListener.addNotificationListener((data) => {
@@ -125,6 +162,10 @@ export default function RootLayout(): React.JSX.Element {
           <ThemeProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
+              <Stack.Screen name="tasks" />
+              <Stack.Screen name="review" />
+              <Stack.Screen name="import-transcript" />
+              <Stack.Screen name="automation" />
               <Stack.Screen name="oauth/google" />
             </Stack>
           </ThemeProvider>

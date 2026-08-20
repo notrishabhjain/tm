@@ -28,7 +28,8 @@ class NotificationListenerModule : Module() {
 
         Events(
             "onNotification",
-            "onCallTranscriptionTestLog"
+            "onCallTranscriptionTestLog",
+            "onAutomationLog"
         )
 
         OnCreate {
@@ -57,9 +58,11 @@ class NotificationListenerModule : Module() {
             hasActiveListener = active
         }
 
-        // Offline notification classifier — runs entirely on-device using Android's
+        // On-device notification classifier — runs entirely locally using Android's
         // TextClassifier (backed by HyperOS AI on Xiaomi devices) plus English/Hindi
-        // pattern matching. Called by the JS pipeline when all network engines fail.
+        // pattern matching. Since v3 this is the FIRST stage of the pipeline, not a
+        // network fallback: it scores every candidate, and the confidence it returns
+        // decides whether the result is auto-created, queued for review, or dropped.
         AsyncFunction("localDecideNotification") { pkg: String, senderName: String, text: String, isGroup: Boolean ->
             val d = LocalNotificationDecider.decide(context, senderName, text, isGroup)
             mapOf(
@@ -68,6 +71,7 @@ class NotificationListenerModule : Module() {
                 "priority" to d.priority,
                 "reasoning" to d.reasoning,
                 "notes" to d.notes,
+                "confidence" to d.confidence,
                 "dueDate" to null
             )
         }
@@ -273,8 +277,174 @@ class NotificationListenerModule : Module() {
             context.startActivity(intent)
         }
 
+        // ── UI automation (accessibility) ────────────────────────────────
+
+        AsyncFunction("getAutomationStatus") {
+            val recorder = RecorderAutomation.installedPackage(context)
+            mapOf(
+                "enabled" to isAccessibilityEnabled(context),
+                "connected" to TaskMindAccessibilityService.isRunning(),
+                "recorderPackage" to (recorder ?: ""),
+                "recorderFound" to (recorder != null)
+            )
+        }
+
+        AsyncFunction("openAccessibilitySettings") {
+            try {
+                context.startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (_: Exception) { }
+        }
+
+        /**
+         * Dumps the foreground window's controls.
+         *
+         * The whole automation depends on knowing what another app's buttons are
+         * actually called, which cannot be guessed from outside. Run this on each
+         * Recorder screen to read the real labels and view ids.
+         */
+        AsyncFunction("inspectForegroundScreen") {
+            TaskMindAccessibilityService.dumpForegroundWindow()
+        }
+
+        AsyncFunction("abortAutomation") {
+            TaskMindAccessibilityService.abort()
+        }
+
+        /**
+         * Runs the Recorder transcription flow. [readOnScreen] uses the variant
+         * that reads text off the screen instead of using the ⋮ → Copy menu,
+         * which needs two fewer controls to match.
+         */
+        AsyncFunction("runRecorderAutomation") { recordingLabel: String?, readOnScreen: Boolean, promise: Promise ->
+            Thread {
+                try {
+                    val pkg = RecorderAutomation.installedPackage(context)
+                    if (pkg == null) {
+                        promise.resolve(
+                            mapOf(
+                                "ok" to false,
+                                "error" to "No recorder app found on this device",
+                                "log" to emptyList<String>(),
+                                "captured" to ""
+                            )
+                        )
+                        return@Thread
+                    }
+                    val label = recordingLabel?.takeIf { it.isNotBlank() }
+                    val script = if (readOnScreen) {
+                        RecorderAutomation.buildReadOnScreenScript(pkg, label)
+                    } else {
+                        RecorderAutomation.buildScript(pkg, label)
+                    }
+
+                    val log = mutableListOf<String>()
+                    val result = TaskMindAccessibilityService.run(script) { line ->
+                        log += line
+                        instance?.sendEvent(
+                            "onAutomationLog",
+                            mapOf("message" to line, "ts" to System.currentTimeMillis().toDouble())
+                        )
+                    }
+                    promise.resolve(
+                        mapOf(
+                            "ok" to result.ok,
+                            "error" to (result.error ?: ""),
+                            "log" to log,
+                            "captured" to result.captured.joinToString("\n")
+                        )
+                    )
+                } catch (e: Exception) {
+                    promise.resolve(
+                        mapOf(
+                            "ok" to false,
+                            "error" to (e.message ?: "automation failed"),
+                            "log" to emptyList<String>(),
+                            "captured" to ""
+                        )
+                    )
+                }
+            }.start()
+        }
+
+        /**
+         * True when the recorder announced a finished transcription since the app
+         * was last opened. Read-and-clear, so the prompt is acted on once.
+         */
+        AsyncFunction("consumeTranscriptImportPending") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            val pending = prefs.getBoolean(
+                TaskMindNotificationListenerService.KEY_TRANSCRIPT_IMPORT_PENDING, false
+            )
+            if (pending) {
+                prefs.edit()
+                    .remove(TaskMindNotificationListenerService.KEY_TRANSCRIPT_IMPORT_PENDING)
+                    .apply()
+            }
+            pending
+        }
+
+        /**
+         * Returns and clears a transcript shared into the app from the recorder,
+         * or an empty string when there is none. Cleared on read so the import
+         * screen cannot re-present the same text after the user has dealt with it.
+         */
+        AsyncFunction("consumeSharedTranscript") {
+            TranscriptShareActivity.consume(context)
+        }
+
         AsyncFunction("getCallDiagnostics") {
             CallTranscriptionDiagnostics.inspect(context)
+        }
+
+        /**
+         * Reports which transcript files the device recorder has produced and
+         * which recordings they pair with.
+         *
+         * The recorder's storage layout is undocumented and varies by HyperOS
+         * build, so this reads the answer off the device rather than assuming a
+         * path. Run once to confirm the real convention.
+         */
+        AsyncFunction("scanRecorderTranscripts") { promise: Promise ->
+            Thread {
+                try {
+                    promise.resolve(CallTranscriptSidecar.scanForDiagnostics(context))
+                } catch (e: Exception) {
+                    promise.resolve(
+                        mapOf("error" to (e.message ?: "scan failed"), "pairs" to emptyList<Any>())
+                    )
+                }
+            }.start()
+        }
+
+        /**
+         * Controls where call transcripts come from.
+         *
+         * [useRecorderTranscript] prefers a transcript the phone's own recorder
+         * produced — on HyperOS that is Xiaomi's cloud AI, which is better than
+         * anything available here and costs nothing.
+         * [ownAsrEnabled] decides what happens when no such transcript exists:
+         * transcribe the audio ourselves, or park the call and wait for the user
+         * to transcribe it in the recorder app.
+         */
+        AsyncFunction("setTranscriptSourcePrefs") { useRecorderTranscript: Boolean, ownAsrEnabled: Boolean ->
+            context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(CallTranscriptionService.KEY_USE_RECORDER_TRANSCRIPT, useRecorderTranscript)
+                .putBoolean(CallTranscriptionService.KEY_OWN_ASR_ENABLED, ownAsrEnabled)
+                .apply()
+        }
+
+        AsyncFunction("getTranscriptSourcePrefs") {
+            val prefs = context.getSharedPreferences("taskmind_prefs", Context.MODE_PRIVATE)
+            mapOf(
+                "useRecorderTranscript" to
+                    prefs.getBoolean(CallTranscriptionService.KEY_USE_RECORDER_TRANSCRIPT, true),
+                "ownAsrEnabled" to
+                    prefs.getBoolean(CallTranscriptionService.KEY_OWN_ASR_ENABLED, true)
+            )
         }
 
         AsyncFunction("runCallTranscriptionTest") { promise: Promise ->

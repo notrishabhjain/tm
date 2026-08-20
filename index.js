@@ -3,6 +3,7 @@ import { AppRegistry } from 'react-native';
 
 import App from './src/app/_layout';
 import { handleNotification, flushOutbox } from './src/services/pipeline';
+import { retryFailedCallAnalyses } from './src/services/call-retry';
 
 // Background processing. The native side starts this Headless JS task whenever
 // work arrives while the app's JS context is dead:
@@ -12,6 +13,14 @@ import { handleNotification, flushOutbox } from './src/services/pipeline';
 AppRegistry.registerHeadlessTask('TaskMindNotificationHandler', () => async (taskData) => {
   if (taskData && taskData.jobType === 'flush_outbox') {
     await flushOutbox();
+    return;
+  }
+  // A transcript became available (the device recorder produced one, or our own
+  // ASR finished) — turn stored transcripts into tasks. Extraction lives here
+  // rather than in native so there is exactly one path that writes tasks.
+  if (taskData && taskData.jobType === 'extract_calls') {
+    await retryFailedCallAnalyses();
+    await flushOutbox().catch(() => {});
     return;
   }
   let thread = [];
